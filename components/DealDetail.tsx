@@ -146,7 +146,7 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
             </div>
             <AffiliateButton productId={product.id} href={buyUrl} />
             <p className="mt-3 text-xs font-semibold leading-5 text-steel">
-              이 버튼은 쿠팡 파트너스 제휴 링크입니다. 구매가 발생하면 운영자가 수수료를 받을 수 있습니다.
+              이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.
             </p>
           </div>
           <AffiliateNotice />
@@ -155,7 +155,7 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-white/95 p-3 shadow-soft backdrop-blur lg:hidden">
         <div className="mx-auto max-w-7xl">
           <AffiliateButton productId={product.id} href={buyUrl} />
-          <p className="mt-1 text-center text-[11px] font-semibold text-steel">제휴 링크이며 구매 시 운영자가 수수료를 받을 수 있습니다.</p>
+          <p className="mt-1 text-center text-[11px] font-semibold text-steel">쿠팡 파트너스 활동의 일환으로 일정액의 수수료를 제공받습니다.</p>
         </div>
       </div>
     </main>

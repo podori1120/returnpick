@@ -36,6 +36,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link className="rounded-md px-3 py-2 hover:bg-mist hover:text-ink" href="/guide/safe-categories">
                 안전 카테고리
               </Link>
+              <Link className="rounded-md px-3 py-2 hover:bg-mist hover:text-ink" href="/disclosure">
+                제휴 안내
+              </Link>
               <Link className="rounded-md px-3 py-2 hover:bg-mist hover:text-ink" href="/admin">
                 관리자
               </Link>

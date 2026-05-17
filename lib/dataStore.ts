@@ -834,6 +834,17 @@ export async function createTelegramLog(input: Omit<TelegramLog, "id" | "created
   return log;
 }
 
+export async function listTelegramLogs(limit = 100) {
+  const client = getSupabaseServiceClient();
+  if (client) {
+    const { data, error } = await client.from("telegram_logs").select("*").order("created_at", { ascending: false }).limit(limit);
+    if (error) throw error;
+    return (data ?? []) as TelegramLog[];
+  }
+
+  return [...memoryTelegramLogs].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, limit);
+}
+
 function safeEventText(value: string | null | undefined, maxLength = 300) {
   if (!value) return null;
   return value.trim().slice(0, maxLength) || null;

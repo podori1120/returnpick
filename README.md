@@ -232,3 +232,28 @@ NEXT_PUBLIC_SITE_URL=
 - 재고/가격 변동 재검수 알림
 - Supabase Storage 기반 이미지 캐싱
 - 카테고리별 점수 가중치 튜닝 UI
+
+## 16. 운영 스케줄러
+
+ReturnPick은 Vercel Cron으로 반복 운영할 수 있습니다. `vercel.json`에는 두 개의 작업이 등록되어 있습니다.
+
+- `/api/cron/sourcing`: 1시간마다 활성 키워드 기준으로 후보를 다시 수집하고 점수화합니다.
+- `/api/cron/telegram-digest`: 매일 09:00 KST 기준으로 아직 텔레그램에 보낸 적 없는 게시 상품 중 점수 높은 상품을 발송합니다.
+
+운영 환경변수:
+
+```bash
+CRON_SECRET=
+CRON_USE_MOCK_FALLBACK=true
+```
+
+`CRON_SECRET`은 Vercel 프로젝트 환경변수에 16자 이상 랜덤 문자열로 설정합니다. Vercel Cron이 호출할 때 이 값이 `Authorization: Bearer ...` 헤더로 전달되며, API는 이 헤더가 맞을 때만 실행됩니다. 로컬 개발 환경에서는 `CRON_SECRET`이 없어도 테스트 호출이 가능합니다.
+
+로컬 테스트:
+
+```bash
+curl http://localhost:3000/api/cron/sourcing
+curl http://localhost:3000/api/cron/telegram-digest
+```
+
+텔레그램 다이제스트는 중복 발송을 피하기 위해 `telegram_logs`에서 이미 `sent` 처리된 상품을 제외합니다. `TELEGRAM_BOT_TOKEN` 또는 `TELEGRAM_CHAT_ID`가 없으면 실제 발송 대신 `API_NOT_CONFIGURED` 상태로 로그만 남습니다.
