@@ -30,15 +30,17 @@ const images: Record<Category, string> = {
   dehumidifier: "https://images.unsplash.com/photo-1586208958839-06c17cacdf08?q=80&w=900&auto=format&fit=crop"
 };
 
+const coupangLandingUrl = "https://www.coupang.com/np/goldbox";
+const coupangPartnersUrl = "https://link.coupang.com/a/dPyGuoKdSm";
+
 function product(input: Omit<DemoProduct, "source" | "image_url" | "source_url" | "coupang_url" | "affiliate_url">): DemoProduct {
-  const slug = input.source_product_id.replace(/^seed-/, "");
   return {
     ...input,
     source: "mock",
     image_url: images[input.category],
-    source_url: `https://example.com/coupang/${slug}`,
-    coupang_url: `https://example.com/coupang/${slug}`,
-    affiliate_url: `https://example.com/deeplink/${slug}`
+    source_url: coupangLandingUrl,
+    coupang_url: coupangLandingUrl,
+    affiliate_url: coupangPartnersUrl
   };
 }
 
