@@ -6,22 +6,28 @@ import CompareButton from "@/components/CompareButton";
 import DealQualityCard from "@/components/DealQualityCard";
 import PriceComparison from "@/components/PriceComparison";
 import PriceHistory from "@/components/PriceHistory";
+import PurchaseDecisionPanel from "@/components/PurchaseDecisionPanel";
 import RelatedDeals from "@/components/RelatedDeals";
 import RiskFlags from "@/components/RiskFlags";
 import ReturnEvidence from "@/components/ReturnEvidence";
 import ScoreBadge from "@/components/ScoreBadge";
 import VerdictBadge from "@/components/VerdictBadge";
 import { getCategoryLabel } from "@/lib/category";
+import { getCoupangOutboundLink } from "@/lib/coupangLink";
 import { getDiscountRate, getUseCaseMatches } from "@/lib/dealIntelligence";
 import { formatPercent, formatPrice } from "@/lib/format";
 import { getLatestScore } from "@/lib/scoring";
 import type { ProductWithScore } from "@/lib/types";
+import { getSiteUrl } from "@/lib/siteUrl";
+import DealShareBar from "@/components/DealShareBar";
 
 export default function DealDetail({ product, relatedProducts = [] }: { product: ProductWithScore; relatedProducts?: ProductWithScore[] }) {
   const score = getLatestScore(product);
-  const buyUrl = product.affiliate_url;
+  const outboundLink = getCoupangOutboundLink(product);
+  const buyUrl = outboundLink.href;
   const useCases = getUseCaseMatches(product).slice(0, 4);
   const discount = getDiscountRate(product);
+  const canonicalUrl = `${getSiteUrl()}/deals/${product.id}`;
 
   return (
     <main className="mx-auto max-w-7xl px-4 pb-28 pt-8 sm:px-6 lg:pb-8">
@@ -50,11 +56,17 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
                 <AffiliateButton
                   productId={product.id}
                   href={buyUrl}
+                  label={outboundLink.label}
+                  placement="detail_hero"
+                  sponsored={outboundLink.isAffiliate}
                   className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-pine px-4 py-2 text-sm font-black text-white hover:bg-ink"
                 />
               </div>
+              <DealShareBar productId={product.id} canonicalUrl={canonicalUrl} />
             </div>
           </div>
+
+          <PurchaseDecisionPanel product={product} />
 
           <section className="space-y-3">
             <h2 className="text-lg font-black">가격 비교</h2>
@@ -64,12 +76,20 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
                 <div>
                   <p className="text-sm font-black text-pine">Coupang Partners</p>
                   <p className="mt-1 text-sm font-semibold text-steel">
-                    가격과 재고는 쿠팡에서 다시 확인하세요. 버튼을 누르면 쿠팡 파트너스 링크가 새 탭으로 열립니다.
+                    {outboundLink.isAffiliate
+                      ? "가격과 재고는 쿠팡에서 다시 확인하세요. 버튼을 누르면 쿠팡 파트너스 링크가 새 탭으로 열립니다."
+                      : "가격과 재고는 쿠팡에서 다시 확인하세요. 현재는 상품별 파트너스 링크 보강 전이라 쿠팡 검색 결과로 이동합니다."}
                   </p>
+                  {!outboundLink.isAffiliate ? (
+                    <p className="mt-1 text-xs font-bold text-coral">{outboundLink.helperText}</p>
+                  ) : null}
                 </div>
                 <AffiliateButton
                   productId={product.id}
                   href={buyUrl}
+                  label={outboundLink.label}
+                  placement="detail_price"
+                  sponsored={outboundLink.isAffiliate}
                   className="focus-ring inline-flex min-w-[180px] items-center justify-center gap-2 rounded-lg bg-ink px-4 py-3 text-sm font-black text-white hover:bg-pine"
                 />
               </div>
@@ -144,9 +164,11 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
                 <span className="font-black">{product.brand ?? "확인필요"}</span>
               </div>
             </div>
-            <AffiliateButton productId={product.id} href={buyUrl} />
+            <AffiliateButton productId={product.id} href={buyUrl} label={outboundLink.label} placement="detail_sidebar" sponsored={outboundLink.isAffiliate} />
             <p className="mt-3 text-xs font-semibold leading-5 text-steel">
-              이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.
+              {outboundLink.isAffiliate
+                ? "이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."
+                : "상품별 쿠팡 파트너스 링크가 아직 연결되지 않아 현재 버튼은 일반 쿠팡 검색으로 이동합니다."}
             </p>
           </div>
           <AffiliateNotice />
@@ -154,8 +176,10 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
       </div>
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-white/95 p-3 shadow-soft backdrop-blur lg:hidden">
         <div className="mx-auto max-w-7xl">
-          <AffiliateButton productId={product.id} href={buyUrl} />
-          <p className="mt-1 text-center text-[11px] font-semibold text-steel">쿠팡 파트너스 활동의 일환으로 일정액의 수수료를 제공받습니다.</p>
+          <AffiliateButton productId={product.id} href={buyUrl} label={outboundLink.label} placement="detail_mobile_sticky" sponsored={outboundLink.isAffiliate} />
+          <p className="mt-1 text-center text-[11px] font-semibold text-steel">
+            {outboundLink.isAffiliate ? "쿠팡 파트너스 활동의 일환으로 일정액의 수수료를 제공받습니다." : "현재 버튼은 쿠팡 검색 결과로 이동합니다."}
+          </p>
         </div>
       </div>
     </main>

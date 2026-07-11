@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Scale, X } from "lucide-react";
+import { getStoredJsonArray, setStoredJsonArray } from "@/lib/clientTracking";
 
 type StoredCompareItem = {
   id: string;
@@ -12,11 +13,7 @@ type StoredCompareItem = {
 const storageKey = "returnpick_compare_deals";
 
 function readItems() {
-  try {
-    return JSON.parse(window.localStorage.getItem(storageKey) || "[]") as StoredCompareItem[];
-  } catch {
-    return [];
-  }
+  return getStoredJsonArray<StoredCompareItem>(storageKey);
 }
 
 export default function CompareDock() {
@@ -36,8 +33,12 @@ export default function CompareDock() {
   }, []);
 
   function clear() {
-    window.localStorage.removeItem(storageKey);
-    window.dispatchEvent(new Event("returnpick_compare_deals_changed"));
+    setStoredJsonArray(storageKey, []);
+    try {
+      window.dispatchEvent(new Event("returnpick_compare_deals_changed"));
+    } catch {
+      // Compare dock is best-effort UI state.
+    }
     setItems([]);
   }
 

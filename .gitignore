@@ -1,9 +1,16 @@
 node_modules/
 .next/
 .vercel/
+.returnpick/
 .env
 .env.local
 .env.production
 .env.development
 *.log
 npm-debug.log*
+*.tsbuildinfo
+
+# Local approval evidence and screenshots
+returnpick-coupang-approval-sample.png
+returnpick-coupang-review.png
+coupang-partners-profile-registered.png

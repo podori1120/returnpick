@@ -40,3 +40,34 @@ textarea {
 .focus-ring {
   @apply focus:outline-none focus:ring-2 focus:ring-pine focus:ring-offset-2 focus:ring-offset-mist;
 }
+
+.admin-anchor-highlight {
+  animation: admin-anchor-highlight 1.8s ease-out;
+}
+
+@keyframes admin-anchor-highlight {
+  0% {
+    border-color: #2f6f60;
+    box-shadow:
+      0 0 0 4px rgba(47, 111, 96, 0.2),
+      0 18px 42px rgba(24, 32, 38, 0.12);
+  }
+
+  70% {
+    border-color: #2f6f60;
+    box-shadow:
+      0 0 0 7px rgba(47, 111, 96, 0),
+      0 10px 28px rgba(24, 32, 38, 0.08);
+  }
+
+  100% {
+    box-shadow: 0 8px 20px rgba(24, 32, 38, 0.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-anchor-highlight {
+    animation: none;
+    box-shadow: 0 0 0 4px rgba(47, 111, 96, 0.2);
+  }
+}

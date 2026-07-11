@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Save } from "lucide-react";
+import { isApprovalSampleAffiliateUrl, isGenericCoupangLandingUrl, isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
 import type { ProductWithScore } from "@/lib/types";
 
 function headers(password: string) {
@@ -28,6 +29,11 @@ export default function AdminProductEditor({
     admin_memo: ""
   });
   const [saving, setSaving] = useState(false);
+  const [saveNotice, setSaveNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const affiliateReady = isUsableAffiliateUrl(form.affiliate_url);
+  const genericAffiliate = isGenericCoupangLandingUrl(form.affiliate_url);
+  const approvalSampleAffiliate = isApprovalSampleAffiliateUrl(form.affiliate_url);
+  const regularProductUrl = !affiliateReady && isUsableCoupangProductUrl(form.affiliate_url);
 
   useEffect(() => {
     if (!product) return;
@@ -41,6 +47,7 @@ export default function AdminProductEditor({
       public_note: product.public_note ?? "",
       admin_memo: product.admin_memo ?? ""
     });
+    setSaveNotice(null);
   }, [product]);
 
   if (!product) {
@@ -55,13 +62,25 @@ export default function AdminProductEditor({
   async function save() {
     if (!product) return;
     setSaving(true);
-    await fetch(`/api/admin/products/${product.id}`, {
-      method: "PATCH",
-      headers: headers(password),
-      body: JSON.stringify(form)
-    });
-    setSaving(false);
-    onSaved();
+    setSaveNotice(null);
+    try {
+      const response = await fetch(`/api/admin/products/${product.id}`, {
+        method: "PATCH",
+        headers: headers(password),
+        body: JSON.stringify(form)
+      });
+      const data = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
+      if (!response.ok) {
+        setSaveNotice({ type: "error", message: data.message ?? data.error ?? "저장에 실패했습니다. 입력값을 확인해 주세요." });
+        return;
+      }
+      setSaveNotice({ type: "success", message: "저장했고 점수를 다시 계산했습니다." });
+      onSaved();
+    } catch {
+      setSaveNotice({ type: "error", message: "네트워크 문제로 저장하지 못했습니다. 잠시 후 다시 시도해 주세요." });
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -108,8 +127,45 @@ export default function AdminProductEditor({
           className="focus-ring mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink"
           value={form.affiliate_url}
           onChange={(event) => setForm((current) => ({ ...current, affiliate_url: event.target.value }))}
+          placeholder="https://link.coupang.com/a/..."
         />
       </label>
+      <div
+        className={
+          affiliateReady && !approvalSampleAffiliate
+            ? "mt-2 rounded-lg bg-pine/10 p-3 text-sm font-bold text-pine"
+            : "mt-2 rounded-lg bg-lemon/30 p-3 text-sm font-bold text-ink"
+        }
+      >
+        <div className="flex items-start gap-2">
+          {affiliateReady && !approvalSampleAffiliate ? <CheckCircle2 className="mt-0.5 shrink-0" size={16} aria-hidden /> : <AlertTriangle className="mt-0.5 shrink-0" size={16} aria-hidden />}
+          <div>
+            <p>
+              {approvalSampleAffiliate
+                ? "승인용 샘플 링크입니다. 실상품 게시에는 사용할 수 없습니다."
+                : affiliateReady
+                  ? "구매 버튼 CTA 준비됨"
+                  : genericAffiliate
+                    ? "공통/샘플 링크로 보입니다. 상품별 파트너스 링크 보강 권장"
+                    : "상품별 쿠팡 파트너스 링크가 필요합니다."}
+            </p>
+            {approvalSampleAffiliate ? (
+              <p className="mt-1 text-xs font-semibold text-red-700">
+                `/products/approval-sample` 캡처용 링크는 심사 전용입니다. 이 상품에 맞는 링크를 쿠팡 파트너스에서 새로 만들어 넣어주세요.
+              </p>
+            ) : null}
+            {regularProductUrl ? (
+              <p className="mt-1 text-xs font-semibold text-red-700">
+                일반 쿠팡 상품 URL은 수익 추적용 CTA로 사용할 수 없습니다. 쿠팡 파트너스에서 생성한
+                `https://link.coupang.com/a/...` 링크를 넣어주세요.
+              </p>
+            ) : null}
+            <p className="mt-1 text-xs font-semibold">
+              게시 전에는 쿠팡 파트너스에서 생성한 상품별 링크를 넣는 것이 전환 추적과 심사 대응에 가장 안전합니다.
+            </p>
+          </div>
+        </div>
+      </div>
       <label className="mt-3 block text-sm font-bold text-steel">
         공개 메모
         <textarea
@@ -132,8 +188,21 @@ export default function AdminProductEditor({
         disabled={saving}
         type="button"
       >
-        <Save size={16} aria-hidden /> 저장 후 재점수화
+        <Save size={16} aria-hidden /> {saving ? "저장 중" : "저장 후 재점수화"}
       </button>
+      {saveNotice ? (
+        <div
+          className={
+            saveNotice.type === "success"
+              ? "mt-3 rounded-lg bg-pine/10 p-3 text-sm font-bold text-pine"
+              : "mt-3 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700"
+          }
+          role="status"
+          aria-live="polite"
+        >
+          {saveNotice.message}
+        </div>
+      ) : null}
     </section>
   );
 }

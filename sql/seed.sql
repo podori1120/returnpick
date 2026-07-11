@@ -24,4 +24,4 @@ values
   ('위닉스 제습기', 'dehumidifier', 100000, 700000, 0.10),
   ('LG 제습기', 'dehumidifier', 150000, 900000, 0.10),
   ('삼성 제습기', 'dehumidifier', 150000, 900000, 0.10)
-on conflict do nothing;
+on conflict (keyword_key, category) do nothing;

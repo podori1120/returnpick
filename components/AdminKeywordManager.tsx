@@ -20,13 +20,23 @@ export default function AdminKeywordManager({ password }: { password: string }) 
     max_price: "",
     min_discount_rate: "0.12"
   });
+  const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   async function loadKeywords() {
     setLoading(true);
-    const response = await fetch("/api/admin/keywords", { headers: headers(password) });
-    const data = await response.json();
-    setKeywords(data.keywords ?? []);
-    setLoading(false);
+    try {
+      const response = await fetch("/api/admin/keywords", { headers: headers(password) });
+      const data = (await response.json().catch(() => ({}))) as { keywords?: SourcingKeyword[]; message?: string; error?: string };
+      if (!response.ok) {
+        setNotice({ type: "error", message: data.message ?? data.error ?? "키워드 목록을 불러오지 못했습니다." });
+        return;
+      }
+      setKeywords(data.keywords ?? []);
+    } catch {
+      setNotice({ type: "error", message: "네트워크 문제로 키워드 목록을 불러오지 못했습니다." });
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -35,26 +45,48 @@ export default function AdminKeywordManager({ password }: { password: string }) 
 
   async function addKeyword() {
     if (!form.keyword.trim()) return;
-    await fetch("/api/admin/keywords", {
-      method: "POST",
-      headers: headers(password),
-      body: JSON.stringify(form)
-    });
-    setForm((current) => ({ ...current, keyword: "" }));
-    await loadKeywords();
+    setNotice(null);
+    try {
+      const response = await fetch("/api/admin/keywords", {
+        method: "POST",
+        headers: headers(password),
+        body: JSON.stringify(form)
+      });
+      const data = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
+      if (!response.ok) {
+        setNotice({ type: "error", message: data.message ?? data.error ?? "키워드를 추가하지 못했습니다." });
+        return;
+      }
+      setForm((current) => ({ ...current, keyword: "" }));
+      setNotice({ type: "success", message: "키워드를 저장했습니다." });
+      await loadKeywords();
+    } catch {
+      setNotice({ type: "error", message: "네트워크 문제로 키워드를 추가하지 못했습니다." });
+    }
   }
 
   async function toggleKeyword(keyword: SourcingKeyword) {
-    await fetch("/api/admin/keywords", {
-      method: "PATCH",
-      headers: headers(password),
-      body: JSON.stringify({ id: keyword.id, is_active: !keyword.is_active })
-    });
-    await loadKeywords();
+    setNotice(null);
+    try {
+      const response = await fetch("/api/admin/keywords", {
+        method: "PATCH",
+        headers: headers(password),
+        body: JSON.stringify({ id: keyword.id, is_active: !keyword.is_active })
+      });
+      const data = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
+      if (!response.ok) {
+        setNotice({ type: "error", message: data.message ?? data.error ?? "키워드 상태를 바꾸지 못했습니다." });
+        return;
+      }
+      setNotice({ type: "success", message: keyword.is_active ? "키워드를 비활성화했습니다." : "키워드를 활성화했습니다." });
+      await loadKeywords();
+    } catch {
+      setNotice({ type: "error", message: "네트워크 문제로 키워드 상태를 바꾸지 못했습니다." });
+    }
   }
 
   return (
-    <section className="rounded-lg border border-line bg-white p-5 shadow-soft">
+    <section id="admin-keyword-manager" className="scroll-mt-4 rounded-lg border border-line bg-white p-5 shadow-soft">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-black">소싱 키워드</h2>
         <button
@@ -112,6 +144,19 @@ export default function AdminKeywordManager({ password }: { password: string }) 
           <Plus size={16} aria-hidden /> 추가
         </button>
       </div>
+      {notice ? (
+        <div
+          className={
+            notice.type === "success"
+              ? "mt-3 rounded-lg bg-pine/10 p-3 text-sm font-bold text-pine"
+              : "mt-3 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700"
+          }
+          role="status"
+          aria-live="polite"
+        >
+          {notice.message}
+        </div>
+      ) : null}
 
       <div className="mt-4 max-h-80 overflow-auto rounded-lg border border-line">
         <table className="w-full min-w-[760px] text-left text-sm">

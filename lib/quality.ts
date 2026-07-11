@@ -1,4 +1,5 @@
 import { calculateDiscountRate } from "@/lib/format";
+import { isApprovalSampleAffiliateUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { getLatestScore } from "@/lib/scoring";
 import type { ProductWithScore } from "@/lib/types";
 
@@ -9,6 +10,12 @@ export interface DealQuality {
   label: string;
   confidence: number;
   priority: number;
+  blockers: string[];
+  warnings: string[];
+}
+
+export interface CustomerPublishReadiness {
+  ready: boolean;
   blockers: string[];
   warnings: string[];
 }
@@ -31,7 +38,7 @@ export function getDealQuality(product: ProductWithScore): DealQuality {
   if (product.naver_lowest_price && dealPrice && dealPrice > product.naver_lowest_price) blockers.push("네이버 최저가 대비 가격 불리");
   if (product.condition_grade === "중" && (dealPrice ?? 0) >= 1_000_000) blockers.push("고가 반품-중 조합");
 
-  if (!product.affiliate_url) warnings.push("파트너스 URL 보완 권장");
+  if (!isUsableAffiliateUrl(product.affiliate_url)) warnings.push("파트너스 URL 보완 권장");
   if (!product.naver_lowest_price) warnings.push("네이버 최저가 없음");
   if (!product.stock_count) warnings.push("재고 확인 필요");
   if (product.stock_count === 1) warnings.push("재고 1개");
@@ -65,4 +72,24 @@ export function getDealQuality(product: ProductWithScore): DealQuality {
     return { status: "watch_price", label: "가격 관찰", confidence, priority, blockers, warnings };
   }
   return { status: "ready", label: "게시 적합", confidence, priority, blockers, warnings };
+}
+
+export function getCustomerPublishReadiness(product: ProductWithScore): CustomerPublishReadiness {
+  const quality = getDealQuality(product);
+  const blockers = new Set<string>();
+  const warnings = new Set<string>();
+
+  if (!isUsableAffiliateUrl(product.affiliate_url)) {
+    blockers.add(isApprovalSampleAffiliateUrl(product.affiliate_url) ? "승인용 샘플 링크 사용 중" : "상품별 파트너스 링크 필요");
+  }
+  for (const blocker of quality.blockers) blockers.add(blocker);
+  if (!product.image_url) blockers.add("상품 이미지 확인 필요");
+  for (const warning of quality.warnings) warnings.add(warning);
+  if (!product.public_note?.trim()) warnings.add("공개 설명 보강 권장");
+
+  return {
+    ready: blockers.size === 0,
+    blockers: Array.from(blockers),
+    warnings: Array.from(warnings)
+  };
 }

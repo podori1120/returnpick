@@ -5,15 +5,22 @@ import { getProductById, listProducts } from "@/lib/dataStore";
 import { getRelatedProducts } from "@/lib/dealIntelligence";
 import { getCategoryLabel } from "@/lib/category";
 import { formatPrice } from "@/lib/format";
+import { isPublicDealReady } from "@/lib/publicDeal";
+import { getSiteUrl } from "@/lib/siteUrl";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
+  const siteUrl = getSiteUrl();
+  const canonicalUrl = `${siteUrl}/deals/${id}`;
   const product = await getProductById(id);
-  if (!product || !product.is_published || product.sourcing_status !== "published") {
+  if (!product || !isPublicDealReady(product)) {
     return {
-      title: "딜을 찾을 수 없습니다 | 리턴픽"
+      title: "딜을 찾을 수 없습니다 | 리턴픽",
+      alternates: {
+        canonical: canonicalUrl
+      }
     };
   }
 
@@ -23,11 +30,22 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title,
     description,
+    alternates: {
+      canonical: canonicalUrl
+    },
     openGraph: {
       title,
       description,
-      images: product.image_url ? [{ url: product.image_url }] : undefined,
+      url: canonicalUrl,
+      siteName: "ReturnPick",
+      images: [{ url: `${canonicalUrl}/opengraph-image` }],
       type: "article"
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [`${canonicalUrl}/twitter-image`]
     }
   };
 }
@@ -35,8 +53,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function DealDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const product = await getProductById(id);
-  if (!product || !product.is_published || product.sourcing_status !== "published") notFound();
-  const publishedProducts = (await listProducts({ published: true })).filter((item) => item.sourcing_status === "published");
+  if (!product || !isPublicDealReady(product)) notFound();
+  const publishedProducts = (await listProducts({ published: true })).filter(isPublicDealReady);
   const relatedProducts = getRelatedProducts(product, publishedProducts, 4);
   return <DealDetail product={product} relatedProducts={relatedProducts} />;
 }

@@ -1,0 +1,3280 @@
+﻿import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+
+const root = process.cwd();
+const mode = process.argv.includes("--launch") ? "launch" : "preapproval";
+const MAX_PUBLIC_WEB_ALLOWED_HOSTS = 5;
+const MAX_PUBLIC_WEB_SEARCH_TEMPLATES = 5;
+
+function readText(file) {
+  return readFileSync(path.join(root, file), "utf8");
+}
+
+function parseEnvFile(file) {
+  const fullPath = path.join(root, file);
+  if (!existsSync(fullPath)) return {};
+  const env = {};
+  for (const rawLine of readFileSync(fullPath, "utf8").split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const index = line.indexOf("=");
+    if (index < 0) continue;
+    const key = line.slice(0, index).trim();
+    const value = line.slice(index + 1).trim().replace(/^["']|["']$/g, "");
+    env[key] = value;
+  }
+  return env;
+}
+
+const localEnv = {
+  ...parseEnvFile(".env"),
+  ...parseEnvFile(".env.production"),
+  ...parseEnvFile(".env.local"),
+  ...process.env
+};
+
+function hasEnv(name) {
+  return Boolean(String(localEnv[name] ?? "").trim());
+}
+
+function envValue(name) {
+  return String(localEnv[name] ?? "").trim();
+}
+
+function isPublicHttpsSiteUrl(value) {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+    const localHosts = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
+    return url.protocol === "https:" && !url.username && !url.password && !localHosts.has(hostname) && !hostname.endsWith(".local");
+  } catch {
+    return false;
+  }
+}
+
+function isCoupangPartnersUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname === "link.coupang.com" && /^\/a\/[A-Za-z0-9]{6,16}$/.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
+function isSupabaseProjectUrl(value) {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+    const localHosts = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
+    return url.protocol === "https:" && !url.username && !url.password && !localHosts.has(hostname) && !hostname.endsWith(".local");
+  } catch {
+    return false;
+  }
+}
+
+function isLikelySupabaseKeyValue(value) {
+  return value.length >= 40 && !/\s/.test(value);
+}
+
+function looksLikePlaceholderValue(value) {
+  const raw = String(value ?? "").trim().toLowerCase();
+  return (
+    raw.includes("your_") ||
+    raw.includes("your-") ||
+    raw.includes("change_me") ||
+    raw.includes("changeme") ||
+    raw.includes("placeholder") ||
+    raw.includes("todo") ||
+    raw.includes("諛쒓툒") ||
+    raw.includes("?낅젰") ||
+    raw === "test" ||
+    raw === "secret" ||
+    raw === "password" ||
+    raw.startsWith("<") ||
+    raw.endsWith(">")
+  );
+}
+
+function containsLikelyMojibake(value) {
+  const raw = String(value ?? "");
+  return /�|諛|荑|鍮|媛|援|留|湲|由|異|寃|쨌|\?뺤|\?좎|\?곹/.test(raw);
+}
+
+function isLikelyProviderSecretValue(value, minLength = 8) {
+  return value.length >= minLength && !/\s/.test(value) && !looksLikePlaceholderValue(value);
+}
+
+function isLikelyAdminPasswordValue(value) {
+  return value.length >= 12 && !/\s/.test(value) && !looksLikePlaceholderValue(value) && !["admin", "password", "test"].includes(value.toLowerCase());
+}
+
+function isLikelyTelegramBotTokenValue(value) {
+  return !looksLikePlaceholderValue(value) && /^\d{6,}:[A-Za-z0-9_-]{20,}$/.test(value);
+}
+
+function isLikelyTelegramChatIdValue(value) {
+  return !looksLikePlaceholderValue(value) && (/^-?\d{5,}$/.test(value) || /^@[A-Za-z0-9_]{5,}$/.test(value));
+}
+
+function splitEnvListValue(value) {
+  return String(value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function isPublicWebHostValue(host) {
+  const raw = host.trim().toLowerCase();
+  if (!raw) return false;
+  if (raw.includes("://") || raw.includes("/") || raw.includes("?") || raw.includes("#")) return false;
+  if (raw === "*" || raw.includes("*")) return false;
+  if (raw === "localhost" || raw === "127.0.0.1" || raw === "0.0.0.0" || raw === "::1" || raw.endsWith(".local")) return false;
+  return /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}$/.test(raw);
+}
+
+function isPublicWebTemplateValue(template, allowedHosts) {
+  const raw = template.trim();
+  if (!raw.includes("{keyword}")) return false;
+  try {
+    const url = new URL(raw.replace("{keyword}", "returnpick-test"));
+    const hostname = url.hostname.toLowerCase();
+    if (!["http:", "https:"].includes(url.protocol)) return false;
+    if (url.username || url.password) return false;
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname === "::1" || hostname.endsWith(".local")) return false;
+    return allowedHosts.has(hostname);
+  } catch {
+    return false;
+  }
+}
+
+function fileExists(file) {
+  return existsSync(path.join(root, file));
+}
+
+const results = [];
+
+function check(name, ok, detail, severity = "required") {
+  results.push({ name, ok: Boolean(ok), detail, severity });
+}
+
+function checkEnvGroup(name, keys, severity = "required") {
+  const missing = keys.filter((key) => !hasEnv(key));
+  check(name, missing.length === 0, missing.length ? `missing: ${missing.join(", ")}` : `set: ${keys.join(", ")}`, severity);
+}
+
+const requiredFiles = [
+  "app/api/admin/sourcing/run/route.ts",
+  "app/api/admin/api-readiness/route.ts",
+  "app/api/admin/affiliate-links/backfill/route.ts",
+  "app/api/admin/affiliate-links/import/route.ts",
+  "app/api/admin/keywords/route.ts",
+  "app/api/admin/launch/route.ts",
+  "app/api/admin/prices/backfill/route.ts",
+  "app/api/admin/products/route.ts",
+  "app/api/admin/telegram/route.ts",
+  "app/api/cron/sourcing/route.ts",
+  "app/api/cron/telegram-digest/route.ts",
+  "app/api/events/route.ts",
+  "components/AdminLaunchStatusBar.tsx",
+  "components/AdminApiReadinessPanel.tsx",
+  "components/AdminAffiliateLinkQueue.tsx",
+  "components/AdminLaunchRunner.tsx",
+  "components/AdminKeywordManager.tsx",
+  "components/AdminCandidateTable.tsx",
+  "components/AdminPriceBackfillPanel.tsx",
+  "components/AdminProductEditor.tsx",
+  "components/AffiliateEventTracker.tsx",
+  "components/TelegramPreview.tsx",
+  "lib/affiliateLinkBackfill.ts",
+  "lib/adminNavigation.ts",
+  "lib/apiReadiness.ts",
+  "lib/clientTracking.ts",
+  "lib/launchState.ts",
+  "lib/naverPriceBackfill.ts",
+  "lib/scoring.ts",
+  "lib/sourcingRunKinds.ts",
+  "lib/sourcing.ts",
+  "lib/telegram.ts",
+  "lib/providers/coupangPartnersProvider.ts",
+  "lib/providers/naverShoppingProvider.ts",
+  "lib/providers/mockProvider.ts",
+  "lib/validators.ts",
+  "scripts/print-production-env-template.mjs",
+  "scripts/print-vercel-env-repair-plan.mjs",
+  "scripts/load-env-files.mjs",
+  "scripts/verify-production-env.mjs",
+  "scripts/verify-vercel-env-names.mjs",
+  "scripts/run-production-doctor.mjs",
+  "scripts/run-production-deploy.mjs",
+  "scripts/run-production-launch.mjs",
+  "scripts/verify-git-deploy-readiness.mjs",
+  "scripts/verify-github-hourly-scheduler.mjs",
+  "scripts/verify-scoring-rules.mjs",
+  "scripts/verify-public-web-config.mjs",
+  "scripts/print-supabase-setup-runbook.mjs",
+  "scripts/verify-production-readiness.mjs",
+  "scripts/verify-supabase-schema.mjs",
+  "scripts/diagnose-sourcing-recovery.mjs",
+  "app/robots.ts",
+  "app/sitemap.ts",
+  "sql/schema.sql",
+  "vercel.json",
+  "next.config.mjs",
+  "eslint.config.mjs",
+  ".vercelignore"
+];
+
+for (const file of requiredFiles) {
+  check(`file: ${file}`, fileExists(file), file, "required");
+}
+
+if (fileExists("package.json") && fileExists("eslint.config.mjs")) {
+  const packageJson = readText("package.json");
+  const eslintConfig = readText("eslint.config.mjs");
+  check(
+    "scripts: lint command",
+    packageJson.includes('"lint": "eslint ."'),
+    "package.json exposes a Next 16 compatible ESLint command",
+    "required"
+  );
+  check(
+    "lint: Next flat config",
+    eslintConfig.includes('from "eslint-config-next/core-web-vitals"') &&
+      eslintConfig.includes('from "eslint-config-next/typescript"') &&
+      eslintConfig.includes("globalIgnores") &&
+      eslintConfig.includes('".next/**"') &&
+      eslintConfig.includes('".vercel/**"') &&
+      eslintConfig.includes('".returnpick/**"') &&
+      eslintConfig.includes('"react-hooks/set-state-in-effect": "warn"') &&
+      eslintConfig.includes('"@typescript-eslint/no-explicit-any": "warn"'),
+    "ESLint uses the Next flat config, ignores generated folders, and keeps current broad refactor rules as warnings",
+    "required"
+  );
+}
+
+if (fileExists("package.json") && fileExists("scripts/verify-scoring-rules.mjs")) {
+  const packageJson = readText("package.json");
+  const scoringCheck = readText("scripts/verify-scoring-rules.mjs");
+  check(
+    "scripts: scoring contract check command",
+    packageJson.includes('"scoring:check": "node scripts/verify-scoring-rules.mjs"'),
+    "package.json exposes a scoring contract check for post-approval sourcing quality",
+    "required"
+  );
+  check(
+    "scripts: scoring contract coverage",
+    scoringCheck.includes("condition grade scoring") &&
+      scoringCheck.includes("price score bands") &&
+      scoringCheck.includes("reference and deal price order") &&
+      scoringCheck.includes("forced verdict caps") &&
+      scoringCheck.includes("sourcing score integration") &&
+      scoringCheck.includes("public type contract") &&
+      scoringCheck.includes("secret values") === false,
+    "scoring check guards price bands, condition scores, verdict caps, risk flags, type strings, and sourcing score persistence without reading secrets",
+    "required"
+  );
+}
+
+if (fileExists("package.json") && fileExists("scripts/verify-production-readiness.mjs")) {
+  const packageJson = readText("package.json");
+  const productionVerifier = readText("scripts/verify-production-readiness.mjs");
+  const envLoader = fileExists("scripts/load-env-files.mjs") ? readText("scripts/load-env-files.mjs") : "";
+  check(
+    "scripts: production readiness commands",
+    packageJson.includes('"check:production": "node scripts/verify-production-readiness.mjs"') &&
+      packageJson.includes('"check:production:launch": "node scripts/verify-production-readiness.mjs --launch"'),
+    "package.json exposes report and launch-mode production readiness checks",
+    "required"
+  );
+  check(
+    "scripts: production readiness verifier",
+    productionVerifier.includes("RETURNPICK_ADMIN_PASSWORD") &&
+      productionVerifier.includes(".env.production") &&
+      productionVerifier.includes("loadEnvFiles") &&
+      productionVerifier.includes("blankEnvSources") &&
+      productionVerifier.includes("adminPasswordMissingDetail") &&
+      productionVerifier.includes('warn("admin password"') &&
+      productionVerifier.includes('fail("admin password"') &&
+      productionVerifier.includes("/products/approval-sample") &&
+      productionVerifier.includes("/disclosure") &&
+      productionVerifier.includes("/robots.txt") &&
+      productionVerifier.includes("/sitemap.xml") &&
+      productionVerifier.includes("/api/admin/api-readiness") &&
+      productionVerifier.includes("/api/admin/launch") &&
+      productionVerifier.includes("/api/admin/scheduler-health") &&
+      productionVerifier.includes("checkDisclosurePage") &&
+      productionVerifier.includes("checkRobotsTxt") &&
+      productionVerifier.includes("checkSitemapXml") &&
+      productionVerifier.includes("checkPublicSecurityHeaders") &&
+      productionVerifier.includes("checkPrivateRouteHeaders") &&
+      productionVerifier.includes("checkAdminLaunchApiProtection") &&
+      productionVerifier.includes("public security headers") &&
+      productionVerifier.includes("admin route headers") &&
+      productionVerifier.includes("admin api headers") &&
+      productionVerifier.includes("admin launch api headers") &&
+      productionVerifier.includes("launch api protection") &&
+      productionVerifier.includes("ADMIN_PASSWORD_NOT_CONFIGURED") &&
+      productionVerifier.includes("UNAUTHORIZED") &&
+      productionVerifier.includes("checkAdminUiBundle") &&
+      productionVerifier.includes("adminUiRequiredText") &&
+      productionVerifier.includes("/_next/static/") &&
+      productionVerifier.includes("상품별 링크 보강") &&
+      productionVerifier.includes("품질 보강 후보로 이동") &&
+      productionVerifier.includes("x-robots-tag") &&
+      productionVerifier.includes("cache-control") &&
+      productionVerifier.includes("/guide/safe-categories") &&
+      productionVerifier.includes("requiredConnectionCheckIds") &&
+      productionVerifier.includes("nofollow sponsored noopener noreferrer") &&
+      productionVerifier.includes("--strict-scheduler"),
+    "production verifier checks approval-page evidence, disclosure evidence, robots/sitemap coverage, deployment headers, launch API protection, deployed admin repair UI chunks, admin live checks, required cards, scheduler health, and local production env files without embedding secrets",
+    "required"
+  );
+  check(
+    "scripts: production env-file loader",
+    envLoader.includes('defaultEnvFiles = [".env.production", ".env.local", ".env"]') &&
+      envLoader.includes("parseEnvFile") &&
+      envLoader.includes("parseRawEnvFile") &&
+      envLoader.includes("rawEnvFileCache") &&
+      envLoader.includes("loadEnvFiles") &&
+      envLoader.includes("envRawEntries") &&
+      envLoader.includes("blankEnvSources") &&
+      envLoader.includes("process.env[key]") &&
+      productionVerifier.includes('from "./load-env-files.mjs"'),
+    "production CLI scripts share a local env-file loader that can diagnose raw whitespace without printing secrets",
+    "required"
+  );
+}
+
+if (fileExists("app/robots.ts") && fileExists("app/sitemap.ts")) {
+  const robots = readText("app/robots.ts");
+  const sitemap = readText("app/sitemap.ts");
+  check(
+    "public SEO routes: robots and sitemap",
+    robots.includes('allow: "/"') &&
+      robots.includes('disallow: ["/admin", "/api"]') &&
+      robots.includes("/sitemap.xml") &&
+      sitemap.includes('/guide/return-checklist') &&
+      sitemap.includes('/guide/safe-categories') &&
+      sitemap.includes('/disclosure') &&
+      sitemap.includes('/products/approval-sample'),
+    "robots protects admin/API while sitemap exposes core public, guide, disclosure, and approval routes",
+    "required"
+  );
+}
+
+if (fileExists("next.config.mjs")) {
+  const nextConfig = readText("next.config.mjs");
+  check(
+    "deployment headers: security and private route indexing",
+    nextConfig.includes("async headers()") &&
+      nextConfig.includes("Referrer-Policy") &&
+      nextConfig.includes("strict-origin-when-cross-origin") &&
+      nextConfig.includes("X-Content-Type-Options") &&
+      nextConfig.includes("nosniff") &&
+      nextConfig.includes("X-Frame-Options") &&
+      nextConfig.includes("DENY") &&
+      nextConfig.includes("Permissions-Policy") &&
+      nextConfig.includes("X-Robots-Tag") &&
+      nextConfig.includes("noindex, nofollow, noarchive") &&
+      nextConfig.includes("Cache-Control") &&
+      nextConfig.includes("no-store") &&
+      nextConfig.includes('source: "/admin"') &&
+      nextConfig.includes('source: "/admin/:path*"') &&
+      nextConfig.includes('source: "/api/:path*"'),
+    "deployment headers reduce referrer leakage, clickjacking risk, and indexing/caching of admin/API routes",
+    "required"
+  );
+}
+
+if (fileExists(".vercelignore")) {
+  const vercelIgnore = readText(".vercelignore");
+  check(
+    "deployment hygiene: vercel ignore",
+    vercelIgnore.includes(".env") &&
+      vercelIgnore.includes(".env.*") &&
+      vercelIgnore.includes("!.env.example") &&
+      vercelIgnore.includes(".returnpick/") &&
+      vercelIgnore.includes(".vercel/") &&
+      vercelIgnore.includes(".next/") &&
+      vercelIgnore.includes("node_modules/") &&
+      vercelIgnore.includes("*.log") &&
+      vercelIgnore.includes("tsconfig.tsbuildinfo"),
+    "Vercel deploy excludes local env files, generated state, build output, logs, and local TypeScript cache",
+    "required"
+  );
+}
+
+if (fileExists("package.json") && fileExists("scripts/run-production-launch.mjs")) {
+  const packageJson = readText("package.json");
+  const productionLaunch = readText("scripts/run-production-launch.mjs");
+  check(
+    "scripts: production launch command",
+    packageJson.includes('"launch:production": "node scripts/run-production-launch.mjs"'),
+    "package.json exposes a guarded production first-launch runner",
+    "required"
+  );
+  check(
+    "scripts: production launch preflight",
+    productionLaunch.includes("--confirm") &&
+      productionLaunch.includes("positionalArgs") &&
+      productionLaunch.includes("confirm") &&
+      productionLaunch.includes("/api/admin/api-readiness") &&
+      productionLaunch.includes("/api/admin/launch") &&
+      productionLaunch.includes("isExternalHttpsSiteUrl") &&
+      productionLaunch.includes("Production launch requires an external HTTPS site URL") &&
+      productionLaunch.includes("Refusing localhost, .local, and http:// targets") &&
+      productionLaunch.includes("requiredConnectionCheckIds") &&
+      productionLaunch.includes("No data work was started") &&
+      productionLaunch.includes("RETURNPICK_ADMIN_PASSWORD") &&
+      productionLaunch.includes("loadEnvFiles") &&
+      productionLaunch.includes('from "./load-env-files.mjs"') &&
+      productionLaunch.includes("printReadinessBlockers") &&
+      productionLaunch.includes("Blocking launch items") &&
+      productionLaunch.includes("missingEnv") &&
+      productionLaunch.includes("printRecoveryActions") &&
+      productionLaunch.includes("recovery_actions") &&
+      productionLaunch.includes("quick") &&
+      productionLaunch.includes("standard") &&
+      productionLaunch.includes("wide"),
+    "production launch runner checks live readiness first, refuses non-public launch targets, prints blocking items, missing env next actions, and post-run recovery actions, and only starts data work with an explicit confirmation flag",
+    "required"
+  );
+}
+
+if (fileExists("package.json") && fileExists("scripts/run-production-deploy.mjs")) {
+  const packageJson = readText("package.json");
+  const productionDeploy = readText("scripts/run-production-deploy.mjs");
+  check(
+    "scripts: guarded production deploy command",
+    packageJson.includes('"deploy:production:launch": "node scripts/run-production-deploy.mjs"') &&
+      packageJson.includes('"deploy:production:go-live": "node scripts/run-production-deploy.mjs --first-launch"'),
+    "package.json exposes a guarded Vercel production deploy runner for post-env setup",
+    "required"
+  );
+  check(
+    "scripts: Git deployment readiness command",
+    packageJson.includes('"git:check": "node scripts/verify-git-deploy-readiness.mjs"') &&
+      fileExists("scripts/verify-git-deploy-readiness.mjs"),
+    "package.json exposes a Git tracking, clean-worktree, and upstream parity check before production deploy",
+    "required"
+  );
+  check(
+    "scripts: guarded production deploy safety",
+    productionDeploy.includes("verify-git-deploy-readiness.mjs") &&
+      productionDeploy.includes("Check Git deployment state") &&
+      productionDeploy.includes("vercel") &&
+      productionDeploy.includes("env") &&
+      productionDeploy.includes("pull") &&
+      productionDeploy.includes(".env.production") &&
+      productionDeploy.includes("verify-vercel-env-names.mjs") &&
+      productionDeploy.includes("verify-production-env.mjs") &&
+      productionDeploy.includes("run-production-doctor.mjs") &&
+      productionDeploy.includes("run-production-launch.mjs") &&
+      productionDeploy.includes("vercel") &&
+      productionDeploy.includes("deploy") &&
+      productionDeploy.includes("--prod") &&
+      productionDeploy.includes("confirmed deploy") &&
+      productionDeploy.includes("preflight only") &&
+      productionDeploy.includes("--first-launch") &&
+      productionDeploy.includes("Production first launch") &&
+      productionDeploy.includes("--confirm") &&
+      productionDeploy.includes("No data work is started") &&
+      productionDeploy.includes("npm run deploy:production:launch -- confirm") &&
+      productionDeploy.includes("npm run deploy:production:go-live -- confirm") &&
+      productionDeploy.includes("nextActionForOutcome") &&
+      productionDeploy.includes("Fill the blank/invalid Production values shown above") &&
+      productionDeploy.includes("Stop: fix the failed step before deploying production"),
+    "guarded deploy requires committed and pushed source, pulls fresh env values, validates launch readiness, requires explicit confirm, deploys production, reruns launch doctor, and can run first launch only with an explicit first-launch request",
+    "required"
+  );
+}
+
+if (fileExists("scripts/verify-git-deploy-readiness.mjs")) {
+  const gitDeployCheck = readText("scripts/verify-git-deploy-readiness.mjs");
+  check(
+    "scripts: Git deployment readiness safety",
+    gitDeployCheck.includes("requiredTrackedFiles") &&
+      gitDeployCheck.includes('["ls-files"]') &&
+      gitDeployCheck.includes('["status", "--porcelain=v1", "--untracked-files=all"]') &&
+      gitDeployCheck.includes("Upstream parity") &&
+      gitDeployCheck.includes("commit the verified ReturnPick source") &&
+      !gitDeployCheck.includes("process.env"),
+    "Git deployment check verifies required tracked files, a clean worktree, and upstream parity without reading secrets",
+    "required"
+  );
+}
+
+if (fileExists("package.json") && fileExists("scripts/print-production-env-template.mjs")) {
+  const packageJson = readText("package.json");
+  const envTemplate = readText("scripts/print-production-env-template.mjs");
+  check(
+    "scripts: production env template command",
+    packageJson.includes('"env:production": "node scripts/print-production-env-template.mjs"'),
+    "package.json exposes a production env template generator",
+    "required"
+  );
+  check(
+    "scripts: production env template safety",
+    envTemplate.includes("randomBytes") &&
+      envTemplate.includes("positionalArgs") &&
+      envTemplate.includes("ADMIN_PASSWORD") &&
+      envTemplate.includes("CRON_SECRET") &&
+      envTemplate.includes("RETURNPICK_CRON_SECRET") &&
+      envTemplate.includes("RETURNPICK_SITE_URL") &&
+      envTemplate.includes("COUPANG_ACCESS_KEY") &&
+      envTemplate.includes("NAVER_CLIENT_ID") &&
+      envTemplate.includes("NEXT_PUBLIC_SUPABASE_URL") &&
+      envTemplate.includes("TELEGRAM_BOT_TOKEN") &&
+      envTemplate.includes("Do not commit real values to git") &&
+      envTemplate.includes("Sensitive provider keys are intentionally blank"),
+    "production env template generates only local operational secrets and leaves official provider keys blank",
+    "required"
+  );
+}
+
+if (fileExists("package.json") && fileExists("scripts/verify-production-env.mjs")) {
+  const packageJson = readText("package.json");
+  const envVerifier = readText("scripts/verify-production-env.mjs");
+  const vercelEnvVerifier = fileExists("scripts/verify-vercel-env-names.mjs") ? readText("scripts/verify-vercel-env-names.mjs") : "";
+  const envRepairPlan = fileExists("scripts/print-vercel-env-repair-plan.mjs") ? readText("scripts/print-vercel-env-repair-plan.mjs") : "";
+  check(
+    "scripts: production env check command",
+    packageJson.includes('"env:check": "node scripts/verify-production-env.mjs"') &&
+      packageJson.includes('"env:check:launch": "node scripts/verify-production-env.mjs --launch"') &&
+      packageJson.includes('"env:repair": "node scripts/print-vercel-env-repair-plan.mjs"'),
+    "package.json exposes report and launch-mode production env preflight checks",
+    "required"
+  );
+  check(
+    "scripts: production env check safety",
+    envVerifier.includes('from "./load-env-files.mjs"') &&
+      envVerifier.includes("envRawEntries") &&
+      envVerifier.includes("outerWhitespaceSource") &&
+      envVerifier.includes("leading or trailing whitespace") &&
+      envVerifier.includes("validateCoupangPartnersUrl") &&
+      envVerifier.includes("validateTelegramBotToken") &&
+      envVerifier.includes("SUPABASE_KEYS_DIFFER") &&
+      envVerifier.includes("PUBLIC_WEB_ALLOWED_HOSTS") &&
+      envVerifier.includes("blankEnvSources") &&
+      envVerifier.includes("Next action checklist") &&
+      envVerifier.includes("Settings > Environment Variables > Production") &&
+      envVerifier.includes("npm run env:vercel:launch") &&
+      envVerifier.includes("npm run doctor:production:launch") &&
+      !envVerifier.includes("console.log(value)") &&
+      !envVerifier.includes("console.error(value)"),
+    "production env check validates launch env formats, blank values, and raw surrounding whitespace, then prints a safe Vercel repair checklist without secret values",
+    "required"
+  );
+  check(
+    "scripts: Vercel env name check command",
+    packageJson.includes('"env:pull:production": "npx vercel env pull .env.production --environment=production --yes"') &&
+      packageJson.includes('"env:vercel": "node scripts/verify-vercel-env-names.mjs production"') &&
+      packageJson.includes('"env:vercel:launch": "npm run env:pull:production && npm run env:vercel && npm run env:check:launch"'),
+    "package.json exposes Vercel production env pull, env-name, and launch-value checks that do not print values",
+    "required"
+  );
+  check(
+    "scripts: Vercel env name check safety",
+    vercelEnvVerifier.includes("vercel") &&
+      vercelEnvVerifier.includes("env") &&
+      vercelEnvVerifier.includes("ls") &&
+      vercelEnvVerifier.includes("values: hidden by Vercel") &&
+      vercelEnvVerifier.includes("requiredNames") &&
+      vercelEnvVerifier.includes("recommendedNames") &&
+      vercelEnvVerifier.includes("ADMIN_PASSWORD") &&
+      vercelEnvVerifier.includes("SUPABASE_SERVICE_ROLE_KEY") &&
+      vercelEnvVerifier.includes("TELEGRAM_BOT_TOKEN") &&
+      !vercelEnvVerifier.includes("console.log(result.stdout)") &&
+      !vercelEnvVerifier.includes("stdio: \"inherit\""),
+    "Vercel env-name check verifies required names through the CLI without printing secret values",
+    "required"
+  );
+  check(
+    "scripts: Vercel env repair plan safety",
+    envRepairPlan.includes("ReturnPick Vercel env repair plan") &&
+      envRepairPlan.includes("secret values: never printed") &&
+      envRepairPlan.includes("Safe non-secret operational defaults") &&
+      envRepairPlan.includes("CRON_USE_MOCK_FALLBACK") &&
+      envRepairPlan.includes("SOURCING_TIME_BUDGET_MS") &&
+      envRepairPlan.includes("PUBLIC_WEB_CRAWL_ENABLED") &&
+      envRepairPlan.includes("External hourly scheduler (GitHub Actions)") &&
+      envRepairPlan.includes("RETURNPICK_CRON_SECRET") &&
+      envRepairPlan.includes("Vercel CRON_SECRET value. The value is never printed here.") &&
+      envRepairPlan.includes("RETURNPICK_SITE_URL") &&
+      envRepairPlan.includes("ReturnPick Hourly Scheduler") &&
+      envRepairPlan.includes("/api/cron/sourcing") &&
+      envRepairPlan.includes("/api/cron/telegram-digest?limit=1") &&
+      envRepairPlan.includes("npm run env:vercel:launch") &&
+      envRepairPlan.includes("npm run doctor:production:launch") &&
+      envRepairPlan.includes("npm run launch:production -- standard confirm") &&
+      !envRepairPlan.includes("console.log(process.env") &&
+      !envRepairPlan.includes("console.error(process.env"),
+    "Vercel env repair plan prints missing names, safe defaults, GitHub hourly scheduler setup, and next launch commands without dumping secret values",
+    "required"
+  );
+}
+
+if (fileExists("package.json") && fileExists("scripts/verify-supabase-schema.mjs")) {
+  const packageJson = readText("package.json");
+  const supabaseSchemaVerifier = readText("scripts/verify-supabase-schema.mjs");
+  const supabaseSetupRunbook = fileExists("scripts/print-supabase-setup-runbook.mjs") ? readText("scripts/print-supabase-setup-runbook.mjs") : "";
+  check(
+    "scripts: production supabase schema command",
+    packageJson.includes('"schema:setup": "node scripts/print-supabase-setup-runbook.mjs"') &&
+      packageJson.includes('"schema:production": "node scripts/verify-supabase-schema.mjs"'),
+    "package.json exposes Supabase SQL setup guidance and a direct live schema verifier for post-approval setup",
+    "required"
+  );
+  check(
+    "scripts: production supabase schema verifier",
+    supabaseSchemaVerifier.includes("EXPECTED_SCHEMA_VERSION") &&
+      supabaseSchemaVerifier.includes("returnpick_schema_meta") &&
+      supabaseSchemaVerifier.includes("is_strict_coupang_partners_url") &&
+      supabaseSchemaVerifier.includes("sourcing_runs") &&
+      supabaseSchemaVerifier.includes("affiliate_events") &&
+      supabaseSchemaVerifier.includes("writeSmokeCheck") &&
+      supabaseSchemaVerifier.includes("NEXT_PUBLIC_SUPABASE_URL") &&
+      supabaseSchemaVerifier.includes("SUPABASE_SERVICE_ROLE_KEY") &&
+      supabaseSchemaVerifier.includes("loadEnvFiles"),
+    "Supabase schema verifier checks version, required tables/columns, strict affiliate RPC, write smoke paths, and local env files without printing secrets",
+    "required"
+  );
+  check(
+    "scripts: supabase setup runbook safety",
+    supabaseSetupRunbook.includes("ReturnPick Supabase setup runbook") &&
+      supabaseSetupRunbook.includes("requiredFragments") &&
+      supabaseSetupRunbook.includes("is_strict_coupang_partners_url") &&
+      supabaseSetupRunbook.includes("sourced_products_public_affiliate_url_check") &&
+      supabaseSetupRunbook.includes("Public can read published products") &&
+      supabaseSetupRunbook.includes("npm run schema:production") &&
+      supabaseSetupRunbook.includes("npm run doctor:production:launch") &&
+      !supabaseSetupRunbook.includes("process.env") &&
+      !supabaseSetupRunbook.includes("SUPABASE_SERVICE_ROLE_KEY"),
+    "Supabase setup runbook verifies the local launch-critical SQL fragments and prints apply/verify steps without secret values",
+    "required"
+  );
+}
+
+if (fileExists("package.json") && fileExists("scripts/run-production-doctor.mjs")) {
+  const packageJson = readText("package.json");
+  const productionDoctor = readText("scripts/run-production-doctor.mjs");
+  check(
+    "scripts: production doctor command",
+    packageJson.includes('"doctor:production": "node scripts/run-production-doctor.mjs"') &&
+      packageJson.includes('"doctor:production:launch": "node scripts/run-production-doctor.mjs --launch"') &&
+      packageJson.includes('"doctor:production:fresh": "npm run env:pull:production && npm run env:vercel && npm run doctor:production"') &&
+      packageJson.includes('"doctor:production:launch:fresh": "npm run env:pull:production && npm run env:vercel && npm run env:check:launch && npm run doctor:production:launch"'),
+    "package.json exposes one-command production report, fresh Vercel-pull, and launch-readiness doctor checks",
+    "required"
+  );
+  check(
+    "scripts: production doctor orchestration",
+    productionDoctor.includes("verify-production-env.mjs") &&
+      productionDoctor.includes("handleEnvStep") &&
+      productionDoctor.includes("handleScoringStep") &&
+      productionDoctor.includes("verify-scoring-rules.mjs") &&
+      productionDoctor.includes("handleGithubSchedulerStep") &&
+      productionDoctor.includes("verify-github-hourly-scheduler.mjs") &&
+      productionDoctor.includes("handlePublicWebConfigStep") &&
+      productionDoctor.includes("verify-public-web-config.mjs") &&
+      productionDoctor.includes("skipAfterEnvFailure") &&
+      productionDoctor.includes("skipAfterTargetFailure") &&
+      productionDoctor.includes("Production env preflight failed; fix env values before live checks") &&
+      productionDoctor.includes("Production doctor requires an external HTTPS target") &&
+      productionDoctor.includes("Refusing localhost, .local, and http:// targets") &&
+      productionDoctor.includes("else if (requireLaunchReady && !envOk)") &&
+      productionDoctor.includes("verify-supabase-schema.mjs") &&
+      productionDoctor.includes("verify-production-readiness.mjs") &&
+      productionDoctor.includes("run-production-launch.mjs") &&
+      productionDoctor.includes("handleSourcingDiagnosisStep") &&
+      productionDoctor.includes("diagnose-sourcing-recovery.mjs") &&
+      productionDoctor.includes("--skip-schema") &&
+      productionDoctor.includes("No data work was started") &&
+      productionDoctor.includes("Next command checklist") &&
+      productionDoctor.includes("doctor:production:launch:fresh") &&
+      productionDoctor.includes("deploy:production:launch -- confirm") &&
+      productionDoctor.includes("deploy:production:go-live -- confirm") &&
+      productionDoctor.includes("env:repair") &&
+      productionDoctor.includes("loadEnvFiles") &&
+      productionDoctor.includes('from "./load-env-files.mjs"') &&
+      productionDoctor.includes("NEXT_PUBLIC_SUPABASE_URL") &&
+      productionDoctor.includes("SUPABASE_SERVICE_ROLE_KEY"),
+    "production doctor chains env preflight, external target guarding, scoring contract, GitHub hourly scheduler, public-web config, live schema, deployed readiness, first-launch preflight, sourcing diagnosis, and exact next commands without starting data work",
+    "required"
+  );
+}
+
+if (fileExists("scripts/verify-github-hourly-scheduler.mjs")) {
+  const schedulerCheck = readText("scripts/verify-github-hourly-scheduler.mjs");
+  const packageJson = readText("package.json");
+  check(
+    "scripts: GitHub hourly scheduler check command",
+    packageJson.includes('"scheduler:check": "node scripts/verify-github-hourly-scheduler.mjs"') &&
+      schedulerCheck.includes(".github") &&
+      schedulerCheck.includes("returnpick-hourly.yml") &&
+      schedulerCheck.includes('cron: "0 * * * *"') &&
+      schedulerCheck.includes("RETURNPICK_CRON_SECRET") &&
+      schedulerCheck.includes("RETURNPICK_SITE_URL") &&
+      schedulerCheck.includes("/api/cron/sourcing") &&
+      schedulerCheck.includes("/api/cron/telegram-digest?limit=1") &&
+      schedulerCheck.includes("local scripts cannot read GitHub repository secrets"),
+    "operators can verify the hourly GitHub Actions scheduler wiring without printing or requiring secret values",
+    "required"
+  );
+}
+
+if (fileExists("sql/schema.sql")) {
+  const schema = readText("sql/schema.sql");
+  check(
+    "schema version marker",
+    schema.includes("returnpick_schema_meta") && schema.includes("2026-05-31-strict-affiliate-links") && schema.includes("schema_version"),
+    "schema.sql writes a launch-ready schema version marker for admin readiness",
+    "required"
+  );
+  for (const table of [
+    "sourcing_keywords",
+    "sourced_products",
+    "deal_scores",
+    "sourcing_runs",
+    "telegram_logs",
+    "affiliate_events",
+    "product_snapshots"
+  ]) {
+    check(`schema table: ${table}`, schema.includes(`create table if not exists ${table}`), table, "required");
+  }
+  check("schema event type: share_copy", schema.includes("'share_copy'"), "affiliate_events accepts share_copy", "required");
+  check("schema published RLS", schema.includes("Public can read published products"), "public can read only published products", "required");
+  check(
+    "schema public affiliate constraint",
+    schema.includes("sourced_products_public_affiliate_url_check") &&
+      schema.includes("not valid") &&
+      schema.includes("is_strict_coupang_partners_url") &&
+      schema.includes("link\\.coupang\\.com/a/[A-Za-z0-9]{6,16}") &&
+      schema.includes("safecheck"),
+    "database rejects new published products unless affiliate_url is a strict Coupang Partners short link",
+    "required"
+  );
+  check(
+    "schema public RLS affiliate-ready only",
+    (schema.match(/is_strict_coupang_partners_url/g) ?? []).length >= 5 &&
+      schema.includes("is_strict_coupang_partners_url(sourced_products.affiliate_url)"),
+    "public product, score, and snapshot RLS policies expose only strict affiliate-ready published products",
+    "required"
+  );
+  check("schema keyword uniqueness", schema.includes("keyword_key") && schema.includes("sourcing_keywords_keyword_category_key"), "sourcing keywords are unique by normalized keyword and category", "required");
+  const operationalIndexes = [
+    "sourced_products_status_category_created_idx",
+    "sourced_products_published_status_created_idx",
+    "sourced_products_public_affiliate_ready_idx",
+    "sourcing_runs_started_idx",
+    "sourcing_runs_status_started_idx",
+    "telegram_logs_created_idx",
+    "telegram_logs_product_created_idx",
+    "affiliate_events_created_idx",
+    "affiliate_events_product_created_idx",
+    "affiliate_events_type_created_idx",
+    "affiliate_events_channel_created_idx",
+    "product_snapshots_product_observed_idx"
+  ];
+  check(
+    "schema operational indexes",
+    operationalIndexes.every((indexName) => schema.includes(indexName)),
+    "schema.sql indexes public deal lists, admin queues, scheduler logs, Telegram logs, snapshots, and revenue funnel events",
+    "required"
+  );
+}
+
+if (fileExists("lib/sourcing.ts")) {
+  const sourcing = readText("lib/sourcing.ts");
+  check("sourcing: serverless time budget", sourcing.includes("time_budget_reached") && sourcing.includes("completed_partial"), "sourcing can finish partially before serverless timeout", "required");
+  check("sourcing: keyword cursor log", sourcing.includes("keywordOffset") && sourcing.includes("next_keyword_offset"), "partial sourcing records the next keyword cursor", "required");
+  check("sourcing: default keyword bootstrap", sourcing.includes("ensureDefaultSourcingKeywords") && sourcing.includes("default_keywords_seeded"), "first sourcing run seeds default keywords when the DB is empty", "required");
+  check("sourcing: coupang deeplink enrichment", sourcing.includes("createCoupangDeeplink") && sourcing.includes("coupang_deeplink"), "creates affiliate_url from Coupang product URLs", "required");
+  check("sourcing: naver lowest price enrichment", sourcing.includes("getLowestPrice") && sourcing.includes("naver_lowest_price"), "fills naver_lowest_price when API is configured", "required");
+  check(
+    "sourcing: naver fallback query log",
+    sourcing.includes("getLowestPriceFromQueries") &&
+      sourcing.includes("naver_price_lookup") &&
+      sourcing.includes("buildNaverRelevanceTokens") &&
+      sourcing.includes("relevance_tokens") &&
+      sourcing.includes("match: result.match ?? null"),
+    "tries multiple Naver queries, filters by relevance, and stores lookup evidence",
+    "required"
+  );
+  check("sourcing: provider status log", sourcing.includes("provider_status"), "stores provider status for first-run diagnostics", "required");
+  check(
+    "sourcing: provider meta log",
+    sourcing.includes("provider_meta: result.meta ?? null") &&
+      sourcing.includes("provider_meta: sourceResult.meta ?? null") &&
+      sourcing.includes("provider_meta: webResult.meta ?? null"),
+    "sourcing run logs retain safe provider metadata such as public-web diagnostics and API response-shape evidence",
+    "required"
+  );
+  check(
+    "sourcing: provider error fallback",
+    sourcing.includes("recordProviderError") &&
+      sourcing.includes('result.status === "error"') &&
+      sourcing.includes("provider_issues") &&
+      sourcing.includes("naver_shopping_candidate"),
+    "sourcing logs provider errors and still tries allowed fallback sources for the keyword",
+    "required"
+  );
+  check(
+    "sourcing: product save counted when score save fails",
+    sourcing.includes("scoreError") &&
+      sourcing.includes("product_score_error") &&
+      sourcing.includes("SOURCING_SCORE_SAVE_FAILED") &&
+      sourcing.includes("if (saved.inserted) insertedCount += 1") &&
+      sourcing.includes("else updatedCount += 1"),
+    "a saved or updated candidate still counts as product progress even if later score creation fails",
+    "required"
+  );
+}
+
+if (fileExists("lib/sourcingDiagnostics.ts")) {
+  const diagnostics = readText("lib/sourcingDiagnostics.ts");
+  const packageJson = fileExists("package.json") ? readText("package.json") : "";
+  const sourcingRecovery = fileExists("scripts/diagnose-sourcing-recovery.mjs") ? readText("scripts/diagnose-sourcing-recovery.mjs") : "";
+  check(
+    "sourcing diagnostics: first run guidance",
+    diagnostics.includes("diagnoseSourcingRun") &&
+      diagnostics.includes("rejectedByPriceFilterCount") &&
+      diagnostics.includes("robotsUnavailableCount") &&
+      diagnostics.includes("actionItems.push"),
+    "admin can explain zero-result sourcing runs",
+    "required"
+  );
+  check(
+    "sourcing diagnostics: provider error summary",
+    diagnostics.includes("providerErrorCount") &&
+      diagnostics.includes("nonProviderErrorCount") &&
+      diagnostics.includes("providerIssueProviders") &&
+      diagnostics.includes("getProviderIssueProviders") &&
+      diagnostics.includes("일부 공급원 오류, 후보 수집은 진행됨") &&
+      diagnostics.includes("공급원 오류"),
+    "admin sourcing diagnostics summarize provider errors separately and downgrades recovered provider-only failures to warning",
+    "required"
+  );
+  check(
+    "sourcing diagnostics: public web evidence summary",
+    diagnostics.includes("getPublicWebDiagnostics") &&
+      diagnostics.includes("publicWebDiagnosticCount") &&
+      diagnostics.includes("publicWebDiagnosticStatuses") &&
+      diagnostics.includes("public_web_diagnostics") &&
+      diagnostics.includes("공개 웹 참고 수집 진단"),
+    "admin sourcing diagnostics summarize public-web allowlist, robots, content, and extraction evidence from provider metadata",
+    "required"
+  );
+  check(
+    "scripts: sourcing recovery diagnosis command",
+    packageJson.includes('"sourcing:diagnose": "node scripts/diagnose-sourcing-recovery.mjs"'),
+    "package.json exposes a sourcing recovery diagnosis command for low/zero candidate first launches",
+    "required"
+  );
+  check(
+    "scripts: sourcing recovery diagnosis safety",
+    sourcingRecovery.includes("ReturnPick sourcing recovery diagnosis") &&
+      sourcingRecovery.includes("secret values: never printed") &&
+      sourcingRecovery.includes("sourcing_keywords") &&
+      sourcingRecovery.includes("sourcing_runs") &&
+      sourcingRecovery.includes("sourced_products") &&
+      sourcingRecovery.includes("SOURCING_KEYWORD_LIMIT") &&
+      sourcingRecovery.includes("CRON_USE_MOCK_FALLBACK") &&
+      sourcingRecovery.includes("PUBLIC_WEB_CRAWL_ENABLED") &&
+      sourcingRecovery.includes("price filter impact") &&
+      sourcingRecovery.includes("provider API_NOT_CONFIGURED") &&
+      sourcingRecovery.includes("public deal visibility") &&
+      sourcingRecovery.includes("public blockers") &&
+      sourcingRecovery.includes("npm run env:vercel:launch") &&
+      sourcingRecovery.includes("npm run schema:production") &&
+      !sourcingRecovery.includes("console.log(serviceRoleKey)") &&
+      !sourcingRecovery.includes("console.log(process.env"),
+    "sourcing recovery diagnosis checks env mode, keyword coverage, recent provider logs, price-filter impact, and customer-visible product blockers without printing secrets",
+    "required"
+  );
+  check(
+    "scripts: sourcing recovery public visibility diagnosis",
+    sourcingRecovery.includes("inspectProductVisibility") &&
+      sourcingRecovery.includes("승인용 샘플 링크 사용 중") &&
+      sourcingRecovery.includes("상품별 파트너스 링크 필요") &&
+      sourcingRecovery.includes("반품가 확인 필요") &&
+      sourcingRecovery.includes("반품등급 확인 필요") &&
+      sourcingRecovery.includes("상품 이미지 확인 필요") &&
+      sourcingRecovery.includes("네이버 최저가 대비 가격 불리") &&
+      sourcingRecovery.includes("affiliate link repair queue") &&
+      sourcingRecovery.includes("customer-visible published deal") &&
+      sourcingRecovery.includes("실제 딜 게시 전 승인용 샘플 링크를 상품별 쿠팡 파트너스 링크로 교체하세요") &&
+      !sourcingRecovery.includes("missing product Partners link"),
+    "sourcing recovery diagnosis explains in readable Korean why collected or published products are still hidden from /deals and Telegram",
+    "required"
+  );
+}
+
+if (fileExists("lib/providers/coupangPartnersProvider.ts")) {
+  const coupangProvider = readText("lib/providers/coupangPartnersProvider.ts");
+  check("provider: coupang detailed errors", coupangProvider.includes("payloadErrorMessage") && coupangProvider.includes("COUPANG_HTTP_${response.status}:"), "Coupang provider surfaces safe API error details", "required");
+  check("provider: coupang timeout", coupangProvider.includes("fetchWithTimeout") && coupangProvider.includes("AbortController"), "Coupang provider bounds API request time", "required");
+  check(
+    "provider: coupang trims env credentials",
+    coupangProvider.includes("function envText") &&
+      coupangProvider.includes("getCoupangCredentials") &&
+      coupangProvider.includes('process.env[name]?.trim() ?? ""') &&
+      coupangProvider.includes("const { accessKey, secretKey, partnerId } = getCoupangCredentials()") &&
+      coupangProvider.includes("const { partnerId } = getCoupangCredentials()"),
+    "Coupang provider trims copied Vercel env values before config checks, HMAC signing, and subId usage",
+    "required"
+  );
+  check(
+    "provider: coupang official HMAC path-query signing",
+    coupangProvider.includes('pathWithQuery.split("?")') &&
+      coupangProvider.includes("path + query") &&
+      coupangProvider.includes("CEA algorithm=HmacSHA256,access-key="),
+    "Coupang HMAC signing follows the official path+query message format without the literal question mark",
+    "required"
+  );
+  check(
+    "provider: coupang strict deeplink output",
+    coupangProvider.includes("firstUsableAffiliateUrl") && coupangProvider.includes("COUPANG_DEEPLINK_NO_PARTNERS_URL"),
+    "Coupang deeplink/search responses only populate affiliate_url with usable Partners links",
+    "required"
+  );
+  check(
+    "provider: coupang parse diagnostics",
+    coupangProvider.includes("coupang_provider_parse") &&
+      coupangProvider.includes("raw_product_count") &&
+      coupangProvider.includes("array_path") &&
+      coupangProvider.includes("product_url_field") &&
+      coupangProvider.includes("data.productList") &&
+      coupangProvider.includes("data.results"),
+    "Coupang search candidates keep safe parse diagnostics so approval-stage API response shape issues can be debugged",
+    "required"
+  );
+  check(
+    "provider: coupang search meta diagnostics",
+    coupangProvider.includes("response_array_path") &&
+      coupangProvider.includes("normalized_product_count") &&
+      coupangProvider.includes("searched_path_count") &&
+      coupangProvider.includes("searched_paths"),
+    "Coupang search results expose response-shape metadata even before candidates are saved",
+    "required"
+  );
+}
+
+if (fileExists("lib/providers/naverShoppingProvider.ts")) {
+  const naverProvider = readText("lib/providers/naverShoppingProvider.ts");
+  check("provider: naver detailed errors", naverProvider.includes("naverErrorMessage") && naverProvider.includes("NAVER_HTTP_${response.status}:"), "Naver provider surfaces safe API error details", "required");
+  check("provider: naver timeout", naverProvider.includes("fetchWithTimeout") && naverProvider.includes("AbortController"), "Naver provider bounds API request time", "required");
+  check(
+    "provider: naver trims env credentials",
+    naverProvider.includes("function envText") &&
+      naverProvider.includes("getNaverCredentials") &&
+      naverProvider.includes('process.env[name]?.trim() ?? ""') &&
+      naverProvider.includes("const { clientId, clientSecret } = getNaverCredentials()") &&
+      naverProvider.includes('"X-Naver-Client-Id": clientId') &&
+      naverProvider.includes('"X-Naver-Client-Secret": clientSecret'),
+    "Naver provider trims copied Vercel env values before config checks and request headers",
+    "required"
+  );
+  check(
+    "provider: naver search meta diagnostics",
+    naverProvider.includes("NaverShoppingSearchResult") &&
+      naverProvider.includes("api_total") &&
+      naverProvider.includes("raw_item_count") &&
+      naverProvider.includes("normalized_item_count") &&
+      naverProvider.includes("priced_item_count"),
+    "Naver search results expose response and price-field metadata for first-launch diagnostics",
+    "required"
+  );
+  check(
+    "provider: naver lowest price relevance guard",
+    naverProvider.includes("NaverLowestPriceOptions") &&
+      naverProvider.includes("relevanceTokens") &&
+      naverProvider.includes("itemRelevance") &&
+      naverProvider.includes("minRelevance") &&
+      naverProvider.includes("rejected_by_relevance_count") &&
+      naverProvider.includes("matched_tokens"),
+    "Naver lowest-price selection can reject irrelevant cheap accessories and records match evidence",
+    "required"
+  );
+}
+
+if (fileExists("lib/providers/publicWebProvider.ts")) {
+  const publicWebProvider = readText("lib/providers/publicWebProvider.ts");
+  const packageJson = fileExists("package.json") ? readText("package.json") : "";
+  const publicWebConfigVerifier = fileExists("scripts/verify-public-web-config.mjs") ? readText("scripts/verify-public-web-config.mjs") : "";
+  check(
+    "provider: public web robots fail closed",
+    publicWebProvider.includes("ROBOTS_UNAVAILABLE") &&
+      publicWebProvider.includes("ROBOTS_TXT_NOT_FOUND") &&
+      publicWebProvider.includes('if (!robots) return false') &&
+      publicWebProvider.includes("safeTemplateUrl"),
+    "public web collection requires an allowlisted http(s) URL and readable robots.txt before fetching pages",
+    "required"
+  );
+  check(
+    "provider: public web identifiable user agent",
+    publicWebProvider.includes("getSiteUrl") &&
+      publicWebProvider.includes("/disclosure") &&
+      publicWebProvider.includes("ReturnPickBot/0.1") &&
+      !publicWebProvider.includes("admin@returnpick.local"),
+    "public web requests identify ReturnPick with a disclosure URL instead of a local placeholder contact",
+    "required"
+  );
+  check(
+    "provider: public web content bounds",
+    publicWebProvider.includes("MAX_PUBLIC_WEB_HTML_BYTES") &&
+      publicWebProvider.includes("MAX_ROBOTS_BYTES") &&
+      publicWebProvider.includes("readTextWithLimit") &&
+      publicWebProvider.includes("UNSUPPORTED_CONTENT_TYPE") &&
+      publicWebProvider.includes("CONTENT_TOO_LARGE") &&
+      publicWebProvider.includes("isPublicHostname"),
+    "public web collection reads only public-host HTML responses within bounded byte limits",
+    "required"
+  );
+  check(
+    "provider: public web extracted href safety",
+    publicWebProvider.includes("safeExtractedProductHref") &&
+      publicWebProvider.includes('!["http:", "https:"].includes(url.protocol)') &&
+      publicWebProvider.includes("url.username || url.password") &&
+      publicWebProvider.includes("!isPublicHostname(url.hostname)") &&
+      publicWebProvider.includes("if (!href) continue"),
+    "public web collection stores only http(s) public-host anchor URLs as candidate source links",
+    "required"
+  );
+  check(
+    "provider: public web redirect fail closed",
+    publicWebProvider.includes('redirect: "manual"') &&
+      publicWebProvider.includes("REDIRECT_BLOCKED") &&
+      publicWebProvider.includes("safeRedirectTarget") &&
+      publicWebProvider.includes("response.status >= 300 && response.status < 400"),
+    "public web collection does not follow redirects before allowlist and robots checks",
+    "required"
+  );
+  check(
+    "provider: public web crawl-delay guard",
+    publicWebProvider.includes("parseCrawlDelaySeconds") &&
+      publicWebProvider.includes("crawlDelaySecondsForRobots") &&
+      publicWebProvider.includes("waitForOriginRateLimit") &&
+      publicWebProvider.includes("MAX_SUPPORTED_CRAWL_DELAY_SECONDS") &&
+      publicWebProvider.includes("CRAWL_DELAY_TOO_HIGH"),
+    "public web collection respects robots Crawl-delay and skips hosts whose delay is too large for serverless sourcing",
+    "required"
+  );
+  check(
+    "provider: public web config bounds",
+    publicWebProvider.includes("MAX_PUBLIC_WEB_ALLOWED_HOSTS") &&
+      publicWebProvider.includes("MAX_PUBLIC_WEB_SEARCH_TEMPLATES") &&
+      publicWebProvider.includes("PUBLIC_WEB_CONFIG_TOO_BROAD") &&
+      publicWebProvider.includes('status: "INVALID_TEMPLATE"') &&
+      publicWebProvider.includes('if (!template.includes("{keyword}")) return null'),
+    "public web collection refuses overly broad host or search template lists and requires keyword-scoped templates before fetching",
+    "required"
+  );
+  check(
+    "provider: public web diagnostic metadata",
+    publicWebProvider.includes("buildPublicWebMeta") &&
+      publicWebProvider.includes("public_web_diagnostics") &&
+      publicWebProvider.includes("public_web_diagnostic_count") &&
+      publicWebProvider.includes('status: "FETCHED_HTML"') &&
+      publicWebProvider.includes("extracted_count") &&
+      publicWebProvider.includes("crawl_delay_seconds") &&
+      publicWebProvider.includes("content_type"),
+    "public web collection records bounded safe diagnostics for allowlist, robots, content, redirect, and extraction outcomes",
+    "required"
+  );
+  check(
+    "scripts: public web config check command",
+    packageJson.includes('"public-web:check": "node scripts/verify-public-web-config.mjs"'),
+    "package.json exposes a public-web allowlist and robots preflight",
+    "required"
+  );
+  check(
+    "scripts: public web config check safety",
+    publicWebConfigVerifier.includes("ReturnPick public web collection check") &&
+      publicWebConfigVerifier.includes("PUBLIC_WEB_CRAWL_ENABLED") &&
+      publicWebConfigVerifier.includes("PUBLIC_WEB_ALLOWED_HOSTS") &&
+      publicWebConfigVerifier.includes("PUBLIC_WEB_SEARCH_TEMPLATES") &&
+      publicWebConfigVerifier.includes("robots.txt not found; ReturnPick treats this as not allowed") &&
+      publicWebConfigVerifier.includes("redirect blocked") &&
+      publicWebConfigVerifier.includes("Crawl-delay") &&
+      publicWebConfigVerifier.includes("MAX_ROBOTS_BYTES") &&
+      publicWebConfigVerifier.includes("readTextWithLimit") &&
+      publicWebConfigVerifier.includes("robots.txt too large") &&
+      publicWebConfigVerifier.includes("ReturnPickBot/0.1") &&
+      publicWebConfigVerifier.includes("No public web requests were made") &&
+      !publicWebConfigVerifier.includes("process.env.COUPANG") &&
+      !publicWebConfigVerifier.includes("process.env.NAVER") &&
+      !publicWebConfigVerifier.includes("process.env.SUPABASE"),
+    "public web config check validates allowlist, templates, robots, and Crawl-delay without reading unrelated secrets",
+    "required"
+  );
+}
+
+if (fileExists("lib/coupangLink.ts")) {
+  const coupangLink = readText("lib/coupangLink.ts");
+  check(
+    "affiliate links: partners link only",
+    coupangLink.includes("isCoupangPartnersLink") &&
+      coupangLink.includes("partnerShortPathPattern") &&
+      coupangLink.includes("suspiciousPartnerCodePattern") &&
+      coupangLink.includes('url.hostname !== "link.coupang.com"') &&
+      coupangLink.includes("isApprovalSampleAffiliateUrl") &&
+      coupangLink.includes("!isApprovalSampleAffiliateUrl(value)") &&
+      !coupangLink.includes('return url.hostname === "link.coupang.com" || isUsableCoupangProductUrl(value)'),
+    "affiliate_url requires a strict product-level Coupang Partners short link, not a regular product URL, approval sample link, or obvious test code",
+    "required"
+  );
+}
+
+if (fileExists("app/api/events/route.ts")) {
+  const eventsRoute = readText("app/api/events/route.ts");
+  check(
+    "events api: referrer privacy",
+    eventsRoute.includes("cleanReferrer") &&
+      eventsRoute.includes("url.origin") &&
+      eventsRoute.includes("url.pathname") &&
+      eventsRoute.includes("raw.split(/[?#]/)") &&
+      eventsRoute.includes("cleanReferrer(request.headers.get(\"referer\"))"),
+    "affiliate event tracking stores referrer origin/path only and strips query strings or hashes",
+    "required"
+  );
+  check(
+    "events api: tracking field privacy",
+    eventsRoute.includes("cleanTrackingLabel") &&
+      eventsRoute.includes("cleanAnonSessionId") &&
+      eventsRoute.includes("EVENT_PAYLOAD_TOO_LARGE") &&
+      eventsRoute.includes("cleanTrackingLabel(body.channel, \"web\")") &&
+      eventsRoute.includes("cleanTrackingLabel(body.utm_source)"),
+    "affiliate event tracking accepts only safe label fields, UUID anon sessions, and bounded payloads",
+    "required"
+  );
+  check(
+    "events api: public-ready product gate",
+    eventsRoute.includes("getProductById") &&
+      eventsRoute.includes("isPublicDealReady") &&
+      eventsRoute.includes("PRODUCT_ID_REQUIRED") &&
+      eventsRoute.includes("PRODUCT_NOT_PUBLIC_READY") &&
+      eventsRoute.includes("product_id: productId"),
+    "affiliate event tracking stores events only for published affiliate-ready products",
+    "required"
+  );
+}
+
+if (fileExists("app/api/products/compare/route.ts")) {
+  const compareRoute = readText("app/api/products/compare/route.ts");
+  check(
+    "compare api: safe public fallback",
+    compareRoute.includes("COMPARE_PRODUCTS_FAILED") &&
+      compareRoute.includes("compareProductsErrorResponse") &&
+      compareRoute.includes("products: []") &&
+      compareRoute.includes("isPublicDealReady"),
+    "public compare API returns an empty safe payload on lookup failures and exposes only public affiliate-ready deals",
+    "required"
+  );
+}
+
+if (fileExists("lib/clientTracking.ts")) {
+  const clientTracking = readText("lib/clientTracking.ts");
+  check(
+    "client tracking: non-blocking purchase clicks",
+    clientTracking.includes("Tracking storage is best-effort") &&
+      clientTracking.includes("A failed tracker must never block navigation to Coupang") &&
+      clientTracking.includes("getStoredJsonArray") &&
+      clientTracking.includes("setStoredJsonArray") &&
+      clientTracking.includes("sendBeacon") &&
+      clientTracking.includes("sendEventWithFetch") &&
+      clientTracking.includes("if (queued) return") &&
+      clientTracking.includes(".catch(() => undefined)"),
+    "client-side analytics failures cannot interrupt Coupang outbound clicks or page views",
+    "required"
+  );
+}
+
+if (fileExists("lib/clientTracking.ts") && fileExists("components/AffiliateEventTracker.tsx")) {
+  const clientTracking = readText("lib/clientTracking.ts");
+  const eventTracker = readText("components/AffiliateEventTracker.tsx");
+  check(
+    "client tracking: telegram detail attribution",
+    clientTracking.includes("getCurrentUtmSource") &&
+      clientTracking.includes("getUtmSource()") &&
+      eventTracker.includes("getCurrentUtmSource") &&
+      eventTracker.includes("const currentUtmSource = getCurrentUtmSource()") &&
+      eventTracker.includes('const isTelegramLanding = currentUtmSource === "telegram"') &&
+      eventTracker.includes('eventType: isTelegramLanding ? "telegram_detail_click" : "detail_view"') &&
+      eventTracker.includes('channel: isTelegramLanding ? "telegram" : "web"'),
+    "telegram_detail_click is counted only for detail-page entries whose current URL carries utm_source=telegram, while persisted UTM remains available for later purchase attribution",
+    "required"
+  );
+}
+
+if (fileExists("components/AffiliateButton.tsx") && fileExists("components/DealDetail.tsx") && fileExists("components/PurchaseDecisionPanel.tsx")) {
+  const affiliateButton = readText("components/AffiliateButton.tsx");
+  const dealDetail = readText("components/DealDetail.tsx");
+  const purchaseDecisionPanel = readText("components/PurchaseDecisionPanel.tsx");
+  check(
+    "client tracking: cta placement channels",
+    affiliateButton.includes("cleanTrackingPlacement") &&
+      affiliateButton.includes("buildTrackingChannel") &&
+      affiliateButton.includes("placement?: string") &&
+      affiliateButton.includes("resolvedChannel") &&
+      dealDetail.includes('placement="detail_hero"') &&
+      dealDetail.includes('placement="detail_price"') &&
+      dealDetail.includes('placement="detail_sidebar"') &&
+      dealDetail.includes('placement="detail_mobile_sticky"') &&
+      purchaseDecisionPanel.includes('placement="detail_decision"'),
+    "purchase CTA clicks include a safe placement channel so admins can see which explicit button drives Coupang clicks",
+    "required"
+  );
+}
+
+if (
+  fileExists("app/disclosure/page.tsx") &&
+  fileExists("components/AffiliateButton.tsx") &&
+  fileExists("components/AffiliateNotice.tsx") &&
+  fileExists("components/CompareBoard.tsx") &&
+  fileExists("components/DealDetail.tsx") &&
+  fileExists("components/PurchaseDecisionPanel.tsx") &&
+  fileExists("lib/coupangLink.ts")
+) {
+  const purchaseCopyFiles = [
+    readText("app/disclosure/page.tsx"),
+    readText("components/AffiliateButton.tsx"),
+    readText("components/AffiliateNotice.tsx"),
+    readText("components/CompareBoard.tsx"),
+    readText("components/DealDetail.tsx"),
+    readText("components/PurchaseDecisionPanel.tsx"),
+    readText("lib/coupangLink.ts")
+  ];
+  const disclosurePage = purchaseCopyFiles[0];
+  const affiliateNotice = purchaseCopyFiles[2];
+  const compareBoard = purchaseCopyFiles[3];
+  const dealDetail = purchaseCopyFiles[4];
+  const purchaseDecisionPanel = purchaseCopyFiles[5];
+  const coupangLink = purchaseCopyFiles[6];
+  check(
+    "public purchase copy readable Korean",
+    purchaseCopyFiles.every((text) => !containsLikelyMojibake(text)) &&
+      disclosurePage.includes("제휴 안내") &&
+      affiliateNotice.includes("쿠팡 파트너스 활동의 일환") &&
+      coupangLink.includes("쿠팡에서 가격 확인") &&
+      dealDetail.includes("가격 비교") &&
+      dealDetail.includes("추천 이유") &&
+      dealDetail.includes("위험 플래그") &&
+      purchaseDecisionPanel.includes("30초 구매 판단") &&
+      purchaseDecisionPanel.includes("구매 전 확인") &&
+      purchaseDecisionPanel.includes("쿠팡에서 실시간 가격 확인") &&
+      compareBoard.includes("구매 전 최종 비교"),
+    "customer-facing purchase, comparison, and affiliate disclosure copy stays readable Korean",
+    "required"
+  );
+}
+
+if (fileExists("lib/adminNavigation.ts") && fileExists("app/globals.css")) {
+  const adminNavigation = readText("lib/adminNavigation.ts");
+  const globals = readText("app/globals.css");
+  check(
+    "admin: anchor handoff highlight utility",
+    adminNavigation.includes("scrollToAdminAnchor") &&
+      adminNavigation.includes("admin-anchor-highlight") &&
+      adminNavigation.includes("scrollIntoView") &&
+      adminNavigation.includes("window.history.replaceState") &&
+      globals.includes(".admin-anchor-highlight") &&
+      globals.includes("@keyframes admin-anchor-highlight") &&
+      globals.includes("prefers-reduced-motion"),
+    "admin handoff buttons scroll to the target panel and briefly highlight it without relying on alerts",
+    "required"
+  );
+}
+
+if (fileExists("components/CompareBoard.tsx") && fileExists("components/CompareButton.tsx") && fileExists("components/CompareDock.tsx")) {
+  const compareBoard = readText("components/CompareBoard.tsx");
+  const compareButton = readText("components/CompareButton.tsx");
+  const compareDock = readText("components/CompareDock.tsx");
+  check(
+    "compare: storage and load failures are non-blocking",
+    compareBoard.includes("getStoredJsonArray") &&
+      compareBoard.includes("비교 상품 정보를 불러오지 못했습니다") &&
+      compareBoard.includes("네트워크 문제로 비교 상품 정보를 불러오지 못했습니다") &&
+      compareButton.includes("setStoredJsonArray") &&
+      compareDock.includes("setStoredJsonArray"),
+    "compare cart storage and API failures do not break the public purchase flow",
+    "required"
+  );
+}
+
+if (fileExists("components/AffiliateEventTracker.tsx")) {
+  const eventTracker = readText("components/AffiliateEventTracker.tsx");
+  check(
+    "client tracking: storage-safe view trackers",
+    eventTracker.includes("getStoredJsonArray") &&
+      eventTracker.includes("setStoredJsonArray") &&
+      !eventTracker.includes("window.localStorage"),
+    "impression and detail trackers use storage-safe helpers instead of raw localStorage",
+    "required"
+  );
+}
+
+if (fileExists("lib/apiReadiness.ts")) {
+  const readiness = readText("lib/apiReadiness.ts");
+  check("readiness: coupang deeplink connection test", readiness.includes("createCoupangDeeplink") && readiness.includes("deeplink_status"), "admin readiness tests Coupang search and deeplink path", "required");
+  check(
+    "readiness: coupang response-shape diagnostics",
+    readiness.includes("response_array_path") &&
+      readiness.includes("raw_product_count") &&
+      readiness.includes("sample_has_product_url") &&
+      readiness.includes("sample_product_url_field") &&
+      readiness.includes("쿠팡 검색 API는 응답했지만 상품 후보 배열이 비어 있습니다"),
+    "admin readiness surfaces Coupang response shape and sample URL diagnostics before first launch",
+    "required"
+  );
+  check(
+    "readiness: coupang approval-stage guidance",
+    readiness.includes("readableCoupangReadinessItem") &&
+      readiness.includes("readableCoupangConnectionCheck") &&
+      readiness.includes("COUPANG_API_PERMISSION_OR_APPROVAL_REQUIRED") &&
+      readiness.includes("최종승인 전이면 정상 대기 상태입니다") &&
+      readiness.includes("operator_next_action"),
+    "admin readiness explains Coupang API permission/approval failures with a concrete next action",
+    "required"
+  );
+  check(
+    "readiness: naver credential guidance",
+    readiness.includes("describeNaverApiIssue") &&
+      readiness.includes("readableNaverConnectionCheck") &&
+      readiness.includes("NAVER_API_CREDENTIAL_OR_PERMISSION_FAILED") &&
+      readiness.includes("NAVER_API_RATE_LIMITED") &&
+      readiness.includes("operator_next_action"),
+    "admin readiness explains Naver credential, permission, and rate-limit failures with a concrete next action",
+    "required"
+  );
+  check(
+    "readiness: naver response-price diagnostics",
+    readiness.includes("api_total") &&
+      readiness.includes("raw_item_count") &&
+      readiness.includes("priced_item_count") &&
+      readiness.includes("sample_mall_name") &&
+      readiness.includes("네이버 쇼핑 API는 응답했지만 테스트 검색어의 items 배열이 비어 있습니다") &&
+      readiness.includes("네이버 검색 결과는 들어왔지만 lprice가 있는 항목이 없습니다"),
+    "admin readiness surfaces Naver response shape and price-field diagnostics before first launch",
+    "required"
+  );
+  check("readiness: telegram launch gate", readiness.includes('"telegram"') && readiness.includes("getChat") && readiness.includes("get_chat_ok"), "admin readiness requires Telegram token and chat access for launch", "required");
+  check(
+    "readiness: telegram operator guidance",
+    readiness.includes("describeTelegramApiIssue") &&
+      readiness.includes("readableTelegramConnectionCheck") &&
+      readiness.includes("TELEGRAM_BOT_TOKEN_INVALID") &&
+      readiness.includes("TELEGRAM_CHAT_ACCESS_FAILED") &&
+      readiness.includes("TELEGRAM_API_RATE_LIMITED") &&
+      readiness.includes("operator_next_action"),
+    "admin readiness explains Telegram token, chat access, and rate-limit failures with a concrete next action",
+    "required"
+  );
+  check(
+    "readiness: supabase schema column test",
+    readiness.includes("requiredSchemaChecks") && readiness.includes("keyword_key") && readiness.includes("SCHEMA_VERSION_MISMATCH"),
+    "admin readiness verifies required Supabase columns",
+    "required"
+  );
+  check(
+    "readiness: supabase env value validation",
+    readiness.includes("buildSupabaseItem") &&
+      readiness.includes("getSupabaseUrlIssue") &&
+      readiness.includes("isLikelySupabaseKey") &&
+      readiness.includes("SUPABASE_KEYS_MUST_DIFFER") &&
+      readiness.includes("missing_or_invalid_env"),
+    "admin readiness rejects malformed Supabase URLs, short keys, or identical anon/service keys before live DB checks",
+    "required"
+  );
+  check(
+    "readiness: supabase operator guidance",
+    readiness.includes("describeSupabaseIssue") &&
+      readiness.includes("readableSupabaseConnectionCheck") &&
+      readiness.includes("SUPABASE_SCHEMA_VERSION_MISMATCH") &&
+      readiness.includes("SUPABASE_TABLE_OR_COLUMN_MISSING") &&
+      readiness.includes("SUPABASE_WRITE_SMOKE_FAILED") &&
+      readiness.includes("SUPABASE_PUBLIC_RLS_FAILED") &&
+      readiness.includes("operator_next_action"),
+    "admin readiness explains Supabase env, schema, write, and RLS failures with a concrete next action",
+    "required"
+  );
+  check(
+    "readiness: supabase schema version marker",
+    readiness.includes("EXPECTED_SCHEMA_VERSION") && readiness.includes("returnpick_schema_meta") && readiness.includes("schema_version"),
+    "admin readiness verifies the deployed DB has the latest schema.sql marker",
+    "required"
+  );
+  check(
+    "readiness: strict affiliate SQL function smoke test",
+    readiness.includes("runStrictAffiliateSqlFunctionSmokeCheck") &&
+      readiness.includes("is_strict_coupang_partners_url") &&
+      readiness.includes("strict_affiliate_function_accepts_short_link") &&
+      readiness.includes("strict_affiliate_function_rejects_fake_code") &&
+      readiness.includes("strict_affiliate_function_rejects_regular_coupang_url") &&
+      readiness.includes("strict_affiliate_function"),
+    "admin readiness calls the DB function and verifies strict Partners link acceptance/rejection, not only the schema version marker",
+    "required"
+  );
+  check(
+    "readiness: public site URL validation",
+    readiness.includes("getPublicSiteUrlIssue") &&
+      readiness.includes("https_required") &&
+      readiness.includes("public_domain_required") &&
+      readiness.includes("localhost") &&
+      readiness.includes("buildPublicSiteUrlItem"),
+    "admin readiness blocks local, invalid, or non-HTTPS NEXT_PUBLIC_SITE_URL values before first launch",
+    "required"
+  );
+  check(
+    "readiness: approval link and cron secret validation",
+    readiness.includes("buildApprovalLinkItem") &&
+      readiness.includes("isCoupangPartnersLink") &&
+      readiness.includes("buildCronSecretItem") &&
+      readiness.includes("raw.length >= 16"),
+    "admin readiness rejects invalid approval links and short CRON_SECRET values before first launch",
+    "required"
+  );
+  check(
+    "readiness: admin password value validation",
+    readiness.includes("buildAdminPasswordItem") &&
+      readiness.includes("isStrongAdminPassword") &&
+      readiness.includes("admin_password") &&
+      readiness.includes("admin_password"),
+    "admin readiness rejects short or placeholder ADMIN_PASSWORD values before first launch",
+    "required"
+  );
+  check(
+    "readiness: provider env value validation",
+    readiness.includes("buildCoupangItem") &&
+      readiness.includes("buildNaverItem") &&
+      readiness.includes("buildTelegramItem") &&
+      readiness.includes("isLikelyProviderSecret") &&
+      readiness.includes("isLikelyTelegramBotToken") &&
+      readiness.includes("missing_or_invalid_env"),
+    "admin readiness rejects malformed Coupang, Naver, or Telegram env values before live API checks",
+    "required"
+  );
+  check(
+    "readiness: public web config validation",
+    readiness.includes("buildPublicWebItem") &&
+      readiness.includes("getPublicWebHostIssue") &&
+      readiness.includes("getPublicWebTemplateIssue") &&
+      readiness.includes("template_host_not_allowed") &&
+      readiness.includes('...(publicWebEnabled ? ["public_web"] : [])'),
+    "admin readiness blocks unsafe or mismatched public-web crawl allowlists and templates when crawling is enabled",
+    "required"
+  );
+  check(
+    "readiness: public web config count bounds",
+    readiness.includes("MAX_PUBLIC_WEB_ALLOWED_HOSTS") &&
+      readiness.includes("MAX_PUBLIC_WEB_SEARCH_TEMPLATES") &&
+      readiness.includes("tooManyHosts") &&
+      readiness.includes("tooManyTemplates") &&
+      readiness.includes("PUBLIC_WEB_ALLOWED_HOSTS는 최대"),
+    "admin readiness blocks overly broad public-web crawl host and template lists",
+    "required"
+  );
+  check(
+    "readiness: public web live connection check",
+    readiness.includes("searchPublicWebProducts") &&
+      readiness.includes("requiredConnectionCheckIds") &&
+      readiness.includes('"public_web"') &&
+      readiness.includes("PUBLIC_WEB_CRAWL_ENABLED") &&
+      readiness.includes("provider_status: result.status"),
+    "admin readiness runs a robots-aware public-web live check only when public web collection is enabled",
+    "required"
+  );
+  check("readiness: supabase write smoke test", readiness.includes("runSupabaseWriteSmokeCheck") && readiness.includes("sourcing_runs_insert") && readiness.includes("affiliate_events_insert"), "admin readiness verifies Supabase write paths for logs and events", "required");
+  check(
+    "readiness: anon public RLS smoke test",
+    readiness.includes("runAnonPublicRlsSmokeCheck") &&
+      readiness.includes("anon_can_read_affiliate_ready_product") &&
+      readiness.includes("anon_cannot_read_unpublished_product") &&
+      readiness.includes("anon_public_rls_smoke"),
+    "admin readiness verifies public RLS with the anon key, not only service role access",
+    "required"
+  );
+  check(
+    "readiness: public data quality gate",
+    readiness.includes("runPublicDataQualityCheck") &&
+      readiness.includes("getCustomerPublishReadiness") &&
+      readiness.includes("published_public_quality_blockers") &&
+      readiness.includes("published_public_ready_count") &&
+      readiness.includes("published_customer_hidden_count") &&
+      readiness.includes("public_quality_blocker_summary") &&
+      readiness.includes("sample_public_quality_blocked_products") &&
+      readiness.includes("published_non_partners_affiliate_url") &&
+      readiness.includes("audited_public_affiliate_rows") &&
+      readiness.includes("approval_sample_link_reuse") &&
+      readiness.includes("public_affiliate_constraint") &&
+      readiness.includes("공개 보류 상품의 최다 blocker"),
+    "admin readiness detects and summarizes published products with public quality blockers, missing, weak, non-Partners, sample, or schema-unprotected affiliate URLs",
+    "required"
+  );
+  check("readiness: public approval live check", readiness.includes("runPublicSiteLiveCheck") && readiness.includes("\uCFE0\uD321\uC5D0\uC11C \uAC00\uACA9 \uD655\uC778") && readiness.includes("has_approval_affiliate_url"), "admin readiness verifies public approval page and affiliate disclosure", "required");
+  check(
+    "readiness: cron endpoint probe",
+    readiness.includes("runCronProbeCheck") &&
+      readiness.includes("/api/cron/sourcing?probe=1") &&
+      readiness.includes("/api/cron/telegram-digest?probe=1") &&
+      readiness.includes("job_started === false"),
+    "admin readiness verifies deployed Cron endpoints with CRON_SECRET without starting jobs",
+    "required"
+  );
+  check("readiness: full launch gate", readiness.includes("launchReady") && readiness.includes("blockingEnv") && readiness.includes("NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL"), "admin readiness distinguishes API keys from full production launch readiness", "required");
+  check(
+    "readiness: isolated connection check failures",
+    readiness.includes("connectionCheckFailure") &&
+      readiness.includes('connectionCheckFailure("coupang"') &&
+      readiness.includes('connectionCheckFailure("naver"') &&
+      readiness.includes('connectionCheckFailure("supabase"') &&
+      readiness.includes('connectionCheckFailure("telegram"'),
+    "admin readiness keeps reporting other live checks when one provider throws unexpectedly",
+    "required"
+  );
+}
+
+if (fileExists("app/api/admin/api-readiness/route.ts")) {
+  const readinessRoute = readText("app/api/admin/api-readiness/route.ts");
+  check(
+    "admin api: api readiness safe error response",
+    readinessRoute.includes("apiReadinessErrorResponse") &&
+      readinessRoute.includes("API_READINESS_FAILED") &&
+      readinessRoute.includes("message.slice(0, 300)") &&
+      readinessRoute.includes("catch (error)") &&
+      readinessRoute.includes("return apiReadinessErrorResponse(error)"),
+    "admin API readiness route returns bounded JSON errors when live connection checks throw",
+    "required"
+  );
+}
+
+if (fileExists("lib/validators.ts")) {
+  const validators = readText("lib/validators.ts");
+  check(
+    "admin api: weak password guard",
+    validators.includes("isStrongAdminPassword") &&
+      validators.includes("ADMIN_PASSWORD_WEAK_CONFIGURATION") &&
+      validators.includes("raw.length < 12") &&
+      validators.includes("looksLikePlaceholder"),
+    "production admin API rejects missing, short, or placeholder ADMIN_PASSWORD values before checking requests",
+    "required"
+  );
+}
+
+if (fileExists("components/AdminLaunchStatusBar.tsx")) {
+  const launchStatusBar = readText("components/AdminLaunchStatusBar.tsx");
+  check(
+    "admin: launch status command center",
+    launchStatusBar.includes("Launch Command Center") &&
+      launchStatusBar.includes("운영 전환 요약") &&
+      launchStatusBar.includes("승인 대기") &&
+      launchStatusBar.includes("첫 가동 가능") &&
+      launchStatusBar.includes("누락 환경변수") &&
+      launchStatusBar.includes("준비도 점검") &&
+      launchStatusBar.includes("첫 가동") &&
+      launchStatusBar.includes("운영 지표") &&
+      launchStatusBar.includes("/products/approval-sample"),
+    "admin top bar summarizes approval/API/launch status and links operators to the next panel without exposing secrets",
+    "required"
+  );
+  check(
+    "admin: launch status safe readiness fetch",
+    launchStatusBar.includes('fetch("/api/admin/api-readiness"') &&
+      launchStatusBar.includes("x-admin-password") &&
+      launchStatusBar.includes("data.message ?? data.error") &&
+      launchStatusBar.includes("네트워크 문제로 운영 전환 상태를 불러오지 못했습니다") &&
+      launchStatusBar.includes("scrollToAdminAnchor(\"admin-api-readiness\")") &&
+      launchStatusBar.includes("scrollToAdminAnchor(\"admin-ops-dashboard\")"),
+    "admin top bar fetches readiness with the admin password and handles API/network errors inline",
+    "required"
+  );
+}
+
+if (fileExists("components/AdminApiReadinessPanel.tsx")) {
+  const panel = readText("components/AdminApiReadinessPanel.tsx");
+  check("admin: launch runbook", panel.includes("승인 후 첫 운영 순서") && panel.includes("목업 끄고 첫 후보 수집"), "admin shows the post-approval first-run checklist", "required");
+  check("admin: launch connection checks include data quality", panel.includes("requiredConnectionCheckIds") && panel.includes("공개 상품 데이터 품질"), "admin launch checklist requires public product data quality checks", "required");
+  check("admin: launch connection checks include telegram", panel.includes("텔레그램 chat ID") && panel.includes("공개 승인 페이지"), "admin launch checklist requires Telegram and public page checks", "required");
+  check("admin: launch connection checks include cron", panel.includes("Cron 인증"), "admin launch checklist requires deployed Cron auth checks", "required");
+  check(
+    "admin: launch connection checks include optional public web",
+    panel.includes("readiness.requiredConnectionCheckIds.every") &&
+      panel.includes("공개 웹 참고 수집 사용 시 robots.txt 경로"),
+    "admin launch checklist includes public-web robots checks when that optional source is enabled",
+    "required"
+  );
+  check(
+    "admin: connection check detail display",
+    panel.includes("formatCheckDetailValue") && panel.includes("checkDetailEntries") && panel.includes("진단 세부정보"),
+    "admin shows safe detail fields for failed API, Supabase, Cron, and public-site connection checks",
+    "required"
+  );
+  check(
+    "admin: readiness operator action cards",
+    panel.includes("operatorNextActionFromDetail") &&
+      panel.includes('key !== "operator_next_action"') &&
+      panel.includes("다음 조치") &&
+      panel.includes("publicQualityBlockerSummaryFromDetail") &&
+      panel.includes("품질 blocker 요약") &&
+      panel.includes('key !== "public_quality_blocker_summary"'),
+    "admin shows next actions and public quality blocker summaries as dedicated cards instead of burying them in JSON detail",
+    "required"
+  );
+  check(
+    "admin: supabase schema action",
+    panel.includes("getSupabaseSchemaIssue") &&
+      panel.includes("Supabase 최신 SQL 적용 필요") &&
+      panel.includes("sql/schema.sql") &&
+      panel.includes("기대 버전") &&
+      panel.includes("현재 DB 버전"),
+    "admin highlights schema version mismatches with a clear Supabase SQL reapply action",
+    "required"
+  );
+  check(
+    "admin: supabase schema runbook copy",
+    panel.includes("copySupabaseSchemaRunbook") &&
+      panel.includes("SQL 적용 체크리스트 복사") &&
+      panel.includes("C:\\\\projects\\\\returnpick\\\\sql\\\\schema.sql") &&
+      panel.includes("returnpick_schema_meta") &&
+      panel.includes("is_strict_coupang_partners_url"),
+    "admin can copy a concrete Supabase SQL reapply checklist when the deployed DB schema is stale",
+    "required"
+  );
+  check(
+    "admin: connection failure report copy",
+    panel.includes("copyConnectionFailureReport") &&
+      panel.includes("실패 보고서 복사") &&
+      panel.includes("ReturnPick 실제 연결 테스트 실패 보고서") &&
+      panel.includes("failedConnectionCheckCount") &&
+      panel.includes("진단 세부정보"),
+    "admin can copy a safe report of failed live connection checks after API keys are entered",
+    "required"
+  );
+  check(
+    "admin: connection failure report action summary copy",
+    panel.includes("operatorNextActionFromDetail(check.detail)") &&
+      panel.includes("publicQualityBlockerSummaryFromDetail(check.detail)") &&
+      panel.includes("- 다음 조치:") &&
+      panel.includes("- 품질 blocker 요약:"),
+    "copied failure reports include the same operator action and public-quality blocker summary shown in the readiness cards",
+    "required"
+  );
+  check(
+    "admin: readiness public quality metric cards",
+    panel.includes("publicQualityMetricCardsFromDetail") &&
+      panel.includes("published_public_ready_count") &&
+      panel.includes("published_customer_hidden_count") &&
+      panel.includes("공개 품질 운영 요약") &&
+      panel.includes("고객 공개 가능") &&
+      panel.includes("링크 보강 필요") &&
+      panel.includes("DB 링크 제약"),
+    "admin readiness connection results summarize customer-visible deal count, hidden published rows, affiliate-link repair, and DB link constraint status",
+    "required"
+  );
+  check(
+    "admin: readiness public quality repair handoff",
+    panel.includes("publicQualityActionButtonsFromDetail") &&
+      panel.includes("바로 보강하기") &&
+      panel.includes("링크 보강 큐로 이동") &&
+      panel.includes("공개 보강 후보로 이동") &&
+      panel.includes("admin-affiliate-links") &&
+      panel.includes("admin-candidate-review") &&
+      panel.includes("scrollToAdminAnchor(action.anchor)"),
+    "admin readiness public-quality summary can send operators directly to affiliate-link repair or candidate public-repair queues",
+    "required"
+  );
+  check(
+    "admin: next launch action card",
+    panel.includes("nextLaunchAction") &&
+      panel.includes("Next Launch Action") &&
+      panel.includes("실제 연결 테스트") &&
+      panel.includes("목업 끄고 첫 후보 수집"),
+    "admin shows the single next operator action for approval wait, env setup, connection checks, or first launch",
+    "required"
+  );
+  check(
+    "admin: readiness to first launch handoff",
+    panel.includes('id="admin-api-readiness"') &&
+      panel.includes("scrollToFirstLaunchRunner") &&
+      panel.includes("scrollToAdminAnchor") &&
+      panel.includes("admin-first-launch") &&
+      panel.includes("첫 가동 실행으로 이동"),
+    "admin readiness panel can send operators to the first-launch runner once live checks pass",
+    "required"
+  );
+  check(
+    "admin: vercel env copy checklist",
+    panel.includes("Vercel Environment Variables") &&
+      panel.includes("누락 키만 복사") &&
+      panel.includes("NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL") &&
+      panel.includes("CRON_USE_MOCK_FALLBACK") &&
+      panel.includes("SOURCING_TIME_BUDGET_MS") &&
+      panel.includes("PUBLIC_WEB_CRAWL_ENABLED"),
+    "admin can copy the required and operational Vercel environment variable template after approval",
+    "required"
+  );
+  check(
+    "admin: operational secret generator",
+    panel.includes("createOperationalSecret") &&
+      panel.includes("generatedSecrets") &&
+      panel.includes("generateOperationalSecrets") &&
+      panel.includes("보안값 생성") &&
+      panel.includes("ADMIN_PASSWORD") &&
+      panel.includes("CRON_SECRET") &&
+      panel.includes("cryptoSource.getRandomValues"),
+    "admin can generate strong ADMIN_PASSWORD and CRON_SECRET values client-side for Vercel launch setup",
+    "required"
+  );
+  check(
+    "admin: GitHub scheduler manual readiness copy",
+    panel.includes("githubSchedulerReadinessRunbook") &&
+      panel.includes("copyGithubSchedulerReadinessRunbook") &&
+      panel.includes("GitHub Actions 1시간 스케줄러 수동 확인") &&
+      panel.includes("RETURNPICK_CRON_SECRET") &&
+      panel.includes("RETURNPICK_SITE_URL") &&
+      panel.includes("ReturnPick Hourly Scheduler") &&
+      panel.includes("GitHub 스케줄러 체크 복사") &&
+      panel.includes("앱 서버는 GitHub Repository secret 값을 직접 읽을 수 없습니다"),
+    "admin readiness panel makes the GitHub hourly scheduler secret/variable check explicit because the app cannot read repository secrets",
+    "required"
+  );
+  check(
+    "admin: production deploy guard copy",
+    panel.includes("productionDeployRunbook") &&
+      panel.includes("copyProductionDeployRunbook") &&
+      panel.includes("Production Deploy Guard") &&
+      panel.includes("운영 전환 명령 복사") &&
+      panel.includes("npm run doctor:production:launch:fresh") &&
+      panel.includes("npm run deploy:production:launch -- confirm") &&
+      panel.includes("npm run deploy:production:go-live -- confirm") &&
+      panel.includes("confirm이 없으면 실제 배포나 데이터 작업을 시작하지 않습니다"),
+    "admin readiness panel exposes the guarded production deploy and go-live command sequence after approval",
+    "required"
+  );
+  check(
+    "admin: readiness check failure feedback",
+    panel.includes("data.message ?? data.error") &&
+      panel.includes("네트워크 문제로 API 연결 테스트를 실행하지 못했습니다") &&
+      panel.includes("setChecks([])") &&
+      panel.includes("catch {"),
+    "admin readiness panel shows API and network failures without leaving the connection check stuck",
+    "required"
+  );
+}
+
+if (fileExists("app/api/admin/keywords/route.ts")) {
+  const keywordRoute = readText("app/api/admin/keywords/route.ts");
+  check(
+    "admin api: keyword input validation",
+    keywordRoute.includes("INVALID_KEYWORD_PRICE") &&
+      keywordRoute.includes("INVALID_KEYWORD_DISCOUNT_RATE") &&
+      keywordRoute.includes("INVALID_KEYWORD_PRICE_RANGE") &&
+      keywordRoute.includes("키워드는 2~80자 사이로 입력하세요") &&
+      keywordRoute.includes("최소가는 최대가보다 클 수 없습니다"),
+    "admin keyword API rejects invalid keyword, price, discount, and price-range values before sourcing",
+    "required"
+  );
+}
+
+if (fileExists("components/AdminKeywordManager.tsx")) {
+  const keywordManager = readText("components/AdminKeywordManager.tsx");
+  check(
+    "admin: keyword manager save feedback",
+    keywordManager.includes("notice") &&
+      keywordManager.includes('id="admin-keyword-manager"') &&
+      keywordManager.includes("!response.ok") &&
+      keywordManager.includes("data.message ?? data.error") &&
+      keywordManager.includes("role=\"status\"") &&
+      keywordManager.includes("키워드를 저장했습니다"),
+    "admin keyword manager shows API validation errors and success feedback",
+    "required"
+  );
+}
+
+if (fileExists("components/AdminSourcingRunner.tsx")) {
+  const runner = readText("components/AdminSourcingRunner.tsx");
+  check("admin: sourcing run diagnosis", runner.includes("diagnoseSourcingRun") && runner.includes("providerStats"), "admin shows first-run sourcing diagnostics", "required");
+  check(
+    "admin: sourcing immediate diagnosis feedback",
+      runner.includes("immediateDiagnosisMessage") &&
+      runner.includes("noticeTypeFromRun") &&
+      runner.includes("data.diagnosis") &&
+      runner.includes("notice.type === \"warning\"") &&
+      runner.includes("다음 조치:") &&
+      runner.includes("공급원 오류"),
+    "admin sourcing runner shows diagnostics immediately after a run finishes and uses warning for recovered provider failures",
+    "required"
+  );
+  check(
+    "admin: sourcing run row diagnostics",
+    runner.includes("runProviderSummary") &&
+      runner.includes("runIssueSummary") &&
+      runner.includes("가격 필터") &&
+      runner.includes("robots 확인불가") &&
+      runner.includes("공개웹 진단") &&
+      runner.includes("publicWebDiagnosticStatuses") &&
+      runner.includes("공급원 오류") &&
+      runner.includes("providerIssueProviders") &&
+      runner.includes("공급원") &&
+      runner.includes("진단"),
+    "admin sourcing run history shows provider-level and issue-level summaries for each run",
+    "required"
+  );
+  check("admin: mock fallback follows API readiness", runner.includes("apiKeysReady") && runner.includes("setUseMockFallback(!nextReadiness.apiKeysReady)"), "admin disables mock fallback by default after API keys are detected", "required");
+  check("admin: mock fallback control locks after API readiness", runner.includes("mockFallbackLocked") && runner.includes("disabled={mockFallbackLocked}") && runner.includes("mockFallbackBlockedReason"), "admin cannot accidentally request mock fallback after API keys are detected", "required");
+  check(
+    "admin: sourcing diagnosis quick actions",
+    runner.includes("diagnosisQuickActions") &&
+      runner.includes('id="admin-sourcing-runner"') &&
+      runner.includes("API 준비도 확인") &&
+      runner.includes("키워드 조건 조정") &&
+      runner.includes("공개웹 설정 확인") &&
+      runner.includes("수집 이어서 실행") &&
+      runner.includes("admin-api-readiness") &&
+      runner.includes("admin-keyword-manager") &&
+      runner.includes("scrollToAdminAnchor(action.anchor)"),
+    "admin sourcing diagnosis cards send operators directly to readiness, keyword repair, public-web settings, or rerun context",
+    "required"
+  );
+  check(
+    "admin: sourcing runner surfaces execution failures",
+    runner.includes("notice") &&
+      runner.includes("!response.ok") &&
+      runner.includes("data.message ?? data.error") &&
+      runner.includes("role=\"status\"") &&
+      runner.includes("네트워크 문제로 후보 수집을 실행하지 못했습니다"),
+    "admin sourcing runner shows API and network failures instead of silently hiding failed runs",
+    "required"
+  );
+  check(
+    "admin: sourcing runner readable Korean copy",
+    runner.includes("자동 후보 수집") &&
+      runner.includes("후보 수집 실행") &&
+      runner.includes("실제 연동 소스만 사용해 후보를 수집하고 있습니다") &&
+      runner.includes("실행 기록이 없습니다") &&
+      runner.includes("Crawl-delay 제외"),
+    "admin sourcing runner uses readable Korean operator copy for run status and diagnostics",
+    "required"
+  );
+}
+
+if (fileExists("lib/sourcingDiagnostics.ts")) {
+  const diagnostics = readText("lib/sourcingDiagnostics.ts");
+  check(
+    "sourcing diagnostics: readable Korean operator guidance",
+    diagnostics.includes("후보 수집 정상") &&
+      diagnostics.includes("수집 오류 확인 필요") &&
+      diagnostics.includes("실제 소스 후보가 없습니다") &&
+      diagnostics.includes("가격 필터가 후보를 모두 제외했습니다") &&
+      diagnostics.includes("robots.txt의 Crawl-delay가 너무 긴 호스트"),
+    "sourcing diagnostics explains first-run sourcing outcomes in readable Korean",
+    "required"
+  );
+}
+
+if (fileExists("components/AdminPriceBackfillPanel.tsx")) {
+  const pricePanel = readText("components/AdminPriceBackfillPanel.tsx");
+  check(
+    "admin: price backfill feedback",
+    pricePanel.includes('id="admin-price-backfill"') &&
+      pricePanel.includes("lastResult") &&
+      pricePanel.includes("최근 보강 상세") &&
+      pricePanel.includes("매칭 검색어와 실패 사유") &&
+      pricePanel.includes("detailStatusLabel") &&
+      pricePanel.includes("가격 보강 완료") &&
+      pricePanel.includes("상품명이나 모델명을 보완") &&
+      pricePanel.includes("includeCandidates") &&
+      pricePanel.includes("검토 후보까지 포함") &&
+      pricePanel.includes("publishedOnly: !includeCandidates") &&
+      pricePanel.includes("!response.ok") &&
+      pricePanel.includes("role=\"status\"") &&
+      pricePanel.includes("네트워크 문제로 네이버 최저가 보강을 실행하지 못했습니다"),
+    "admin price backfill panel shows API, network, per-product result feedback, and can include review candidates",
+    "required"
+  );
+  check(
+    "admin: price backfill retry query links",
+    pricePanel.includes("naverShoppingSearchUrl") &&
+      pricePanel.includes("detailQueries") &&
+      pricePanel.includes("queries?: string[]") &&
+      pricePanel.includes("재검색어") &&
+      pricePanel.includes("search.shopping.naver.com/search/all") &&
+      pricePanel.includes("target=\"_blank\"") &&
+      pricePanel.includes("rel=\"noopener noreferrer\""),
+    "admin price backfill details expose attempted Naver queries as safe manual retry links",
+    "required"
+  );
+}
+
+if (fileExists("lib/naverPriceBackfill.ts")) {
+  const naverPriceBackfill = readText("lib/naverPriceBackfill.ts");
+  check(
+    "naver price backfill: per-item update failure isolation",
+    naverPriceBackfill.includes("backfillErrorMessage") &&
+      naverPriceBackfill.includes("NAVER_PRICE_BACKFILL_UPDATE_FAILED") &&
+      naverPriceBackfill.includes("NAVER_PRICE_BACKFILL_SCORE_FAILED") &&
+      naverPriceBackfill.includes("NAVER_PRICE_BACKFILL_LOG_FAILED") &&
+      naverPriceBackfill.includes("continue;") &&
+      naverPriceBackfill.includes("await updateProduct(product.id"),
+    "a single product save, score, or log failure is reported on that item while the Naver price backfill continues",
+    "required"
+  );
+  check(
+    "naver price backfill: readable cleanup tokens",
+    naverPriceBackfill.includes("반품|리퍼|중고|미개봉") &&
+      naverPriceBackfill.includes("확인필요") &&
+      naverPriceBackfill.includes("쿠팡|파트너스"),
+    "Naver price backfill removes readable Korean condition and affiliate words before searching",
+    "required"
+  );
+  check(
+    "naver price backfill: no-match retry details",
+    naverPriceBackfill.includes("NaverPriceBackfillDetail") &&
+      naverPriceBackfill.includes("queries?: string[]") &&
+      naverPriceBackfill.includes("firstQuery") &&
+      naverPriceBackfill.includes("noMatchReason") &&
+      naverPriceBackfill.includes("NO_RELEVANT_PRICED_MATCH") &&
+      naverPriceBackfill.includes("NAVER_API_NOT_CONFIGURED") &&
+      naverPriceBackfill.includes("queries: result.queries"),
+    "Naver price backfill returns attempted query details when API is missing or no priced match is found",
+    "required"
+  );
+}
+
+if (fileExists("app/api/admin/sourcing/run/route.ts")) {
+  const route = readText("app/api/admin/sourcing/run/route.ts");
+  check(
+    "admin api: sourcing run diagnosis response",
+    route.includes("diagnoseSourcingRun") &&
+      route.includes("diagnosis: diagnoseSourcingRun(run)") &&
+      route.includes("defaults: mockFallbackDecision"),
+    "admin sourcing run API returns immediate diagnostics with the run result",
+    "required"
+  );
+  check("admin api: safe mock fallback default", route.includes("getApiReadinessSummary") && route.includes("readiness.apiKeysReady") && route.includes("mockFallbackDecision"), "admin sourcing API defaults to real-source mode when API keys are present", "required");
+  check("admin api: production mock fallback hard block", route.includes("MOCK_FALLBACK_BLOCKED_AFTER_API_READY") && route.includes('process.env.NODE_ENV === "production"') && route.includes("requestedMockFallback === true"), "production admin sourcing blocks explicit mock fallback requests after API keys are present", "required");
+  check(
+    "admin api: sourcing run safe error response",
+    route.includes("sourcingErrorResponse") &&
+      route.includes("SOURCING_RUN_FAILED") &&
+      route.includes("message.slice(0, 300)") &&
+      route.includes("catch (error)") &&
+      route.includes("return sourcingErrorResponse(error)"),
+    "admin sourcing API returns bounded JSON errors when run lookup or execution fails",
+    "required"
+  );
+}
+
+if (fileExists("app/api/admin/prices/backfill/route.ts")) {
+  const priceRoute = readText("app/api/admin/prices/backfill/route.ts");
+  check(
+    "admin api: price backfill safe error response",
+    priceRoute.includes("priceBackfillErrorResponse") &&
+      priceRoute.includes("PRICE_BACKFILL_FAILED") &&
+      priceRoute.includes("message.slice(0, 300)") &&
+      priceRoute.includes("needs_review_missing_naver_lowest_price") &&
+      priceRoute.includes("catch (error)") &&
+      priceRoute.includes("return priceBackfillErrorResponse(error)"),
+    "admin price backfill API returns bounded JSON errors and candidate-missing summary when summary or execution fails",
+    "required"
+  );
+}
+
+if (fileExists("app/api/admin/products/route.ts")) {
+  const productsRoute = readText("app/api/admin/products/route.ts");
+  check(
+    "admin api: product list safe error response",
+    productsRoute.includes("adminProductsErrorResponse") &&
+      productsRoute.includes("ADMIN_PRODUCTS_FAILED") &&
+      productsRoute.includes("message.slice(0, 300)") &&
+      productsRoute.includes("catch (error)") &&
+      productsRoute.includes("return adminProductsErrorResponse(error)"),
+    "admin product list API returns bounded JSON errors when product lookup fails",
+    "required"
+  );
+}
+
+if (fileExists("app/api/admin/metrics/route.ts") && fileExists("app/api/admin/revenue-metrics/route.ts")) {
+  const metricsRoute = readText("app/api/admin/metrics/route.ts");
+  const revenueMetricsRoute = readText("app/api/admin/revenue-metrics/route.ts");
+  check(
+    "admin api: metrics safe error response",
+    metricsRoute.includes("ADMIN_METRICS_FAILED") &&
+      metricsRoute.includes("adminMetricsErrorResponse") &&
+      revenueMetricsRoute.includes("REVENUE_METRICS_FAILED") &&
+      revenueMetricsRoute.includes("revenueMetricsErrorResponse"),
+    "admin operational and revenue metrics APIs return bounded JSON errors when lookup fails",
+    "required"
+  );
+}
+
+if (fileExists("app/api/admin/products/[id]/route.ts")) {
+  const productRoute = readText("app/api/admin/products/[id]/route.ts");
+  check(
+    "admin api: affiliate required for publish",
+    productRoute.includes("AFFILIATE_URL_REQUIRED_FOR_PUBLISH") && productRoute.includes("isUsableAffiliateUrl"),
+    "server blocks publishing products without usable affiliate links",
+    "required"
+  );
+  check(
+    "admin api: approval sample link blocked for publish",
+    productRoute.includes("APPROVAL_SAMPLE_LINK_NOT_ALLOWED_FOR_PUBLISH") &&
+      productRoute.includes("isApprovalSampleAffiliateUrl") &&
+      productRoute.includes("/products/approval-sample 전용"),
+    "server blocks reusing the approval sample affiliate link on real published products",
+    "required"
+  );
+  check(
+    "admin api: approval sample link blocked for save",
+    productRoute.includes('"affiliate_url" in body') &&
+      productRoute.includes("APPROVAL_SAMPLE_LINK_NOT_ALLOWED_FOR_PRODUCT") &&
+      productRoute.includes("실상품에는 상품별 파트너스 링크를 저장하세요"),
+    "server blocks saving the approval sample affiliate link on real products before it can become bad inventory",
+    "required"
+  );
+  check(
+    "admin api: invalid affiliate url blocked for save",
+    productRoute.includes("INVALID_AFFILIATE_URL_FOR_PRODUCT") &&
+      productRoute.includes("invalidAffiliateUrlMessage") &&
+      productRoute.includes("일반 쿠팡 상품 URL은 affiliate_url에 저장할 수 없습니다") &&
+      productRoute.includes("nextPublishedStatus") &&
+      productRoute.includes("current.sourcing_status") &&
+      productRoute.includes("hasAffiliateUrlPatch ? patch.affiliate_url : current.affiliate_url"),
+    "server blocks regular Coupang URLs or invalid affiliate_url values and prevents clearing a published CTA link",
+    "required"
+  );
+  check(
+    "admin api: product mutation safe error response",
+    productRoute.includes("productMutationErrorResponse") &&
+      productRoute.includes("ADMIN_PRODUCT_MUTATION_FAILED") &&
+      productRoute.includes("message.slice(0, 300)") &&
+      productRoute.includes("catch (error)") &&
+      productRoute.includes("return productMutationErrorResponse(error)"),
+    "admin product detail and mutation API returns bounded JSON errors for unexpected failures",
+    "required"
+  );
+  check(
+    "admin api: customer-ready publish gate",
+    productRoute.includes("getCustomerPublishReadiness") &&
+      productRoute.includes("PUBLIC_QUALITY_BLOCKERS_FOR_PUBLISH") &&
+      productRoute.includes("projectProductForPublishCheck") &&
+      productRoute.includes("publicQualityBlockResponse") &&
+      productRoute.includes("게시 전 ${blockers") &&
+      productRoute.includes("qualityBlock"),
+    "server-side product publish blocks public quality issues even when the admin UI is bypassed",
+    "required"
+  );
+}
+
+if (fileExists("components/AdminOpsDashboard.tsx")) {
+  const opsDashboard = readText("components/AdminOpsDashboard.tsx");
+  const dataStore = fileExists("lib/dataStore.ts") ? readText("lib/dataStore.ts") : "";
+  check(
+    "admin: ops dashboard feedback",
+    opsDashboard.includes("notice") &&
+      opsDashboard.includes('id="admin-ops-dashboard"') &&
+      opsDashboard.includes("role=\"status\"") &&
+      opsDashboard.includes("운영 지표를 불러오지 못했습니다") &&
+      opsDashboard.includes("수익 퍼널을 불러오지 못했습니다") &&
+      opsDashboard.includes("네트워크 문제로 운영 지표를 불러오지 못했습니다"),
+    "admin ops dashboard shows metrics, revenue metrics, and network failures inline",
+    "required"
+  );
+  check(
+    "admin: ops dashboard public-ready metrics",
+    opsDashboard.includes("publishedStatusCount") &&
+      opsDashboard.includes("공개 가능") &&
+      opsDashboard.includes("공개 보강 대기") &&
+      opsDashboard.includes("실제 사용자 화면에 보이는 공개 가능 상품") &&
+      opsDashboard.includes("고객공개 품질 블로커") &&
+      opsDashboard.includes("상품별 링크 보강") &&
+      opsDashboard.includes("품질 보강 대기") &&
+      opsDashboard.includes("링크 보강 큐로 이동") &&
+      opsDashboard.includes("품질 보강 후보로 이동") &&
+      opsDashboard.includes("scrollToAdminAnchor(\"admin-affiliate-links\")") &&
+      opsDashboard.includes("openAdminCandidateQueue(\"public_repair\")") &&
+      opsDashboard.includes("공개 목록과 텔레그램 발송에서 숨겨집니다"),
+    "admin dashboard separates truly visible public deals from published products missing links or quality readiness and links directly to repair queues",
+    "required"
+  );
+  check(
+    "admin: ops revenue recovery plan",
+    opsDashboard.includes("수익 회복 플랜") &&
+      opsDashboard.includes("Revenue Recovery") &&
+      opsDashboard.includes("primaryRecoveryAction") &&
+      opsDashboard.includes("상품별 파트너스 링크 보강") &&
+      opsDashboard.includes("공개 품질 보강") &&
+      opsDashboard.includes("검토 대기 후보 처리") &&
+      opsDashboard.includes("텔레그램 유입 시작") &&
+      opsDashboard.includes("openAdminCandidateQueue(\"review\")") &&
+      opsDashboard.includes("admin-telegram-distribution"),
+    "admin ops dashboard ranks the next revenue recovery action and sends operators to the exact repair queue",
+    "required"
+  );
+  check(
+    "admin: ops dashboard cta placement metrics",
+    opsDashboard.includes("channelMetrics") &&
+      opsDashboard.includes("CTA 위치별 클릭") &&
+      opsDashboard.includes("channelLabel") &&
+      opsDashboard.includes("web_detail_hero") &&
+      opsDashboard.includes("web_detail_mobile_sticky") &&
+      dataStore.includes("channelMetrics") &&
+      dataStore.includes("b.affiliate_clicks - a.affiliate_clicks"),
+    "admin revenue dashboard shows which explicit detail-page CTA placement generates Coupang clicks",
+    "required"
+  );
+}
+
+if (fileExists("components/AdminCandidateTable.tsx")) {
+  const candidateTable = readText("components/AdminCandidateTable.tsx");
+  const adminNavigation = fileExists("lib/adminNavigation.ts") ? readText("lib/adminNavigation.ts") : "";
+  const quality = fileExists("lib/quality.ts") ? readText("lib/quality.ts") : "";
+  check(
+    "admin: publish button requires affiliate",
+    candidateTable.includes("상품별 파트너스 링크 필요") &&
+      candidateTable.includes("isApprovalSampleAffiliateUrl") &&
+      candidateTable.includes("publishReady") &&
+      (candidateTable.includes("disabled={!publishReady}") || candidateTable.includes("disabled={!publishReady || actionProductId === product.id}")),
+    "admin publish button is disabled until a non-sample product affiliate link is ready",
+    "required"
+  );
+  check(
+    "admin: candidate table feedback",
+    candidateTable.includes("notice") &&
+      candidateTable.includes("!response.ok") &&
+      candidateTable.includes("role=\"status\"") &&
+      candidateTable.includes("네트워크 문제로 후보 목록을 불러오지 못했습니다") &&
+      candidateTable.includes("네트워크 문제로 후보 상태를 변경하지 못했습니다"),
+    "admin candidate table shows product-list, metrics, action, and network failures inline",
+    "required"
+  );
+  check(
+    "admin: candidate review anchor",
+    candidateTable.includes('id="admin-candidate-review"') && candidateTable.includes("scroll-mt-4"),
+    "admin candidate review queue has a stable anchor for post-launch handoff",
+    "required"
+  );
+  check(
+    "admin: candidate publish-ready fast filter",
+    candidateTable.includes("publishReadyOnly") &&
+      candidateTable.includes("바로 게시 가능") &&
+      candidateTable.includes("게시 가능만 보기") &&
+      candidateTable.includes("showPublishReadyQueue") &&
+      candidateTable.includes("setMissingAffiliateOnly(false)") &&
+      candidateTable.includes("reviewStats.publishReadyCount"),
+    "admin candidate review queue can focus on product-level affiliate-ready deals first",
+    "required"
+  );
+  check(
+    "admin: candidate public repair fast filter",
+    candidateTable.includes("publicBlockedOnly") &&
+      candidateTable.includes("isPublishedPublicBlocked") &&
+      candidateTable.includes("showPublicRepairQueue") &&
+      candidateTable.includes("공개 보강 대기") &&
+      candidateTable.includes("공개 보강 대기만 보기") &&
+      candidateTable.includes("게시됐지만 고객 화면 숨김") &&
+      candidateTable.includes('setStatus("published")'),
+    "admin candidate review queue can focus on published products hidden by customer-facing quality rules",
+    "required"
+  );
+  check(
+    "admin: cross-panel candidate queue handoff",
+    adminNavigation.includes("ADMIN_CANDIDATE_QUEUE_EVENT") &&
+      adminNavigation.includes("openAdminCandidateQueue") &&
+      adminNavigation.includes("returnpick_admin_candidate_queue") &&
+      candidateTable.includes("ADMIN_CANDIDATE_QUEUE_EVENT") &&
+      candidateTable.includes("applyCandidateQueue") &&
+      candidateTable.includes("publish_ready") &&
+      candidateTable.includes("affiliate_backfill") &&
+      candidateTable.includes("public_repair") &&
+      candidateTable.includes("window.addEventListener(ADMIN_CANDIDATE_QUEUE_EVENT"),
+    "admin recovery CTAs can open the candidate table with the intended review, publish-ready, affiliate-backfill, or public-repair filter",
+    "required"
+  );
+  check(
+    "admin: customer-ready publish gate",
+    candidateTable.includes("getCustomerPublishReadiness") &&
+      candidateTable.includes("isCustomerPublishReady") &&
+      candidateTable.includes("링크와 공개 품질 블로커 없음") &&
+      candidateTable.includes("고객공개 준비") &&
+      quality.includes("상품 이미지 확인 필요") &&
+      quality.includes("quality.blockers") &&
+      candidateTable.includes("게시 전 ${publishReadiness.blockers"),
+    "admin bulk and one-click publishing only targets customer-ready deals without public quality blockers",
+    "required"
+  );
+  check(
+    "admin: candidate bulk publish ready selection",
+    candidateTable.includes("selectedProductIds") &&
+      candidateTable.includes("selectedPublishReady") &&
+      candidateTable.includes("toggleAllPublishReadyFiltered") &&
+      candidateTable.includes("publishSelectedReady") &&
+      candidateTable.includes("선택 승인+게시") &&
+      candidateTable.includes("게시 가능 전체 선택") &&
+      candidateTable.includes('JSON.stringify({ action: "publish" })'),
+    "admin candidate review queue can publish selected product-level affiliate-ready deals in one explicit operator action",
+    "required"
+  );
+  check(
+    "admin: candidate post-publish telegram handoff",
+    candidateTable.includes("publishedActionCount") &&
+      candidateTable.includes("scrollToTelegramDistribution") &&
+      candidateTable.includes("admin-telegram-distribution") &&
+      candidateTable.includes("텔레그램 후보 발송으로 이동"),
+    "admin candidate review queue points operators to Telegram distribution after explicit publish actions",
+    "required"
+  );
+}
+
+if (fileExists("components/AdminAffiliateLinkQueue.tsx")) {
+  const linkQueue = readText("components/AdminAffiliateLinkQueue.tsx");
+  check(
+    "admin: affiliate link queue",
+    linkQueue.includes("상품별 파트너스 링크 보강") && linkQueue.includes("buildCoupangSearchUrl") && linkQueue.includes("저장 후 게시") && linkQueue.includes("/api/admin/affiliate-links/backfill") && linkQueue.includes('id="admin-affiliate-links"'),
+    "admin can find products, paste product-level affiliate links, publish after saving, and run API backfill",
+    "required"
+  );
+  check(
+    "admin: affiliate link queue feedback",
+    linkQueue.includes("notice") &&
+      linkQueue.includes("role=\"status\"") &&
+      linkQueue.includes("!response.ok") &&
+      linkQueue.includes("backfillMessage") &&
+      linkQueue.includes("네트워크 문제로 API 기반 파트너스 링크 보강을 실행하지 못했습니다") &&
+      linkQueue.includes("네트워크 문제로 파트너스 링크를 저장하지 못했습니다"),
+    "affiliate link queue shows load, save, API backfill, and network failures inline",
+    "required"
+  );
+  check(
+    "admin: affiliate link queue blocks approval sample",
+    linkQueue.includes("isApprovalSampleAffiliateUrl") &&
+      linkQueue.includes("승인용 샘플 링크는 심사용 페이지 전용") &&
+      linkQueue.includes("저장하거나 게시할 수 없습니다"),
+    "affiliate link queue prevents saving or publishing the approval sample link for real products",
+    "required"
+  );
+  check(
+    "admin: bulk affiliate link import UI",
+    linkQueue.includes("대량 링크 입력") &&
+      linkQueue.includes("템플릿 복사") &&
+      linkQueue.includes("/api/admin/affiliate-links/import") &&
+      linkQueue.includes("검증만") &&
+      linkQueue.includes("대량 저장 후 게시") &&
+      linkQueue.includes("상품 ID") &&
+      linkQueue.includes("한 번에 최대 80줄"),
+    "admin can validate, save, or save-and-publish many product-level affiliate links at once from product-id templates",
+    "required"
+  );
+  check(
+    "admin: affiliate link result readability",
+    linkQueue.includes("linkResultStatusLabel") &&
+      linkQueue.includes("linkResultReasonLabel") &&
+      linkQueue.includes("API 키 필요") &&
+      linkQueue.includes("저장 완료") &&
+      linkQueue.includes("쿠팡 검색에서 매칭 상품을 찾지 못했습니다") &&
+      linkQueue.includes("상품별 쿠팡 파트너스 단축 링크 형식이 아닙니다") &&
+      linkQueue.includes("링크는 저장했지만 게시 전 품질 확인이 필요합니다"),
+    "affiliate link queue translates API/import item statuses and reasons into readable operator guidance",
+    "required"
+  );
+  check(
+    "admin: affiliate backfill manual retry links",
+    linkQueue.includes("backfillResultLinks") &&
+      linkQueue.includes("manual_search_url") &&
+      linkQueue.includes("쿠팡 검색 열기") &&
+      linkQueue.includes("검색어") &&
+      linkQueue.includes("원본 보기"),
+    "automatic affiliate-link backfill results expose the attempted Coupang query and safe manual retry links",
+    "required"
+  );
+  check(
+    "admin: affiliate backfill match evidence",
+    linkQueue.includes("BackfillMatchEvidence") &&
+      linkQueue.includes("backfillMatchSummary") &&
+      linkQueue.includes("matched_tokens") &&
+      linkQueue.includes("관련도 제외") &&
+      linkQueue.includes("COUPANG_MATCH_RELEVANCE_TOO_LOW"),
+    "automatic affiliate-link backfill results show relevance scores, matched tokens, and rejected candidate counts",
+    "required"
+  );
+  check(
+    "admin: affiliate backfill failure bulk handoff",
+    linkQueue.includes("fillBackfillFailuresTemplate") &&
+      linkQueue.includes("buildBackfillManualTemplate") &&
+      linkQueue.includes("실패") &&
+      linkQueue.includes("대량 입력으로 보내기") &&
+      linkQueue.includes("상품별 파트너스 링크 붙여넣기") &&
+      linkQueue.includes("검색 URL은 참고용입니다"),
+    "operators can turn failed automatic affiliate-link backfill items into a bulk manual import template",
+    "required"
+  );
+}
+
+if (fileExists("lib/affiliateLinkBackfill.ts")) {
+  const affiliateBackfill = readText("lib/affiliateLinkBackfill.ts");
+  check(
+    "affiliate backfill: API deeplink",
+    affiliateBackfill.includes("backfillCoupangAffiliateLinks") && affiliateBackfill.includes("searchCoupangProducts") && affiliateBackfill.includes("createCoupangDeeplink"),
+    "existing missing-affiliate products can be converted through Coupang search and deeplink APIs after approval",
+    "required"
+  );
+  check(
+    "affiliate backfill: direct deeplink fallback",
+    affiliateBackfill.includes("directDeeplinkFailureReason") &&
+      affiliateBackfill.includes("DIRECT_DEEPLINK_FAILED") &&
+      affiliateBackfill.includes("combineBackfillReasons") &&
+      affiliateBackfill.includes('if (deeplink.status === "ok" && isUsableAffiliateUrl(deeplink.url))') &&
+      affiliateBackfill.includes('if (deeplink.status === "API_NOT_CONFIGURED")'),
+    "automatic affiliate-link backfill falls back to Coupang search when a stored product URL cannot be deeplinked",
+    "required"
+  );
+  check(
+    "affiliate backfill: per-item update failure isolation",
+    affiliateBackfill.includes("backfillErrorMessage") &&
+      affiliateBackfill.includes("AFFILIATE_BACKFILL_UPDATE_FAILED") &&
+      affiliateBackfill.includes("continue;") &&
+      affiliateBackfill.includes("result.error_count += 1") &&
+      affiliateBackfill.includes("await updateProduct(product.id"),
+    "a single product save failure is reported on that item while the automatic affiliate-link backfill continues",
+    "required"
+  );
+  check(
+    "affiliate backfill: manual retry details",
+    affiliateBackfill.includes("query?: string | null") &&
+      affiliateBackfill.includes("manual_search_url?: string | null") &&
+      affiliateBackfill.includes("const manualSearchUrl = buildCoupangSearchUrl(product)") &&
+      affiliateBackfill.includes("manual_search_url: resolved.manualSearchUrl") &&
+      affiliateBackfill.includes("query: resolved.query"),
+    "affiliate-link backfill returns attempted Coupang search details when API configuration or product matching needs manual follow-up",
+    "required"
+  );
+  check(
+    "affiliate backfill: search result relevance guard",
+    affiliateBackfill.includes("buildAffiliateBackfillRelevanceTokens") &&
+      affiliateBackfill.includes("affiliateItemRelevance") &&
+      affiliateBackfill.includes("MATCH_RELEVANCE_TOO_LOW") &&
+      affiliateBackfill.includes("COUPANG_MATCH_RELEVANCE_TOO_LOW") &&
+      affiliateBackfill.includes("rejected_by_relevance_count") &&
+      affiliateBackfill.includes("relevance_tokens") &&
+      affiliateBackfill.includes("match: resolved.match ?? null"),
+    "automatic affiliate-link backfill rejects weak Coupang search matches and stores matching evidence",
+    "required"
+  );
+}
+
+if (fileExists("app/api/admin/affiliate-links/backfill/route.ts")) {
+  const affiliateBackfillRoute = readText("app/api/admin/affiliate-links/backfill/route.ts");
+  check(
+    "admin api: affiliate backfill route",
+    affiliateBackfillRoute.includes("requireAdmin") && affiliateBackfillRoute.includes("backfillCoupangAffiliateLinks"),
+    "admin-protected route runs the Coupang affiliate link backfill",
+    "required"
+  );
+  check(
+    "admin api: affiliate backfill safe error response",
+    affiliateBackfillRoute.includes("affiliateBackfillErrorResponse") &&
+      affiliateBackfillRoute.includes("AFFILIATE_BACKFILL_FAILED") &&
+      affiliateBackfillRoute.includes("message.slice(0, 300)") &&
+      affiliateBackfillRoute.includes("positiveInteger") &&
+      affiliateBackfillRoute.includes("return affiliateBackfillErrorResponse(error)"),
+    "admin affiliate-link backfill API returns bounded JSON errors and clamps requested limits",
+    "required"
+  );
+}
+
+if (fileExists("app/api/admin/affiliate-links/import/route.ts")) {
+  const affiliateImportRoute = readText("app/api/admin/affiliate-links/import/route.ts");
+  check(
+    "admin api: bulk affiliate link import route",
+    affiliateImportRoute.includes("requireAdmin") &&
+      affiliateImportRoute.includes("BULK_AFFILIATE_LINK_IMPORT_FAILED") &&
+      affiliateImportRoute.includes("getProductById") &&
+      affiliateImportRoute.includes("updateProduct") &&
+      affiliateImportRoute.includes("isUsableAffiliateUrl") &&
+      affiliateImportRoute.includes("isApprovalSampleAffiliateUrl") &&
+      affiliateImportRoute.includes("getCoupangPartnersLinkIssue") &&
+      affiliateImportRoute.includes("dryRun") &&
+      affiliateImportRoute.includes("publish_requested") &&
+      affiliateImportRoute.includes("published_count") &&
+      affiliateImportRoute.includes('sourcing_status: "published"') &&
+      affiliateImportRoute.includes(".slice(0, 80)"),
+    "admin-protected bulk import route validates, updates, or publishes only product-id matched, non-sample Coupang Partners links and clamps batch size",
+    "required"
+  );
+  check(
+    "admin api: bulk import customer-ready publish gate",
+    affiliateImportRoute.includes("getCustomerPublishReadiness") &&
+      affiliateImportRoute.includes("PUBLISH_BLOCKED_PUBLIC_QUALITY") &&
+      affiliateImportRoute.includes("readiness.blockers") &&
+      affiliateImportRoute.includes('await updateProduct(productId, { affiliate_url: affiliateUrl })') &&
+      affiliateImportRoute.includes("publishedCount += 1"),
+    "bulk link import saves valid links but does not publish products with public quality blockers",
+    "required"
+  );
+}
+
+if (fileExists("app/api/admin/launch/route.ts")) {
+  const launchRoute = readText("app/api/admin/launch/route.ts");
+  check(
+    "admin api: post-approval launch route",
+    launchRoute.includes("runSourcing") &&
+      launchRoute.includes("backfillCoupangAffiliateLinks") &&
+      launchRoute.includes("backfillNaverLowestPrices") &&
+      launchRoute.includes("launchReady") &&
+      launchRoute.includes("runApiConnectionChecks") &&
+      launchRoute.includes("connection_checks") &&
+      launchRoute.includes("readiness.requiredConnectionCheckIds"),
+    "admin can run a bounded first-launch sequence only after production envs, live connections, public data quality, and Cron auth are ready",
+    "required"
+  );
+  check(
+    "admin api: launch required connection check completeness",
+    launchRoute.includes("missingRequiredConnectionCheckIds") &&
+      launchRoute.includes("MISSING_REQUIRED_CONNECTION_CHECK") &&
+      launchRoute.includes("missing_required_connection_check_ids") &&
+      launchRoute.includes("requiredConnectionCheckIds.filter"),
+    "first launch fails closed when a required live connection check is missing from the readiness response",
+    "required"
+  );
+  check(
+    "admin api: launch operator actions",
+    launchRoute.includes("getReadinessBlockingActions") &&
+      launchRoute.includes("getConnectionFailureActions") &&
+      launchRoute.includes("blocking_items") &&
+      launchRoute.includes("failed_connection_checks") &&
+      launchRoute.includes("operator_next_action"),
+    "first-launch not-ready and connection-failure responses include operator next actions",
+    "required"
+  );
+  check(
+    "admin api: launch before-after delta",
+    launchRoute.includes("before_summary") && launchRoute.includes("delta_summary") && launchRoute.includes("deltaSummary"),
+    "post-approval launch response includes before/after summaries and per-run deltas",
+    "required"
+  );
+  check(
+    "admin api: launch batch controls",
+    launchRoute.includes("sourcingTimeBudgetMs") &&
+      launchRoute.includes("positiveInteger(body.sourcingKeywordLimit, 6, 12)") &&
+      launchRoute.includes("positiveInteger(body.affiliateLimit, 8, 20)") &&
+      launchRoute.includes("positiveInteger(body.priceLimit, 5, 12)"),
+    "post-approval launch can run a practical first batch while staying bounded",
+    "required"
+  );
+  check(
+    "admin api: first-launch confirmation",
+    launchRoute.includes("markFirstLaunchConfirmed") &&
+      launchRoute.includes("launch_confirmed") &&
+      launchRoute.includes("자동 운영 시작 확인"),
+    "successful post-approval first launch records a confirmation before scheduled jobs can run",
+    "required"
+  );
+  check(
+    "admin api: first-launch confirmation failure is actionable",
+    launchRoute.includes("FIRST_LAUNCH_CONFIRMATION_FAILED") &&
+      launchRoute.includes("finalHasError") &&
+      launchRoute.includes("자동 운영 시작 확인 기록을 저장하지 못했습니다") &&
+      launchRoute.includes("Supabase sourcing_runs 쓰기 권한"),
+    "first-launch confirmation write failures return an actionable step result instead of erasing prior launch progress with a generic 500",
+    "required"
+  );
+  check(
+    "admin api: first-launch data signal gate",
+    launchRoute.includes("getLaunchDataSignal") &&
+      launchRoute.includes("NO_LAUNCH_DATA_SIGNAL") &&
+      launchRoute.includes("isPublicDealReady") &&
+      launchRoute.includes("published_public_ready") &&
+      launchRoute.includes("launch_data_signal") &&
+      launchRoute.includes("current_launch_progress") &&
+      launchRoute.includes("existing_public_affiliate_ready") &&
+      launchRoute.includes("existing_public_customer_ready") &&
+      launchRoute.includes("getLaunchRecoveryActions") &&
+      launchRoute.includes("recovery_actions") &&
+      launchRoute.includes("operator_next_action") &&
+      launchRoute.includes("admin-affiliate-links") &&
+      launchRoute.includes("admin-price-backfill") &&
+      launchRoute.includes("admin-sourcing-runner"),
+    "first launch is not confirmed when live connections pass but no candidate, link, price, or customer-ready public data signal exists, and returns concrete recovery actions",
+    "required"
+  );
+  check(
+    "admin api: launch safe error response",
+    launchRoute.includes("launchErrorResponse") &&
+      launchRoute.includes("LAUNCH_RUN_FAILED") &&
+      launchRoute.includes("message.slice(0, 300)") &&
+      launchRoute.includes("catch (error)") &&
+      launchRoute.includes("return launchErrorResponse(error)"),
+    "post-approval launch route returns bounded JSON errors if preflight or summary lookup throws",
+    "required"
+  );
+}
+
+if (fileExists("lib/launchState.ts")) {
+  const launchState = readText("lib/launchState.ts");
+  check(
+    "launch state: first-launch marker",
+    launchState.includes("FIRST_LAUNCH_CONFIRMED_STATUS") &&
+      launchState.includes("FIRST_LAUNCH_MARKER") &&
+      launchState.includes("getFirstLaunchConfirmation") &&
+      launchState.includes("markFirstLaunchConfirmed"),
+    "first-launch completion is recorded in sourcing_runs as an operational marker",
+    "required"
+  );
+}
+
+if (fileExists("lib/sourcingRunKinds.ts")) {
+  const sourcingRunKinds = readText("lib/sourcingRunKinds.ts");
+  check(
+    "sourcing runs: shared operational marker filter",
+    sourcingRunKinds.includes("FIRST_LAUNCH_CONFIRMED_STATUS") &&
+      sourcingRunKinds.includes("FIRST_LAUNCH_MARKER") &&
+      sourcingRunKinds.includes("isFirstLaunchConfirmationRun") &&
+      sourcingRunKinds.includes("isSourcingExecutionRun"),
+    "sourcing run marker filtering is shared across cursor, metrics, and admin views",
+    "required"
+  );
+}
+
+if (fileExists("components/AdminLaunchRunner.tsx")) {
+  const launchRunner = readText("components/AdminLaunchRunner.tsx");
+  check(
+    "admin: post-approval launch runner",
+    launchRunner.includes("승인 후 첫 가동 실행") && launchRunner.includes("/api/admin/launch") && launchRunner.includes("첫 가동 실행"),
+    "admin exposes the first-launch sequence as a clear operator action",
+    "required"
+  );
+  check(
+    "admin: launch delta display",
+    launchRunner.includes("delta_summary") && launchRunner.includes("이번 실행 변화"),
+    "admin launch panel shows what changed during the first-launch run",
+    "required"
+  );
+  check(
+    "admin: launch step detail display",
+    launchRunner.includes("formatLaunchDetailValue") &&
+      launchRunner.includes("launchDetailEntries") &&
+      launchRunner.includes("실행 세부정보") &&
+      launchRunner.includes("operatorNextActionFromLaunchDetail") &&
+      launchRunner.includes("단계 다음 조치") &&
+      launchRunner.includes('key !== "operator_next_action"'),
+    "admin launch panel shows per-step details for connection checks, sourcing, affiliate backfill, and price backfill",
+    "required"
+  );
+  check(
+    "admin: launch batch presets",
+    launchRunner.includes("launchPresets") &&
+      launchRunner.includes('"standard"') &&
+      launchRunner.includes('"wide"') &&
+      launchRunner.includes('"quick"') &&
+      launchRunner.includes("sourcingTimeBudgetMs"),
+    "admin can choose quick, standard, or wider first-launch batches after approval",
+    "required"
+  );
+  check(
+    "admin: launch run feedback",
+    launchRunner.includes("notice") &&
+      launchRunner.includes("data.message ?? data.error") &&
+      launchRunner.includes("네트워크 문제로 첫 가동 실행을 시작하지 못했습니다") &&
+      launchRunner.includes("role=\"status\"") &&
+      !launchRunner.includes("window.alert"),
+    "admin launch runner shows API and network failures inline instead of using alert dialogs",
+    "required"
+  );
+  check(
+    "admin: launch next action guidance",
+    launchRunner.includes("getLaunchNextAction") &&
+      launchRunner.includes("Next Action") &&
+      launchRunner.includes("setResult(null)") &&
+      launchRunner.includes("다음 조치: 준비도 패널에서 누락 환경변수를 채우세요") &&
+      launchRunner.includes("다음 조치: 실제 연결 테스트 실패 카드를 먼저 고치세요") &&
+      launchRunner.includes("다음 조치: 키워드 범위를 넓혀 첫 실데이터 신호를 만드세요") &&
+      launchRunner.includes("다음 조치: 첫 가동 확인 기록을 다시 남기세요"),
+    "admin launch runner clears stale results and shows the next operator action after first-launch outcomes",
+    "required"
+  );
+  check(
+    "admin: launch blocking action display",
+    launchRunner.includes("blockingItems") &&
+      launchRunner.includes("막힌 준비 항목과 바로 할 일") &&
+      launchRunner.includes("failedConnectionChecks") &&
+      launchRunner.includes("실패한 연결 테스트 조치"),
+    "admin launch runner displays concrete fixes for blocked readiness and failed connection checks",
+    "required"
+  );
+  check(
+    "admin: launch to review handoff",
+    launchRunner.includes("scrollToCandidateReviewQueue") &&
+      launchRunner.includes("admin-candidate-review") &&
+      launchRunner.includes("검토 대기 상품 보기") &&
+      launchRunner.includes("needs_review"),
+    "admin launch runner can send operators directly to the needs-review candidate queue after first launch",
+    "required"
+  );
+  check(
+    "admin: launch to scheduler handoff",
+    launchRunner.includes("scrollToSchedulerControl") &&
+      launchRunner.includes("admin-telegram-distribution") &&
+      launchRunner.includes("자동 운영 센터 보기") &&
+      launchRunner.includes('result.status === "completed"'),
+    "admin launch runner can send operators to scheduler health and Telegram distribution after a confirmed first launch",
+    "required"
+  );
+  check(
+    "admin: first launch repair handoff",
+    launchRunner.includes("scrollToAffiliateLinkQueue") &&
+      launchRunner.includes("scrollToPriceBackfill") &&
+      launchRunner.includes("scrollToSourcingRunner") &&
+      launchRunner.includes("admin-affiliate-links") &&
+      launchRunner.includes("admin-price-backfill") &&
+      launchRunner.includes("admin-sourcing-runner") &&
+      launchRunner.includes("파트너스 링크 보강") &&
+      launchRunner.includes("네이버 가격 보강") &&
+      launchRunner.includes("수집 진단 보기") &&
+      launchRunner.includes("missingAffiliateCount") &&
+      launchRunner.includes("missingNaverPriceCount"),
+    "admin first-launch results send operators directly to affiliate-link, Naver price, or sourcing repair panels when launch gaps remain",
+    "required"
+  );
+  check(
+    "admin: first launch back to readiness handoff",
+    launchRunner.includes('id="admin-first-launch"') &&
+      launchRunner.includes("scrollToApiReadinessPanel") &&
+      launchRunner.includes("scrollToAdminAnchor") &&
+      launchRunner.includes("admin-api-readiness") &&
+      launchRunner.includes("준비도 패널로 이동"),
+    "admin first-launch runner can send operators back to readiness when envs or live checks block launch",
+    "required"
+  );
+}
+
+if (fileExists("components/AdminProductEditor.tsx")) {
+  const productEditor = readText("components/AdminProductEditor.tsx");
+  check(
+    "admin: no approval link bulk misuse",
+    !productEditor.includes("승인용 파트너스 링크 채우기") && !productEditor.includes("NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL"),
+    "product editor does not encourage reusing the approval sample link for unrelated products",
+    "required"
+  );
+  check(
+    "admin: product editor warns on approval sample link",
+    productEditor.includes("isApprovalSampleAffiliateUrl") &&
+      productEditor.includes("승인용 샘플 링크입니다") &&
+      productEditor.includes("실상품 게시에는 사용할 수 없습니다"),
+    "product editor clearly warns when a real product uses the approval sample link",
+    "required"
+  );
+  check(
+    "admin: product editor surfaces save failures",
+    productEditor.includes("saveNotice") &&
+      productEditor.includes("!response.ok") &&
+    productEditor.includes("data.message ?? data.error") &&
+      productEditor.includes("role=\"status\"") &&
+      productEditor.includes("저장 중"),
+    "product editor shows API validation errors and network failures instead of silently refreshing",
+    "required"
+  );
+}
+
+if (fileExists("lib/publicDeal.ts")) {
+  const publicDeal = readText("lib/publicDeal.ts");
+  check(
+    "public deals: customer-ready only",
+    publicDeal.includes("isPublicDealReady") &&
+      publicDeal.includes("getCustomerPublishReadiness(product).ready") &&
+      publicDeal.includes('product.sourcing_status === "published"'),
+    "public deal surfaces require published customer-ready products with no quality blockers",
+    "required"
+  );
+}
+
+if (fileExists("lib/telegram.ts")) {
+  const telegram = readText("lib/telegram.ts");
+  check(
+    "telegram: public customer-ready only",
+    telegram.includes("isPublicDealReady(product)") &&
+      telegram.includes("ONLY_PUBLIC_CUSTOMER_READY_PRODUCTS_CAN_BE_SENT") &&
+      telegram.includes("getSiteUrl()"),
+    "Telegram sends only public customer-ready products and uses the configured public site URL",
+    "required"
+  );
+  check(
+    "telegram: send timeout and safe error log",
+    telegram.includes("TELEGRAM_SEND_TIMEOUT_MS") &&
+      telegram.includes("AbortController") &&
+      telegram.includes("telegramErrorMessage") &&
+      telegram.includes("telegramSendFailureMessage") &&
+      telegram.includes("createTelegramLog({ product_id: product.id, message, status: \"error\", error: safeError })"),
+    "Telegram send uses a bounded request and logs safe failure summaries for HTTP errors, network errors, and timeouts",
+    "required"
+  );
+  check(
+    "telegram: message length guard",
+    telegram.includes("TELEGRAM_MESSAGE_LIMIT") &&
+      telegram.includes("fitTelegramMessage") &&
+      telegram.includes("TELEGRAM_AFFILIATE_NOTICE") &&
+      telegram.includes("return fitTelegramMessage(message, detailUrl)") &&
+      telegram.includes("\uC81C\uD734 \uC548\uB0B4:") &&
+      telegram.includes("\uC790\uC138\uD788 \uBCF4\uAE30:") &&
+      telegram.includes("\uBC18\uD488\uAC00:") &&
+      telegram.includes("\uCFE0\uD321 \uD30C\uD2B8\uB108\uC2A4 \uD65C\uB3D9\uC758 \uC77C\uD658"),
+    "Telegram message generation stays below Telegram length limits while preserving readable Korean copy, detail URL, and affiliate notice",
+    "required"
+  );
+}
+
+if (fileExists("lib/format.ts")) {
+  const format = readText("lib/format.ts");
+  check(
+    "format: readable Korean price placeholders",
+    format.includes('return "\uD655\uC778\uD544\uC694"') && format.includes('toLocaleString("ko-KR")') && format.includes("}\uC6D0`"),
+    "public and Telegram price copy uses readable Korean instead of mojibake placeholders",
+    "required"
+  );
+}
+
+if (fileExists("app/api/admin/telegram/route.ts")) {
+  const telegramRoute = readText("app/api/admin/telegram/route.ts");
+  check(
+    "admin api: telegram preview readiness gate",
+    telegramRoute.includes("TELEGRAM_PRODUCT_NOT_PUBLIC_READY") &&
+      telegramRoute.includes("isPublicDealReady(product)") &&
+      telegramRoute.includes("고객공개 품질 블로커"),
+    "admin Telegram preview/send endpoints reject products that are not public customer-ready",
+    "required"
+  );
+  check(
+    "admin api: telegram safe error response",
+    telegramRoute.includes("telegramAdminErrorResponse") &&
+      telegramRoute.includes("TELEGRAM_ADMIN_FAILED") &&
+      telegramRoute.includes("message.slice(0, 300)") &&
+      telegramRoute.includes("INVALID_TELEGRAM_MODE"),
+    "admin Telegram API returns bounded JSON errors and rejects invalid modes",
+    "required"
+  );
+}
+
+if (fileExists("components/TelegramPreview.tsx")) {
+  const telegramPreview = readText("components/TelegramPreview.tsx");
+  check(
+    "admin: telegram preview feedback",
+    telegramPreview.includes("runningMode") &&
+      telegramPreview.includes("role=\"status\"") &&
+      telegramPreview.includes("!response.ok") &&
+      telegramPreview.includes("네트워크 문제로 텔레그램 발송을 실행하지 못했습니다") &&
+      telegramPreview.includes("텔레그램 미리보기를 생성했습니다") &&
+      telegramPreview.includes("TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID"),
+    "admin Telegram panel shows preview/send progress, API errors, and network failures",
+    "required"
+  );
+}
+if (fileExists("app/deals/[id]/page.tsx")) {
+  const dealPage = readText("app/deals/[id]/page.tsx");
+  check(
+    "public detail: hides non-purchasable deals",
+    dealPage.includes("isPublicDealReady(product)") && dealPage.includes("notFound()"),
+    "deal detail 404s when the published product has no usable affiliate link",
+    "required"
+  );
+}
+
+if (fileExists("vercel.json")) {
+  const vercel = JSON.parse(readText("vercel.json"));
+  const crons = Array.isArray(vercel.crons) ? vercel.crons : [];
+  check("cron: sourcing Vercel deployable fallback", crons.some((cron) => cron.path === "/api/cron/sourcing" && cron.schedule === "0 0 * * *"), "/api/cron/sourcing 0 0 * * *", "required");
+  check(
+    "cron: telegram digest Vercel deployable fallback",
+    crons.some((cron) => cron.path === "/api/cron/telegram-digest" && cron.schedule === "10 0 * * *"),
+    "/api/cron/telegram-digest 10 0 * * *",
+    "required"
+  );
+}
+
+if (fileExists(".github/workflows/returnpick-hourly.yml")) {
+  const hourlyWorkflow = readText(".github/workflows/returnpick-hourly.yml");
+  check(
+    "cron: GitHub Actions hourly scheduler",
+    hourlyWorkflow.includes('cron: "0 * * * *"') &&
+      hourlyWorkflow.includes("RETURNPICK_CRON_SECRET") &&
+      hourlyWorkflow.includes("RETURNPICK_SITE_URL") &&
+      hourlyWorkflow.includes("/api/cron/sourcing") &&
+      hourlyWorkflow.includes("/api/cron/telegram-digest?limit=1") &&
+      hourlyWorkflow.includes("Authorization: Bearer") &&
+      hourlyWorkflow.includes("--fail-with-body") &&
+      hourlyWorkflow.includes("concurrency:"),
+    "GitHub Actions can call protected ReturnPick Cron endpoints hourly when Vercel Hobby cannot deploy hourly Cron",
+    "required"
+  );
+}
+
+if (fileExists("lib/cron.ts")) {
+  const cron = readText("lib/cron.ts");
+  check("cron: auth probe mode", cron.includes("isCronProbeRequest") && cron.includes("cronProbeJson") && cron.includes("job_started"), "cron endpoints support an authenticated no-op probe", "required");
+  check(
+    "cron: bounded error json",
+    cron.includes("cronErrorJson") && cron.includes("UNKNOWN_") && cron.includes('status: "error"'),
+    "cron endpoints can return safe JSON errors instead of opaque 500 responses",
+    "required"
+  );
+}
+
+if (fileExists("app/api/cron/sourcing/route.ts") && fileExists("app/api/cron/telegram-digest/route.ts")) {
+  const cronSourcingRoute = readText("app/api/cron/sourcing/route.ts");
+  const cronTelegramRoute = readText("app/api/cron/telegram-digest/route.ts");
+  check(
+    "cron: scheduled routes catch execution failures",
+    cronSourcingRoute.includes("CRON_SOURCING_FAILED") &&
+      cronSourcingRoute.includes("cronErrorJson") &&
+      cronTelegramRoute.includes("CRON_TELEGRAM_DIGEST_FAILED") &&
+      cronTelegramRoute.includes("cronErrorJson"),
+    "scheduled sourcing and Telegram digest routes return bounded JSON when execution throws",
+    "required"
+  );
+}
+
+if (fileExists("lib/scheduler.ts")) {
+  const scheduler = readText("lib/scheduler.ts");
+  check("cron: production real-source default", scheduler.includes("getScheduledMockFallback") && scheduler.includes('process.env.NODE_ENV !== "production"'), "production cron does not use mock fallback unless explicitly enabled", "required");
+  check("cron: sourcing time budget env", scheduler.includes("SOURCING_TIME_BUDGET_MS") && scheduler.includes("SOURCING_KEYWORD_LIMIT"), "cron sourcing can be bounded by env time and keyword limits", "required");
+  check("cron: keyword cursor resume", scheduler.includes("getNextSourcingKeywordOffset") && scheduler.includes("keywordOffset"), "scheduled sourcing resumes from the previous keyword cursor", "required");
+  check("cron: persistent storage signal", scheduler.includes("persistent_storage") && scheduler.includes("hasSupabaseConfig"), "scheduler result exposes whether run logs are persisted", "required");
+  check(
+    "cron: launch readiness gate",
+    scheduler.includes("getScheduledAutomationGate") &&
+      scheduler.includes("LAUNCH_NOT_READY") &&
+      scheduler.includes("readiness.launchReady") &&
+      scheduler.includes("getSchedulerBlockingItems") &&
+      scheduler.includes("getSchedulerOperatorAction") &&
+      scheduler.includes("blocking_items"),
+    "production scheduled jobs wait until launch readiness is complete and return concrete blocking items",
+    "required"
+  );
+  check(
+    "cron: first-launch confirmation gate",
+    scheduler.includes("getFirstLaunchConfirmation") &&
+      scheduler.includes("FIRST_LAUNCH_NOT_CONFIRMED") &&
+      scheduler.includes("RUN_FIRST_LAUNCH") &&
+      scheduler.includes("operator_action") &&
+      scheduler.includes("first_launch_confirmed") &&
+      scheduler.includes("launch_confirmation_id"),
+    "scheduled sourcing and telegram jobs wait for a successful post-approval first launch and return the first-launch operator action",
+    "required"
+  );
+  check(
+    "cron: telegram digest customer-ready candidates",
+    scheduler.includes("isPublicDealReady") &&
+      scheduler.includes("NO_UNSENT_PUBLIC_CUSTOMER_READY_DEALS") &&
+      !scheduler.includes("NO_UNSENT_PUBLISHED_DEALS_WITH_AFFILIATE_URL"),
+    "scheduled Telegram digest uses customer-ready public deal visibility",
+    "required"
+  );
+  check(
+    "cron: telegram digest error summary",
+    scheduler.includes("const errorCount = results.filter") &&
+      scheduler.includes('item.status === "API_NOT_CONFIGURED"') &&
+      scheduler.includes('const status = !candidates.length ? "skipped"') &&
+      scheduler.includes("error_count: errorCount") &&
+      scheduler.includes("sent_count: sentCount"),
+    "scheduled Telegram digest summarizes send failures so admin and cron callers do not mistake partial sends for success",
+    "required"
+  );
+}
+
+if (fileExists("lib/sourcingCursor.ts")) {
+  const sourcingCursor = readText("lib/sourcingCursor.ts");
+  check(
+    "cron: cursor ignores launch markers",
+    sourcingCursor.includes("isSourcingExecutionRun") &&
+      sourcingCursor.includes("@/lib/sourcingRunKinds") &&
+      sourcingCursor.includes("continue"),
+    "keyword cursor resumes from real sourcing runs, not first-launch confirmation markers",
+    "required"
+  );
+}
+
+if (fileExists("app/api/admin/scheduler/run/route.ts")) {
+  const schedulerRunRoute = readText("app/api/admin/scheduler/run/route.ts");
+  check(
+    "admin: scheduler run bounded errors",
+    schedulerRunRoute.includes("SCHEDULER_RUN_FAILED") &&
+      schedulerRunRoute.includes("INVALID_SCHEDULER_JOB") &&
+      schedulerRunRoute.includes("positiveInteger"),
+    "admin manual scheduler execution returns safe JSON errors and clamps Telegram digest limits",
+    "required"
+  );
+}
+
+if (fileExists("app/api/admin/scheduler-health/route.ts")) {
+  const schedulerHealthRoute = readText("app/api/admin/scheduler-health/route.ts");
+  check(
+    "admin: scheduler health bounded errors",
+    schedulerHealthRoute.includes("SCHEDULER_HEALTH_FAILED") && schedulerHealthRoute.includes("schedulerHealthErrorResponse"),
+    "admin scheduler health lookup returns safe JSON errors if insight generation fails",
+    "required"
+  );
+}
+
+if (fileExists("lib/schedulerInsights.ts")) {
+  const schedulerInsights = readText("lib/schedulerInsights.ts");
+  check(
+    "admin: scheduler insights ignore launch markers",
+    schedulerInsights.includes("isSourcingExecutionRun") &&
+      schedulerInsights.includes("sourcingRuns") &&
+      schedulerInsights.includes("recent_runs: sourcingRuns"),
+    "admin scheduler health and recent runs ignore first-launch confirmation markers",
+    "required"
+  );
+  check(
+    "admin: scheduler insights customer-ready queues",
+    schedulerInsights.includes("isPublicDealReady") &&
+      schedulerInsights.includes("getCustomerPublishReadiness") &&
+      schedulerInsights.includes("qualityBlockedPublished") &&
+      schedulerInsights.includes("quality_blocked_published_count") &&
+      schedulerInsights.includes(".filter(isPublicDealReady)"),
+    "admin scheduler insights use customer-ready products for Telegram candidates and quality-blocked queues",
+    "required"
+  );
+  check(
+    "admin: scheduler insights blocking item details",
+    schedulerInsights.includes("getSchedulerBlockingItems") &&
+      schedulerInsights.includes("getSchedulerOperatorAction") &&
+      schedulerInsights.includes("blocking_items") &&
+      schedulerInsights.includes("operator_action"),
+    "admin scheduler health includes readiness labels, missing envs, next actions, and the next operator action for blocked automation",
+    "required"
+  );
+}
+
+if (fileExists("app/api/admin/sourcing/run/route.ts") && fileExists("lib/dataStore.ts")) {
+  const sourcingRunRoute = readText("app/api/admin/sourcing/run/route.ts");
+  const dataStore = readText("lib/dataStore.ts");
+  check(
+    "admin: sourcing run list ignores launch markers",
+    sourcingRunRoute.includes("listSourcingExecutionRuns") &&
+      dataStore.includes("listSourcingExecutionRuns") &&
+      dataStore.includes("isSourcingExecutionRun") &&
+      dataStore.includes("getAdminMetrics"),
+    "admin recent sourcing runs and metrics list real sourcing executions, not launch confirmation markers",
+    "required"
+  );
+  check(
+    "admin: metrics separate public ready from published status",
+    dataStore.includes("publishedStatusCount") &&
+      dataStore.includes("const published = publicReady") &&
+      dataStore.includes("hiddenPublishedWithoutAffiliate") &&
+      dataStore.includes("hiddenPublishedWithQualityBlockers") &&
+      dataStore.includes("getCustomerPublishReadiness(product).ready"),
+    "admin metrics use customer-ready public visibility for the main public count and keep hidden published products separate",
+    "required"
+  );
+  check(
+    "data store: product snapshot failure does not block product save",
+    dataStore.includes("createProductSnapshotSafely") &&
+      dataStore.includes("PRODUCT_SNAPSHOT_SAVE_FAILED") &&
+      dataStore.includes("console.warn") &&
+      dataStore.includes("await createProductSnapshotSafely(product, getSnapshotChangeFlags(existing, product))") &&
+      dataStore.includes('await createProductSnapshotSafely(product, ["NEW_PRODUCT"])') &&
+      dataStore.includes("await createProductSnapshotSafely(product, changeFlags)"),
+    "product save/update returns after core product write even if snapshot logging fails",
+    "required"
+  );
+  check(
+    "data store: resourcing preserves admin review fields",
+    dataStore.includes("preserveExistingReviewFields") &&
+      dataStore.includes("weakConditionGrades") &&
+      dataStore.includes("payload.return_price ?? existing.return_price") &&
+      dataStore.includes("payload.naver_lowest_price ?? existing.naver_lowest_price") &&
+      dataStore.includes("payload.stock_count ?? existing.stock_count") &&
+      dataStore.includes("isUsableAffiliateUrl(existing.affiliate_url)") &&
+      dataStore.includes("...preserveExistingReviewFields(existing, payload)") &&
+      dataStore.includes("...preserveExistingReviewFields(memoryProducts[existingIndex], payload)"),
+    "hourly resourcing keeps manual return price, condition, stock, public notes, and product-level affiliate links when providers return weak or empty values",
+    "required"
+  );
+}
+
+if (fileExists("components/AdminSchedulerPanel.tsx")) {
+  const schedulerPanel = readText("components/AdminSchedulerPanel.tsx");
+  check(
+    "admin: scheduler launch gate visible",
+    schedulerPanel.includes("첫 가동 준비 전이라 운영 스케줄러는 대기합니다") &&
+      schedulerPanel.includes("!insights.sourcing.launch_ready") &&
+      schedulerPanel.includes("blocking_items") &&
+      schedulerPanel.includes("누락 환경변수") &&
+      schedulerPanel.includes("next_action") &&
+      schedulerPanel.includes("scrollToAnchor") &&
+      schedulerPanel.includes("scrollToAdminAnchor") &&
+      schedulerPanel.includes("operatorActionButtonLabel") &&
+      schedulerPanel.includes("admin-api-readiness") &&
+      schedulerPanel.includes("준비도 패널로 이동"),
+    "admin scheduler explains launch blockers and sends operators back to the readiness panel with concrete next actions",
+    "required"
+  );
+  check(
+    "admin: scheduler first-launch confirmation gate visible",
+    schedulerPanel.includes("first_launch_confirmed") &&
+      schedulerPanel.includes("scheduler_ready") &&
+      schedulerPanel.includes("FIRST_LAUNCH_NOT_CONFIRMED") &&
+      schedulerPanel.includes("operator_action") &&
+      schedulerPanel.includes("scrollToAnchor") &&
+      schedulerPanel.includes("scrollToAdminAnchor") &&
+      schedulerPanel.includes("operatorActionButtonLabel") &&
+      schedulerPanel.includes("승인 후 첫 가동 실행으로 이동"),
+    "admin scheduler waits for a successful first-launch confirmation and sends operators to the first-launch runner",
+    "required"
+  );
+  check(
+    "admin: scheduler operation feedback visible",
+    schedulerPanel.includes("noticeClassName") &&
+      schedulerPanel.includes("자동 운영 상태를 불러오지 못했습니다") &&
+      schedulerPanel.includes("네트워크 문제로 자동 운영 작업을 실행하지 못했습니다") &&
+      schedulerPanel.includes("최근 수동 실행 응답") &&
+      schedulerPanel.includes("오류 ${result.error_count ?? 0}건"),
+    "admin scheduler panel shows inline load, run, network, and not-ready feedback",
+    "required"
+  );
+  check(
+    "admin: scheduler quality-blocked queue visible",
+    schedulerPanel.includes("quality_blocked_published_count") &&
+      schedulerPanel.includes("품질 보강") &&
+      schedulerPanel.includes("고객공개 발송 후보"),
+    "admin scheduler panel shows products that are published but blocked by customer-facing quality rules",
+    "required"
+  );
+  check(
+    "admin: scheduler refreshes after launch actions",
+    schedulerPanel.includes("refreshToken = 0") && schedulerPanel.includes("[password, refreshToken]"),
+    "admin scheduler panel reloads when first-launch or related admin actions update the shared refresh token",
+    "required"
+  );
+  check(
+    "admin: scheduler telegram distribution anchor",
+    schedulerPanel.includes('id="admin-telegram-distribution"') && schedulerPanel.includes("scroll-mt-4"),
+    "admin scheduler panel has a stable anchor for post-publish Telegram handoff",
+    "required"
+  );
+  check(
+    "admin: GitHub hourly scheduler setup copy",
+    schedulerPanel.includes("copyGithubSchedulerSetup") &&
+      schedulerPanel.includes("githubSchedulerSetupText") &&
+      schedulerPanel.includes("GitHub Actions 1시간 스케줄러 설정값을 복사했습니다") &&
+      schedulerPanel.includes("RETURNPICK_CRON_SECRET") &&
+      schedulerPanel.includes("RETURNPICK_SITE_URL") &&
+      schedulerPanel.includes("ReturnPick Hourly Scheduler") &&
+      schedulerPanel.includes("/api/cron/sourcing") &&
+      schedulerPanel.includes("/api/cron/telegram-digest?limit=1"),
+    "admin scheduler panel can copy the GitHub Actions hourly scheduler setup for Vercel Hobby operation",
+    "required"
+  );
+}
+
+if (fileExists("app/admin/page.tsx")) {
+  const adminPage = readText("app/admin/page.tsx");
+  check(
+    "admin: launch status bar mounted first",
+    adminPage.includes("AdminLaunchStatusBar") &&
+      adminPage.indexOf("<AdminLaunchStatusBar password={password} />") < adminPage.indexOf("<AdminApiReadinessPanel password={password} />"),
+    "admin shows the approval/API/go-live command center before the detailed readiness panel",
+    "required"
+  );
+  check(
+    "admin: scheduler wired to shared refresh token",
+    adminPage.includes("<AdminSchedulerPanel password={password} refreshToken={refreshToken}") &&
+      adminPage.includes("setRefreshToken((value) => value + 1)"),
+    "first-launch completion can refresh scheduler health without a manual page reload",
+    "required"
+  );
+  check(
+    "admin: hash anchor resumes after login",
+    adminPage.includes("scrollToAdminAnchor") &&
+      adminPage.includes("window.location.hash") &&
+      adminPage.includes("hashchange") &&
+      adminPage.includes("decodeURIComponent") &&
+      adminPage.includes("window.clearTimeout"),
+    "admin deep links like /admin#admin-api-readiness still scroll and highlight the target after password login",
+    "required"
+  );
+}
+
+checkEnvGroup("env: approval page", ["NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL"], "warning");
+checkEnvGroup("env: site/admin", ["NEXT_PUBLIC_SITE_URL", "ADMIN_PASSWORD"], mode === "launch" ? "required" : "warning");
+checkEnvGroup("env: cron", ["CRON_SECRET"], mode === "launch" ? "required" : "warning");
+checkEnvGroup("env: supabase", ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"], mode === "launch" ? "required" : "warning");
+checkEnvGroup("env: coupang partners api", ["COUPANG_ACCESS_KEY", "COUPANG_SECRET_KEY", "COUPANG_PARTNER_ID"], mode === "launch" ? "required" : "warning");
+checkEnvGroup("env: naver shopping api", ["NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET"], mode === "launch" ? "required" : "warning");
+checkEnvGroup("env: telegram", ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"], mode === "launch" ? "required" : "warning");
+if (envValue("PUBLIC_WEB_CRAWL_ENABLED") === "true") {
+  checkEnvGroup("env: public web crawl", ["PUBLIC_WEB_ALLOWED_HOSTS", "PUBLIC_WEB_SEARCH_TEMPLATES"], "required");
+}
+
+const launchValueSeverity = mode === "launch" ? "required" : "warning";
+if (hasEnv("NEXT_PUBLIC_SITE_URL")) {
+  check(
+    "env value: public site url",
+    isPublicHttpsSiteUrl(envValue("NEXT_PUBLIC_SITE_URL")),
+    "NEXT_PUBLIC_SITE_URL must be an external https URL, not localhost/http",
+    launchValueSeverity
+  );
+}
+if (hasEnv("NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL")) {
+  check(
+    "env value: approval partners url",
+    isCoupangPartnersUrl(envValue("NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL")),
+    "NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL must look like https://link.coupang.com/a/<short-code>",
+    "required"
+  );
+}
+if (hasEnv("CRON_SECRET")) {
+  check(
+    "env value: cron secret length",
+    envValue("CRON_SECRET").length >= 16,
+    "CRON_SECRET must be at least 16 characters",
+    launchValueSeverity
+  );
+}
+if (hasEnv("ADMIN_PASSWORD")) {
+  check(
+    "env value: admin password strength",
+    isLikelyAdminPasswordValue(envValue("ADMIN_PASSWORD")),
+    "ADMIN_PASSWORD must be at least 12 characters and not contain whitespace or placeholder text",
+    launchValueSeverity
+  );
+}
+if (hasEnv("COUPANG_ACCESS_KEY")) {
+  check(
+    "env value: coupang access key",
+    isLikelyProviderSecretValue(envValue("COUPANG_ACCESS_KEY"), 8),
+    "COUPANG_ACCESS_KEY must be a copied API key without whitespace or placeholder text",
+    launchValueSeverity
+  );
+}
+if (hasEnv("COUPANG_SECRET_KEY")) {
+  check(
+    "env value: coupang secret key",
+    isLikelyProviderSecretValue(envValue("COUPANG_SECRET_KEY"), 8),
+    "COUPANG_SECRET_KEY must be a copied API key without whitespace or placeholder text",
+    launchValueSeverity
+  );
+}
+if (hasEnv("COUPANG_PARTNER_ID")) {
+  check(
+    "env value: coupang partner id",
+    isLikelyProviderSecretValue(envValue("COUPANG_PARTNER_ID"), 2),
+    "COUPANG_PARTNER_ID must be copied without whitespace or placeholder text",
+    launchValueSeverity
+  );
+}
+if (hasEnv("NAVER_CLIENT_ID")) {
+  check(
+    "env value: naver client id",
+    isLikelyProviderSecretValue(envValue("NAVER_CLIENT_ID"), 5),
+    "NAVER_CLIENT_ID must be copied without whitespace or placeholder text",
+    launchValueSeverity
+  );
+}
+if (hasEnv("NAVER_CLIENT_SECRET")) {
+  check(
+    "env value: naver client secret",
+    isLikelyProviderSecretValue(envValue("NAVER_CLIENT_SECRET"), 5),
+    "NAVER_CLIENT_SECRET must be copied without whitespace or placeholder text",
+    launchValueSeverity
+  );
+}
+if (hasEnv("TELEGRAM_BOT_TOKEN")) {
+  check(
+    "env value: telegram bot token",
+    isLikelyTelegramBotTokenValue(envValue("TELEGRAM_BOT_TOKEN")),
+    "TELEGRAM_BOT_TOKEN must look like 123456:bot-token",
+    launchValueSeverity
+  );
+}
+if (hasEnv("TELEGRAM_CHAT_ID")) {
+  check(
+    "env value: telegram chat id",
+    isLikelyTelegramChatIdValue(envValue("TELEGRAM_CHAT_ID")),
+    "TELEGRAM_CHAT_ID must be a numeric chat id or @channel username",
+    launchValueSeverity
+  );
+}
+if (hasEnv("NEXT_PUBLIC_SUPABASE_URL")) {
+  check(
+    "env value: supabase url",
+    isSupabaseProjectUrl(envValue("NEXT_PUBLIC_SUPABASE_URL")),
+    "NEXT_PUBLIC_SUPABASE_URL must be an external https Supabase project URL",
+    launchValueSeverity
+  );
+}
+if (hasEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY")) {
+  check(
+    "env value: supabase anon key",
+    isLikelySupabaseKeyValue(envValue("NEXT_PUBLIC_SUPABASE_ANON_KEY")),
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY must be a complete key without whitespace",
+    launchValueSeverity
+  );
+}
+if (hasEnv("SUPABASE_SERVICE_ROLE_KEY")) {
+  check(
+    "env value: supabase service role key",
+    isLikelySupabaseKeyValue(envValue("SUPABASE_SERVICE_ROLE_KEY")),
+    "SUPABASE_SERVICE_ROLE_KEY must be a complete key without whitespace",
+    launchValueSeverity
+  );
+}
+if (hasEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY") && hasEnv("SUPABASE_SERVICE_ROLE_KEY")) {
+  check(
+    "env value: supabase keys differ",
+    envValue("NEXT_PUBLIC_SUPABASE_ANON_KEY") !== envValue("SUPABASE_SERVICE_ROLE_KEY"),
+    "Supabase anon key and service role key must be different",
+    launchValueSeverity
+  );
+}
+if (envValue("PUBLIC_WEB_CRAWL_ENABLED") === "true") {
+  const publicWebHosts = splitEnvListValue(envValue("PUBLIC_WEB_ALLOWED_HOSTS"));
+  const publicWebTemplates = splitEnvListValue(envValue("PUBLIC_WEB_SEARCH_TEMPLATES"));
+  const allowedHostSet = new Set(publicWebHosts.map((host) => host.toLowerCase()));
+  check(
+    "env value: public web hosts",
+    publicWebHosts.length > 0 && publicWebHosts.every(isPublicWebHostValue),
+    "PUBLIC_WEB_ALLOWED_HOSTS must contain comma-separated public hostnames only, without protocol/path/wildcards",
+    "required"
+  );
+  check(
+    "env value: public web host count",
+    publicWebHosts.length <= MAX_PUBLIC_WEB_ALLOWED_HOSTS,
+    `PUBLIC_WEB_ALLOWED_HOSTS supports at most ${MAX_PUBLIC_WEB_ALLOWED_HOSTS} hosts`,
+    "required"
+  );
+  check(
+    "env value: public web templates",
+    publicWebTemplates.length > 0 && publicWebTemplates.every((template) => isPublicWebTemplateValue(template, allowedHostSet)),
+    "PUBLIC_WEB_SEARCH_TEMPLATES must be http(s) URLs with {keyword} and hostnames from PUBLIC_WEB_ALLOWED_HOSTS",
+    "required"
+  );
+  check(
+    "env value: public web template count",
+    publicWebTemplates.length <= MAX_PUBLIC_WEB_SEARCH_TEMPLATES,
+    `PUBLIC_WEB_SEARCH_TEMPLATES supports at most ${MAX_PUBLIC_WEB_SEARCH_TEMPLATES} templates`,
+    "required"
+  );
+}
+
+const failedRequired = results.filter((result) => !result.ok && result.severity === "required");
+const warnings = results.filter((result) => !result.ok && result.severity === "warning");
+
+console.log(`ReturnPick readiness check (${mode})`);
+console.log("=".repeat(36));
+for (const result of results) {
+  const marker = result.ok ? "PASS" : result.severity === "required" ? "FAIL" : "WARN";
+  console.log(`${marker} ${result.name} - ${result.detail}`);
+}
+console.log("=".repeat(36));
+console.log(`summary: ${results.length - failedRequired.length - warnings.length} pass, ${warnings.length} warn, ${failedRequired.length} fail`);
+
+if (mode === "preapproval") {
+  console.log("preapproval mode: missing API keys are warnings so the site can run with manual links and mock fallback.");
+} else {
+  console.log("launch mode: API, Supabase, admin, and cron environment variables must be set.");
+}
+
+if (failedRequired.length) {
+  process.exitCode = 1;
+}

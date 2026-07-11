@@ -1,13 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, BarChart3, CheckCircle2, Clock3, Link2Off, MousePointerClick, PackageSearch, TrendingUp } from "lucide-react";
+import { AlertTriangle, ArrowRight, BarChart3, CheckCircle2, Clock3, Link2Off, MousePointerClick, PackageSearch, RefreshCw, Send, TrendingUp } from "lucide-react";
+import { openAdminCandidateQueue, scrollToAdminAnchor } from "@/lib/adminNavigation";
 import { getCategoryLabel } from "@/lib/category";
 import { formatDate } from "@/lib/format";
 
 type Metrics = {
   total: number;
   published: number;
+  publishedStatusCount: number;
+  publicReady: number;
+  hiddenPublishedWithoutAffiliate: number;
+  hiddenPublishedWithQualityBlockers?: number;
   needsReview: number;
   approved: number;
   highScore: number;
@@ -61,6 +66,7 @@ type RevenueMetrics = {
   };
   ctaReady: number;
   missingAffiliateUrl: number;
+  publicQualityBlocked?: number;
   productMetrics: Array<{
     product_id: string;
     title: string;
@@ -83,25 +89,93 @@ type RevenueMetrics = {
     detail_ctr: number;
     affiliate_ctr: number;
   }>;
+  channelMetrics: Array<{
+    channel: string;
+    impressions: number;
+    detail_views: number;
+    affiliate_clicks: number;
+    telegram_clicks: number;
+  }>;
+};
+
+type MetricsResponse = {
+  metrics?: Metrics;
+  error?: string;
+  message?: string;
+};
+
+type RevenueMetricsResponse = {
+  metrics?: RevenueMetrics;
+  error?: string;
+  message?: string;
 };
 
 function headers(password: string) {
   return { "Content-Type": "application/json", "x-admin-password": password };
 }
 
+function noticeClassName(type: "info" | "error") {
+  if (type === "error") return "border-coral/30 bg-coral/10 text-coral";
+  return "border-line bg-mist text-steel";
+}
+
+function channelLabel(channel: string) {
+  const labels: Record<string, string> = {
+    web: "웹 기본",
+    telegram: "텔레그램 기본",
+    web_detail_hero: "상세 상단 CTA",
+    telegram_detail_hero: "텔레그램 상단 CTA",
+    web_detail_decision: "30초 판단 CTA",
+    telegram_detail_decision: "텔레그램 30초 판단 CTA",
+    web_detail_price: "가격 비교 CTA",
+    telegram_detail_price: "텔레그램 가격 비교 CTA",
+    web_detail_sidebar: "데스크톱 사이드 CTA",
+    telegram_detail_sidebar: "텔레그램 사이드 CTA",
+    web_detail_mobile_sticky: "모바일 하단 CTA",
+    telegram_detail_mobile_sticky: "텔레그램 모바일 하단 CTA"
+  };
+  return labels[channel] ?? channel.replace(/_/g, " ");
+}
+
 export default function AdminOpsDashboard({ password, refreshToken }: { password: string; refreshToken: number }) {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [revenueMetrics, setRevenueMetrics] = useState<RevenueMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState<{ type: "info" | "error"; message: string } | null>(null);
 
   async function loadMetrics() {
-    const [metricsResponse, revenueResponse] = await Promise.all([
-      fetch("/api/admin/metrics", { headers: headers(password) }),
-      fetch("/api/admin/revenue-metrics", { headers: headers(password) })
-    ]);
-    const metricsData = await metricsResponse.json();
-    const revenueData = await revenueResponse.json();
-    setMetrics(metricsData.metrics ?? null);
-    setRevenueMetrics(revenueData.metrics ?? null);
+    setLoading(true);
+    setNotice(null);
+    try {
+      const [metricsResponse, revenueResponse] = await Promise.all([
+        fetch("/api/admin/metrics", { headers: headers(password) }),
+        fetch("/api/admin/revenue-metrics", { headers: headers(password) })
+      ]);
+      const metricsData = (await metricsResponse.json().catch(() => ({}))) as MetricsResponse;
+      const revenueData = (await revenueResponse.json().catch(() => ({}))) as RevenueMetricsResponse;
+
+      if (!metricsResponse.ok || !metricsData.metrics) {
+        setMetrics(null);
+        setRevenueMetrics(null);
+        setNotice({ type: "error", message: metricsData.message ?? metricsData.error ?? "운영 지표를 불러오지 못했습니다." });
+        return;
+      }
+
+      setMetrics(metricsData.metrics);
+      if (!revenueResponse.ok || !revenueData.metrics) {
+        setRevenueMetrics(null);
+        setNotice({ type: "error", message: revenueData.message ?? revenueData.error ?? "운영 기본 지표는 불러왔지만 수익 퍼널을 불러오지 못했습니다." });
+        return;
+      }
+
+      setRevenueMetrics(revenueData.metrics);
+    } catch {
+      setMetrics(null);
+      setRevenueMetrics(null);
+      setNotice({ type: "error", message: "네트워크 문제로 운영 지표를 불러오지 못했습니다." });
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -110,24 +184,94 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
 
   if (!metrics) {
     return (
-      <section className="rounded-lg border border-line bg-white p-5 shadow-soft">
-        <p className="text-sm font-bold text-steel">운영 지표를 불러오는 중입니다.</p>
+      <section id="admin-ops-dashboard" className="scroll-mt-4 rounded-lg border border-line bg-white p-5 shadow-soft">
+        <p className="text-sm font-bold text-steel">{loading ? "운영 지표를 불러오는 중입니다." : "운영 지표를 불러오지 못했습니다."}</p>
+        {notice ? (
+          <p className={`mt-3 rounded-lg border px-3 py-2 text-sm font-bold ${noticeClassName(notice.type)}`} role="status" aria-live="polite">
+            {notice.message}
+          </p>
+        ) : null}
+        <button
+          className="focus-ring mt-3 inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-black hover:bg-mist disabled:opacity-60"
+          onClick={loadMetrics}
+          disabled={loading}
+          type="button"
+        >
+          <RefreshCw size={15} aria-hidden /> {loading ? "불러오는 중" : "다시 불러오기"}
+        </button>
       </section>
     );
   }
 
+  const publicReadyCount = metrics.publicReady ?? metrics.published;
+  const hiddenPublishedCount = metrics.hiddenPublishedWithoutAffiliate ?? metrics.missingAffiliateUrl;
+  const hiddenQualityCount = metrics.hiddenPublishedWithQualityBlockers ?? 0;
+  const publishedStatusCount = metrics.publishedStatusCount ?? publicReadyCount + hiddenPublishedCount + hiddenQualityCount;
+
   const cards = [
     { label: "검토 대기", value: metrics.needsReview, icon: PackageSearch, tone: "text-pine" },
-    { label: "게시 중", value: metrics.published, icon: CheckCircle2, tone: "text-pine" },
+    { label: "공개 가능", value: publicReadyCount, icon: CheckCircle2, tone: "text-pine" },
+    { label: "공개 보강 대기", value: hiddenPublishedCount + hiddenQualityCount, icon: Link2Off, tone: "text-coral" },
     { label: "평균 점수", value: `${metrics.averageScore}점`, icon: BarChart3, tone: "text-lemon" },
     { label: "수동 확인", value: metrics.unknownCondition + metrics.missingReturnPrice, icon: AlertTriangle, tone: "text-coral" },
     { label: "구매 클릭", value: revenueMetrics?.funnel.affiliate_clicks ?? 0, icon: MousePointerClick, tone: "text-pine" },
-    { label: "제휴 URL 누락", value: metrics.missingAffiliateUrl, icon: Link2Off, tone: "text-coral" },
     { label: "변동 감지", value: metrics.changedRecently, icon: Clock3, tone: "text-steel" }
   ];
+  const topCtaChannels = [...(revenueMetrics?.channelMetrics ?? [])]
+    .filter((item) => item.affiliate_clicks > 0)
+    .sort((a, b) => b.affiliate_clicks - a.affiliate_clicks || b.detail_views - a.detail_views)
+    .slice(0, 4);
+  const recoveryActions = [
+    {
+      key: "affiliate",
+      count: hiddenPublishedCount,
+      title: "상품별 파트너스 링크 보강",
+      summary: "게시 상태지만 구매 버튼이 살아나지 못한 상품입니다. 링크를 채우면 공개 목록과 텔레그램 후보로 복귀할 수 있습니다.",
+      buttonLabel: "링크 보강 큐 열기",
+      icon: Link2Off,
+      tone: "text-coral",
+      onClick: () => scrollToAdminAnchor("admin-affiliate-links")
+    },
+    {
+      key: "quality",
+      count: hiddenQualityCount,
+      title: "공개 품질 보강",
+      summary: "링크는 있지만 반품가, 등급, 이미지, 가격 비교 같은 신뢰 정보가 부족한 상품입니다. 고객공개 보강 필터로 바로 좁힙니다.",
+      buttonLabel: "공개 보강 후보 열기",
+      icon: AlertTriangle,
+      tone: "text-lemon",
+      onClick: () => openAdminCandidateQueue("public_repair")
+    },
+    {
+      key: "review",
+      count: metrics.needsReview,
+      title: "검토 대기 후보 처리",
+      summary: "점수와 품질 신호가 쌓인 후보를 검토해 공개 가능한 딜로 전환합니다. 필터를 초기화하고 검토 대기 큐부터 엽니다.",
+      buttonLabel: "검토 대기 큐 열기",
+      icon: PackageSearch,
+      tone: "text-pine",
+      onClick: () => openAdminCandidateQueue("review")
+    },
+    {
+      key: "telegram",
+      count: publicReadyCount > 0 && (revenueMetrics?.totals.telegram_detail_click ?? 0) === 0 ? publicReadyCount : 0,
+      title: "텔레그램 유입 시작",
+      summary: "고객공개 가능한 상품은 있는데 텔레그램 상세 유입이 아직 없습니다. 발송 후보를 보내 초기 클릭 신호를 만듭니다.",
+      buttonLabel: "텔레그램 발송 열기",
+      icon: Send,
+      tone: "text-pine",
+      onClick: () => scrollToAdminAnchor("admin-telegram-distribution")
+    }
+  ].filter((action) => action.count > 0);
+  const primaryRecoveryAction = recoveryActions[0] ?? null;
 
   return (
-    <section className="space-y-4">
+    <section id="admin-ops-dashboard" className="scroll-mt-4 space-y-4">
+      {notice ? (
+        <p className={`rounded-lg border px-3 py-2 text-sm font-bold ${noticeClassName(notice.type)}`} role="status" aria-live="polite">
+          {notice.message}
+        </p>
+      ) : null}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
         {cards.map((card) => (
           <div key={card.label} className="rounded-lg border border-line bg-white p-4 shadow-soft">
@@ -137,6 +281,99 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
           </div>
         ))}
       </div>
+      <p className="rounded-lg border border-line bg-white px-4 py-3 text-sm font-bold text-steel shadow-soft" role="status" aria-live="polite">
+        게시 상태 {publishedStatusCount.toLocaleString("ko-KR")}개 중 실제 사용자 화면에 보이는 공개 가능 상품은{" "}
+        <span className="text-pine">{publicReadyCount.toLocaleString("ko-KR")}개</span>입니다. 상품별 쿠팡 파트너스 링크가 없거나 고객공개 품질 블로커가 있는{" "}
+        <span className="text-coral">{(hiddenPublishedCount + hiddenQualityCount).toLocaleString("ko-KR")}개</span>는 보강 전까지 공개 목록과 텔레그램 발송에서 숨겨집니다.
+      </p>
+
+      <div className="rounded-lg border border-line bg-white p-5 shadow-soft">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-black text-pine">Revenue Recovery</p>
+            <h2 className="mt-1 text-lg font-black">수익 회복 플랜</h2>
+          </div>
+          <span className="rounded-md bg-mist px-2 py-1 text-xs font-black text-steel">
+            {primaryRecoveryAction
+              ? `우선순위: ${primaryRecoveryAction.title} ${primaryRecoveryAction.count.toLocaleString("ko-KR")}건`
+              : "공개/발송 흐름 정상"}
+          </span>
+        </div>
+        {recoveryActions.length ? (
+          <div className="mt-4 space-y-3">
+            {recoveryActions.slice(0, 3).map((action) => {
+              const Icon = action.icon;
+              return (
+                <div key={action.key} className="grid gap-3 border-t border-line pt-3 first:border-t-0 first:pt-0 md:grid-cols-[auto_1fr_auto] md:items-center">
+                  <Icon className={action.tone} size={20} aria-hidden />
+                  <div className="min-w-0">
+                    <p className="text-sm font-black">
+                      {action.title} <span className="text-pine">{action.count.toLocaleString("ko-KR")}건</span>
+                    </p>
+                    <p className="mt-1 text-xs font-bold leading-5 text-steel">{action.summary}</p>
+                  </div>
+                  <button
+                    className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-xs font-black text-ink hover:bg-mist"
+                    onClick={action.onClick}
+                    type="button"
+                  >
+                    {action.buttonLabel}
+                    <ArrowRight size={14} aria-hidden />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-4 text-sm font-bold leading-6 text-steel">
+            지금은 숨겨진 게시 상품이나 검토 병목이 없습니다. 새 수집을 돌리거나 텔레그램 후보 발송으로 유입 신호를 이어가면 됩니다.
+          </p>
+        )}
+      </div>
+
+      {hiddenPublishedCount + hiddenQualityCount > 0 ? (
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="rounded-lg border border-coral/20 bg-coral/10 p-4 shadow-soft">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-black text-coral">상품별 링크 보강</p>
+                <p className="mt-1 text-2xl font-black text-coral">{hiddenPublishedCount.toLocaleString("ko-KR")}개</p>
+                <p className="mt-2 text-xs font-bold leading-5 text-ink">
+                  게시 상태지만 상품별 쿠팡 파트너스 링크가 없어 구매 CTA와 텔레그램 후보에서 제외됩니다.
+                </p>
+              </div>
+              <Link2Off className="shrink-0 text-coral" size={22} aria-hidden />
+            </div>
+            <button
+              className="focus-ring mt-3 rounded-lg bg-white px-3 py-2 text-xs font-black text-ink hover:bg-mist"
+              onClick={() => scrollToAdminAnchor("admin-affiliate-links")}
+              type="button"
+            >
+              링크 보강 큐로 이동
+            </button>
+          </div>
+
+          <div className="rounded-lg border border-lemon/60 bg-lemon/20 p-4 shadow-soft">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-black text-ink">품질 보강 대기</p>
+                <p className="mt-1 text-2xl font-black text-ink">{hiddenQualityCount.toLocaleString("ko-KR")}개</p>
+                <p className="mt-2 text-xs font-bold leading-5 text-ink">
+                  링크는 있어도 반품가, 등급, 이미지, 가격 비교 같은 고객 신뢰 정보가 부족해 공개에서 숨겨집니다.
+                </p>
+              </div>
+              <AlertTriangle className="shrink-0 text-ink" size={22} aria-hidden />
+            </div>
+            <button
+              className="focus-ring mt-3 rounded-lg bg-white px-3 py-2 text-xs font-black text-ink hover:bg-mist"
+              onClick={() => openAdminCandidateQueue("public_repair")}
+              type="button"
+            >
+              품질 보강 후보로 이동
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {revenueMetrics ? (
         <div className="grid gap-4 xl:grid-cols-[1fr_1.2fr]">
@@ -162,8 +399,23 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
               </div>
             </div>
             <p className="mt-4 text-sm font-semibold text-steel">
-              텔레그램 유입 {revenueMetrics.totals.telegram_detail_click} · CTA 준비 {revenueMetrics.ctaReady} · 링크 누락 {revenueMetrics.missingAffiliateUrl}
+              텔레그램 유입 {revenueMetrics.totals.telegram_detail_click} · CTA 준비 {revenueMetrics.ctaReady} · 링크 보강 대기 {hiddenPublishedCount}
             </p>
+            <div className="mt-4 rounded-lg border border-line bg-white p-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-black text-steel">CTA 위치별 클릭</p>
+                <span className="rounded-md bg-mist px-2 py-1 text-[11px] font-black text-steel">상세 페이지</span>
+              </div>
+              <div className="mt-3 space-y-2">
+                {topCtaChannels.map((item) => (
+                  <div key={item.channel} className="flex items-center justify-between gap-3 rounded-md bg-mist px-2 py-1.5 text-xs font-bold">
+                    <span className="min-w-0 truncate">{channelLabel(item.channel)}</span>
+                    <span className="shrink-0 font-black text-pine">{item.affiliate_clicks}회</span>
+                  </div>
+                ))}
+                {!topCtaChannels.length ? <p className="text-xs font-bold text-steel">아직 구매 CTA 클릭 위치 데이터가 없습니다.</p> : null}
+              </div>
+            </div>
           </div>
 
           <div className="rounded-lg border border-line bg-white p-5 shadow-soft">

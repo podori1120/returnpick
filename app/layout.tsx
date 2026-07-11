@@ -1,11 +1,32 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import CompareDock from "@/components/CompareDock";
+import { getSiteUrl } from "@/lib/siteUrl";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ReturnPick | 리턴픽",
-  description: "반품 노트북, 디지털, 소형가전 딜을 자동 수집하고 검수해 보여주는 리턴픽"
+  metadataBase: new URL(getSiteUrl()),
+  title: {
+    default: "ReturnPick | 리턴픽",
+    template: "%s | ReturnPick"
+  },
+  description: "반품 노트북, 디지털, 소형가전 딜을 자동 수집하고 검수해 보여주는 리턴픽",
+  alternates: {
+    canonical: "/"
+  },
+  openGraph: {
+    title: "ReturnPick | 리턴픽",
+    description: "반품 디지털 딜을 자동 수집하고 검수해 보여주는 리턴픽",
+    type: "website",
+    locale: "ko_KR",
+    siteName: "ReturnPick",
+    url: "/"
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ReturnPick | 리턴픽",
+    description: "반품 디지털 딜을 자동 수집하고 검수해 보여주는 리턴픽"
+  }
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -46,6 +67,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
         {children}
+        <footer className="border-t border-line bg-white">
+          <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-6 text-sm font-semibold leading-6 text-steel sm:px-6 md:flex-row md:items-center md:justify-between">
+            <p>이 포스팅은 쿠팡 파트너스 활동의 일환으로 일정액의 수수료를 제공받을 수 있습니다.</p>
+            <div className="flex flex-wrap gap-3 font-black">
+              <Link className="text-pine hover:text-ink" href="/disclosure">
+                제휴 안내
+              </Link>
+              <Link className="text-pine hover:text-ink" href="/products/approval-sample">
+                승인용 추천 상품
+              </Link>
+            </div>
+          </div>
+        </footer>
         <CompareDock />
       </body>
     </html>

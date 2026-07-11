@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Loader2, Scale, Trash2 } from "lucide-react";
 import AffiliateButton from "@/components/AffiliateButton";
 import AffiliateNotice from "@/components/AffiliateNotice";
+import { getStoredJsonArray, setStoredJsonArray } from "@/lib/clientTracking";
+import { getCoupangOutboundLink } from "@/lib/coupangLink";
 import { formatPercent, formatPrice } from "@/lib/format";
 import type { PublicDeal } from "@/lib/publicDeal";
 
@@ -16,18 +18,16 @@ type StoredCompareItem = {
 const storageKey = "returnpick_compare_deals";
 
 function readCompareItems(): StoredCompareItem[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(storageKey) || "[]") as StoredCompareItem[];
-    return Array.isArray(parsed) ? parsed.filter((item) => item.id && item.title) : [];
-  } catch {
-    return [];
-  }
+  return getStoredJsonArray<StoredCompareItem>(storageKey).filter((item) => item.id && item.title);
 }
 
 function writeCompareItems(items: StoredCompareItem[]) {
-  window.localStorage.setItem(storageKey, JSON.stringify(items));
-  window.dispatchEvent(new Event("returnpick_compare_deals_changed"));
+  setStoredJsonArray(storageKey, items);
+  try {
+    window.dispatchEvent(new Event("returnpick_compare_deals_changed"));
+  } catch {
+    // Compare storage is a convenience feature. It should not break the page.
+  }
 }
 
 function valueClass(isBest: boolean) {
@@ -38,6 +38,7 @@ export default function CompareBoard() {
   const [items, setItems] = useState<StoredCompareItem[]>([]);
   const [products, setProducts] = useState<PublicDeal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     setItems(readCompareItems());
@@ -46,23 +47,35 @@ export default function CompareBoard() {
   useEffect(() => {
     async function load() {
       setLoading(true);
+      setError("");
       const ids = items.map((item) => item.id);
       if (!ids.length) {
         setProducts([]);
         setLoading(false);
         return;
       }
-      const response = await fetch(`/api/products/compare?ids=${encodeURIComponent(ids.join(","))}`, { cache: "no-store" });
-      const body = (await response.json()) as { products?: PublicDeal[] };
-      setProducts(body.products ?? []);
-      setLoading(false);
+      try {
+        const response = await fetch(`/api/products/compare?ids=${encodeURIComponent(ids.join(","))}`, { cache: "no-store" });
+        const body = (await response.json().catch(() => ({}))) as { products?: PublicDeal[]; error?: string; message?: string };
+        if (!response.ok || body.error) {
+          setProducts([]);
+          setError(body.message ?? body.error ?? "비교 상품 정보를 불러오지 못했습니다.");
+          return;
+        }
+        setProducts(body.products ?? []);
+      } catch {
+        setProducts([]);
+        setError("네트워크 문제로 비교 상품 정보를 불러오지 못했습니다.");
+      } finally {
+        setLoading(false);
+      }
     }
 
     load();
   }, [items]);
 
   const best = useMemo(() => {
-    const ready = products.filter((product) => product.affiliate_url);
+    const ready = products.filter((product) => getCoupangOutboundLink(product).isAffiliate);
     const candidates = ready.length ? ready : products;
     const byScore = [...candidates].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0] ?? null;
     const byPrice = [...products].filter((product) => product.deal_price != null).sort((a, b) => (a.deal_price ?? 0) - (b.deal_price ?? 0))[0] ?? null;
@@ -93,9 +106,11 @@ export default function CompareBoard() {
   if (!products.length) {
     return (
       <section className="rounded-lg border border-line bg-white p-8 text-center shadow-soft">
-        <Scale className="mx-auto text-pine" size={34} aria-hidden />
-        <h2 className="mt-3 text-xl font-black">아직 비교할 상품이 없습니다</h2>
-        <p className="mt-2 text-sm font-semibold leading-6 text-steel">딜 목록이나 상세 페이지에서 비교함을 눌러 최대 6개까지 모아볼 수 있습니다.</p>
+        {error ? <AlertTriangle className="mx-auto text-coral" size={34} aria-hidden /> : <Scale className="mx-auto text-pine" size={34} aria-hidden />}
+        <h2 className="mt-3 text-xl font-black">{error ? "비교 정보를 불러오지 못했습니다" : "아직 비교할 상품이 없습니다"}</h2>
+        <p className="mt-2 text-sm font-semibold leading-6 text-steel">
+          {error || "딜 목록이나 상세 페이지에서 비교함을 눌러 최대 6개까지 모아볼 수 있습니다."}
+        </p>
         <Link className="focus-ring mt-5 inline-flex rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink" href="/deals">
           딜 보러가기
         </Link>
@@ -138,7 +153,9 @@ export default function CompareBoard() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-3">
-        {products.map((product) => (
+        {products.map((product) => {
+          const outboundLink = getCoupangOutboundLink(product);
+          return (
           <article key={product.id} className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">
             <Link href={product.detail_url} className="block">
               <div className="aspect-[16/10] bg-line">
@@ -183,22 +200,29 @@ export default function CompareBoard() {
                 {product.primary_use_case ? product.primary_use_case.reason : product.reasons[0] ?? "상세 페이지에서 추천 이유와 위험 플래그를 확인하세요."}
               </div>
               <div className="flex flex-wrap gap-2 text-xs font-black">
-                {product.affiliate_url ? (
+                {outboundLink.isAffiliate ? (
                   <span className="inline-flex items-center gap-1 rounded-md bg-pine/10 px-2.5 py-1 text-pine">
                     <CheckCircle2 size={14} aria-hidden /> CTA 준비
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-coral/10 px-2.5 py-1 text-coral">
-                    <AlertTriangle size={14} aria-hidden /> 링크 확인필요
+                  <span className="inline-flex items-center gap-1 rounded-md bg-lemon/30 px-2.5 py-1 text-ink">
+                    <AlertTriangle size={14} aria-hidden /> 검색 이동
                   </span>
                 )}
                 <span className="rounded-md bg-mist px-2.5 py-1 text-steel">위험 {product.risk_flags.length}</span>
                 <span className="rounded-md bg-mist px-2.5 py-1 text-steel">재고 {product.stock_count ?? "확인필요"}</span>
               </div>
-              <AffiliateButton productId={product.id} href={product.affiliate_url} channel="compare" />
+              <AffiliateButton
+                productId={product.id}
+                href={outboundLink.href}
+                label={outboundLink.label}
+                sponsored={outboundLink.isAffiliate}
+                channel="compare"
+              />
             </div>
           </article>
-        ))}
+          );
+        })}
       </section>
 
       <section className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">
@@ -222,7 +246,7 @@ export default function CompareBoard() {
                 ["반품등급", (product: PublicDeal) => product.condition_grade],
                 ["검수", (product: PublicDeal) => `${product.quality.label} ${product.quality.confidence}`],
                 ["위험 플래그", (product: PublicDeal) => `${product.risk_flags.length}개`],
-                ["제휴 링크", (product: PublicDeal) => (product.affiliate_url ? "준비됨" : "확인필요")]
+                ["제휴 링크", (product: PublicDeal) => (getCoupangOutboundLink(product).isAffiliate ? "준비됨" : "검색 이동")]
               ].map(([label, getter]) => (
                 <tr key={String(label)}>
                   <th className="w-28 bg-mist/50 p-3 text-xs font-black text-steel">{String(label)}</th>

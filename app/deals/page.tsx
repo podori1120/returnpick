@@ -19,6 +19,7 @@ import {
 } from "@/lib/dealIntelligence";
 import { formatPercent, formatPrice } from "@/lib/format";
 import { listProducts } from "@/lib/dataStore";
+import { isPublicDealReady } from "@/lib/publicDeal";
 import { getDealQuality, type DealQualityStatus } from "@/lib/quality";
 import type { Category, ConditionGrade, ProductWithScore } from "@/lib/types";
 
@@ -95,7 +96,7 @@ export default async function DealsPage({
   const selectedQuality = isQuality(quality) ? quality : undefined;
   const selectedUseCase = isUseCase(useCaseParam) ? useCaseParam : undefined;
   const selectedPriceBand = isPriceBand(priceBandParam) ? priceBandParam : undefined;
-  const allPublished = (await listProducts({ published: true })).filter((product) => product.sourcing_status === "published");
+  const allPublished = (await listProducts({ published: true })).filter(isPublicDealReady);
   const filteredProducts = sortProducts(
     allPublished
       .filter((product) => (category ? product.category === category : true))
@@ -351,7 +352,18 @@ export default async function DealsPage({
           <DealCard key={product.id} product={product} />
         ))}
       </div>
-      {!products.length ? <div className="rounded-lg border border-line bg-white p-8 text-center font-bold text-steel">아직 공개된 딜이 없습니다. 관리자에서 후보를 게시하면 여기에 표시됩니다.</div> : null}
+      {!products.length ? (
+        <div className="rounded-lg border border-line bg-white p-8 text-center shadow-soft">
+          <p className="text-sm font-black text-pine">구매 CTA 검수 중</p>
+          <h2 className="mt-2 text-2xl font-black">파트너스 링크가 준비된 상품만 공개합니다</h2>
+          <p className="mx-auto mt-3 max-w-2xl text-sm font-semibold leading-6 text-steel">
+            현재 게시 후보는 관리자에서 제휴 링크 보강을 기다리고 있습니다. 가격 확인 버튼이 실제 쿠팡 파트너스 링크로 연결되는 상품만 공개 목록에 표시됩니다.
+          </p>
+          <Link className="focus-ring mt-5 inline-flex rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink" href="/products/approval-sample">
+            승인용 추천 상품 보기
+          </Link>
+        </div>
+      ) : null}
 
       {totalPages > 1 ? (
         <nav className="flex flex-wrap items-center justify-center gap-2">

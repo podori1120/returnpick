@@ -45,7 +45,7 @@ export type SnapshotChangeFlag =
   | "SOLD_OUT"
   | "BACK_IN_STOCK";
 
-export type AffiliateEventType = "impression" | "detail_view" | "affiliate_click" | "telegram_detail_click";
+export type AffiliateEventType = "impression" | "detail_view" | "affiliate_click" | "telegram_detail_click" | "share_copy";
 
 export type JsonValue =
   | string

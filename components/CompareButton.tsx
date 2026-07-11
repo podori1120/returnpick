@@ -1,16 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getStoredJsonArray, setStoredJsonArray } from "@/lib/clientTracking";
 
 const storageKey = "returnpick_compare_deals";
 const changeEvent = "returnpick_compare_deals_changed";
 
 function readItems() {
-  try {
-    return JSON.parse(window.localStorage.getItem(storageKey) || "[]") as Array<{ id: string; title: string }>;
-  } catch {
-    return [];
-  }
+  return getStoredJsonArray<Array<{ id: string; title: string }>[number]>(storageKey);
 }
 
 export default function CompareButton({ productId, title }: { productId: string; title: string }) {
@@ -33,8 +30,12 @@ export default function CompareButton({ productId, title }: { productId: string;
     const items = readItems();
     const exists = items.some((item) => item.id === productId);
     const next = exists ? items.filter((item) => item.id !== productId) : [{ id: productId, title }, ...items].slice(0, 6);
-    window.localStorage.setItem(storageKey, JSON.stringify(next));
-    window.dispatchEvent(new Event(changeEvent));
+    setStoredJsonArray(storageKey, next);
+    try {
+      window.dispatchEvent(new Event(changeEvent));
+    } catch {
+      // Compare storage is best-effort and should not block browsing.
+    }
     setSelected(!exists);
   }
 

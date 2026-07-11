@@ -14,13 +14,99 @@ export interface NaverShoppingItem {
   category4: string | null;
 }
 
-function isConfigured() {
-  return Boolean(process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET);
+export type NaverShoppingSearchResult = {
+  status: "ok" | "API_NOT_CONFIGURED" | "error";
+  items: NaverShoppingItem[];
+  error?: string;
+  meta?: {
+    query: string;
+    items_path: "items" | null;
+    api_total: number | null;
+    api_start: number | null;
+    api_display: number | null;
+    raw_item_count: number;
+    normalized_item_count: number;
+    priced_item_count: number;
+    sort: "sim";
+    display_limit: number;
+  };
+};
+
+export type NaverLowestPriceResult = {
+  status: "ok" | "API_NOT_CONFIGURED" | "error" | "no_match";
+  price: number | null;
+  query: string | null;
+  item: NaverShoppingItem | null;
+  errors: string[];
+  match?: {
+    relevance_score: number;
+    matched_tokens: string[];
+    priced_item_count: number;
+    relevance_candidate_count: number;
+    rejected_by_relevance_count: number;
+  };
+};
+
+type NaverLowestPriceOptions = {
+  relevanceTokens?: Array<string | number | null | undefined>;
+  minRelevance?: number;
+};
+
+function envText(name: string) {
+  return process.env[name]?.trim() ?? "";
 }
 
-export async function searchNaverShopping(query: string): Promise<{ status: "ok" | "API_NOT_CONFIGURED" | "error"; items: NaverShoppingItem[]; error?: string }> {
+function getNaverCredentials() {
+  return {
+    clientId: envText("NAVER_CLIENT_ID"),
+    clientSecret: envText("NAVER_CLIENT_SECRET")
+  };
+}
+
+function isConfigured() {
+  const { clientId, clientSecret } = getNaverCredentials();
+  return Boolean(clientId && clientSecret);
+}
+
+function compactErrorText(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, 240) : null;
+}
+
+function naverErrorMessage(payload: Record<string, unknown>) {
+  return (
+    compactErrorText(payload.errorMessage) ??
+    compactErrorText(payload.message) ??
+    compactErrorText(payload.error_description) ??
+    compactErrorText(payload.error) ??
+    compactErrorText(payload.errorCode) ??
+    compactErrorText(payload.raw_text)
+  );
+}
+
+async function responsePayload(response: Response): Promise<Record<string, unknown>> {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    return { raw_text: text.slice(0, 500) };
+  }
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function searchNaverShopping(query: string): Promise<NaverShoppingSearchResult> {
   if (!isConfigured()) return { status: "API_NOT_CONFIGURED", items: [] };
 
+  const { clientId, clientSecret } = getNaverCredentials();
   const params = new URLSearchParams({
     query,
     display: "10",
@@ -28,39 +114,154 @@ export async function searchNaverShopping(query: string): Promise<{ status: "ok"
   });
 
   try {
-    const response = await fetch(`https://openapi.naver.com/v1/search/shop.json?${params.toString()}`, {
+    const response = await fetchWithTimeout(`https://openapi.naver.com/v1/search/shop.json?${params.toString()}`, {
       headers: {
-        "X-Naver-Client-Id": process.env.NAVER_CLIENT_ID ?? "",
-        "X-Naver-Client-Secret": process.env.NAVER_CLIENT_SECRET ?? ""
+        "X-Naver-Client-Id": clientId,
+        "X-Naver-Client-Secret": clientSecret
       },
       cache: "no-store"
     });
 
-    if (!response.ok) return { status: "error", items: [], error: `NAVER_HTTP_${response.status}` };
-    const payload = (await response.json()) as { items?: Record<string, unknown>[] };
-    const items = (payload.items ?? []).map((item) => ({
-      title: stripHtml(String(item.title ?? "")),
-      link: typeof item.link === "string" ? item.link : null,
-      image: typeof item.image === "string" ? item.image : null,
-      lprice: toNumberOrNull(item.lprice),
-      mallName: typeof item.mallName === "string" ? item.mallName : null,
-      brand: typeof item.brand === "string" ? item.brand : null,
-      maker: typeof item.maker === "string" ? item.maker : null,
-      category1: typeof item.category1 === "string" ? item.category1 : null,
-      category2: typeof item.category2 === "string" ? item.category2 : null,
-      category3: typeof item.category3 === "string" ? item.category3 : null,
-      category4: typeof item.category4 === "string" ? item.category4 : null
-    }));
+    const payload = await responsePayload(response);
+    if (!response.ok) {
+      const detail = naverErrorMessage(payload);
+      return { status: "error", items: [], error: detail ? `NAVER_HTTP_${response.status}: ${detail}` : `NAVER_HTTP_${response.status}` };
+    }
+    const rawItems = Array.isArray(payload.items) ? payload.items : [];
+    const items = rawItems.map((item) => {
+      const record = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+      return {
+        title: stripHtml(String(record.title ?? "")),
+        link: typeof record.link === "string" ? record.link : null,
+        image: typeof record.image === "string" ? record.image : null,
+        lprice: toNumberOrNull(record.lprice),
+        mallName: typeof record.mallName === "string" ? record.mallName : null,
+        brand: typeof record.brand === "string" ? record.brand : null,
+        maker: typeof record.maker === "string" ? record.maker : null,
+        category1: typeof record.category1 === "string" ? record.category1 : null,
+        category2: typeof record.category2 === "string" ? record.category2 : null,
+        category3: typeof record.category3 === "string" ? record.category3 : null,
+        category4: typeof record.category4 === "string" ? record.category4 : null
+      };
+    });
 
-    return { status: "ok", items };
+    return {
+      status: "ok",
+      items,
+      meta: {
+        query,
+        items_path: Array.isArray(payload.items) ? "items" : null,
+        api_total: toNumberOrNull(payload.total),
+        api_start: toNumberOrNull(payload.start),
+        api_display: toNumberOrNull(payload.display),
+        raw_item_count: rawItems.length,
+        normalized_item_count: items.length,
+        priced_item_count: items.filter((item) => typeof item.lprice === "number" && item.lprice > 0).length,
+        sort: "sim",
+        display_limit: 10
+      }
+    };
   } catch (error) {
     return { status: "error", items: [], error: error instanceof Error ? error.message : "NAVER_UNKNOWN_ERROR" };
   }
 }
 
 export async function getLowestPrice(query: string) {
-  const result = await searchNaverShopping(query);
-  if (result.status !== "ok") return null;
-  const prices = result.items.map((item) => item.lprice).filter((price): price is number => typeof price === "number" && price > 0);
-  return prices.length > 0 ? Math.min(...prices) : null;
+  const result = await getLowestPriceFromQueries([query]);
+  return result.price;
+}
+
+function normalizeMatchToken(value: string | number | null | undefined) {
+  const raw = String(value ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+  if (raw.length < 2) return "";
+  return raw;
+}
+
+function uniqueMatchTokens(values: Array<string | number | null | undefined>) {
+  return Array.from(new Set(values.map(normalizeMatchToken).filter(Boolean))).slice(0, 18);
+}
+
+function itemSearchText(item: NaverShoppingItem) {
+  return [item.title, item.brand, item.maker, item.mallName, item.category1, item.category2, item.category3, item.category4]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .join(" ")
+    .toLowerCase();
+}
+
+function itemRelevance(item: NaverShoppingItem, relevanceTokens: string[]) {
+  if (!relevanceTokens.length) return { score: 1, matchedTokens: [] as string[] };
+  const haystack = itemSearchText(item);
+  const matchedTokens = relevanceTokens.filter((token) => haystack.includes(token));
+  return { score: matchedTokens.length, matchedTokens };
+}
+
+export async function getLowestPriceFromQueries(queries: string[], options: NaverLowestPriceOptions = {}): Promise<NaverLowestPriceResult> {
+  const normalizedQueries = Array.from(
+    new Set(
+      queries
+        .map((query) => query.replace(/\s+/g, " ").trim())
+        .filter((query) => query.length >= 2)
+        .map((query) => query.slice(0, 120))
+    )
+  );
+  if (!normalizedQueries.length) return { status: "no_match", price: null, query: null, item: null, errors: [] };
+
+  const relevanceTokens = uniqueMatchTokens(options.relevanceTokens ?? []);
+  const minRelevance = relevanceTokens.length ? Math.max(1, Math.min(4, options.minRelevance ?? Math.min(2, relevanceTokens.length))) : 0;
+  let sawOk = false;
+  const errors: string[] = [];
+  let pricedItemCount = 0;
+  let relevanceCandidateCount = 0;
+  let rejectedByRelevanceCount = 0;
+  let best: { price: number; query: string; item: NaverShoppingItem; relevanceScore: number; matchedTokens: string[] } | null = null;
+
+  for (const query of normalizedQueries) {
+    const result = await searchNaverShopping(query);
+    if (result.status === "API_NOT_CONFIGURED") {
+      return { status: "API_NOT_CONFIGURED", price: null, query: null, item: null, errors };
+    }
+    if (result.status === "error") {
+      errors.push(`${query}: ${result.error ?? "NAVER_ERROR"}`);
+      continue;
+    }
+
+    sawOk = true;
+    for (const item of result.items) {
+      const price = item.lprice;
+      if (!price || price <= 0) continue;
+      pricedItemCount += 1;
+      const relevance = itemRelevance(item, relevanceTokens);
+      if (relevance.score < minRelevance) {
+        rejectedByRelevanceCount += 1;
+        continue;
+      }
+      relevanceCandidateCount += 1;
+      if (!best || price < best.price) {
+        best = { price, query, item, relevanceScore: relevance.score, matchedTokens: relevance.matchedTokens };
+      }
+    }
+  }
+
+  const match = {
+    relevance_score: best?.relevanceScore ?? 0,
+    matched_tokens: best?.matchedTokens.slice(0, 10) ?? [],
+    priced_item_count: pricedItemCount,
+    relevance_candidate_count: relevanceCandidateCount,
+    rejected_by_relevance_count: rejectedByRelevanceCount
+  };
+
+  if (best) {
+    return {
+      status: "ok",
+      price: best.price,
+      query: best.query,
+      item: best.item,
+      errors,
+      match
+    };
+  }
+  return { status: sawOk ? "no_match" : "error", price: null, query: null, item: null, errors, match };
 }

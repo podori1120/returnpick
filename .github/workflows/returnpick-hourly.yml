@@ -1,0 +1,67 @@
+name: ReturnPick Hourly Scheduler
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      site_url:
+        description: "ReturnPick production URL. Blank uses repository variable RETURNPICK_SITE_URL or https://returnpick.vercel.app."
+        required: false
+        type: string
+      run_telegram:
+        description: "Run Telegram digest after sourcing."
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: returnpick-hourly-scheduler
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run-hourly-scheduler:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      CRON_SECRET: ${{ secrets.RETURNPICK_CRON_SECRET }}
+      REPOSITORY_SITE_URL: ${{ vars.RETURNPICK_SITE_URL }}
+      DISPATCH_SITE_URL: ${{ github.event.inputs.site_url }}
+      RUN_TELEGRAM: ${{ github.event.inputs.run_telegram }}
+    steps:
+      - name: Call ReturnPick scheduler endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${CRON_SECRET}" ]]; then
+            echo "::error::Missing GitHub secret RETURNPICK_CRON_SECRET. Use the same value as Vercel CRON_SECRET."
+            exit 1
+          fi
+
+          site_url="${DISPATCH_SITE_URL:-${REPOSITORY_SITE_URL:-https://returnpick.vercel.app}}"
+          site_url="${site_url%/}"
+          if [[ ! "${site_url}" =~ ^https:// ]]; then
+            echo "::error::ReturnPick site URL must start with https://"
+            exit 1
+          fi
+
+          call_returnpick() {
+            local path="$1"
+            echo "Calling ${site_url}${path}"
+            curl --fail-with-body --silent --show-error --location --max-time 75 \
+              -H "Authorization: Bearer ${CRON_SECRET}" \
+              "${site_url}${path}"
+            echo
+          }
+
+          call_returnpick "/api/cron/sourcing"
+
+          if [[ "${RUN_TELEGRAM:-true}" != "false" ]]; then
+            call_returnpick "/api/cron/telegram-digest?limit=1"
+          else
+            echo "Telegram digest skipped by workflow_dispatch input."
+          fi

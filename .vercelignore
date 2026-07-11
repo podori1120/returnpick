@@ -1,0 +1,17 @@
+node_modules/
+.next/
+.vercel/
+.git/
+.returnpick/
+
+.env
+.env.*
+!.env.example
+
+*.log
+npm-debug.log*
+tsconfig.tsbuildinfo
+
+returnpick-coupang-approval-sample.png
+returnpick-coupang-review.png
+coupang-partners-profile-registered.png

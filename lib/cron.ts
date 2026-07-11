@@ -11,6 +11,22 @@ export function requireCronAuth(request: Request) {
   return NextResponse.json({ error: "UNAUTHORIZED_CRON" }, { status: 401 });
 }
 
+export function isCronProbeRequest(request: Request) {
+  const url = new URL(request.url);
+  return url.searchParams.get("probe") === "1";
+}
+
+export function cronProbeJson(job: string) {
+  return cronJson({
+    result: {
+      type: job,
+      status: "authorized",
+      probe: true,
+      job_started: false
+    }
+  });
+}
+
 export function cronJson(data: Record<string, unknown>, status = 200) {
   return NextResponse.json(
     {
@@ -19,5 +35,21 @@ export function cronJson(data: Record<string, unknown>, status = 200) {
       ...data
     },
     { status }
+  );
+}
+
+export function cronErrorJson(job: string, code: string, error: unknown) {
+  const message = error instanceof Error && error.message ? error.message.slice(0, 300) : `UNKNOWN_${code}`;
+  return cronJson(
+    {
+      result: {
+        type: job,
+        status: "error",
+        job_started: true
+      },
+      error: code,
+      message
+    },
+    500
   );
 }

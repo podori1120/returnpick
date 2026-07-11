@@ -19,6 +19,10 @@ export function getSupabaseBrowserClient() {
   return browserClient;
 }
 
+export function getSupabaseAnonClient() {
+  return getSupabaseBrowserClient();
+}
+
 export function getSupabaseServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;

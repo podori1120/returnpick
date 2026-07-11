@@ -1,9 +1,11 @@
 import { randomUUID } from "crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import path from "path";
+import { isGenericCoupangLandingUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { demoCatalog } from "@/lib/demoCatalog";
-import { getDealQuality } from "@/lib/quality";
+import { getCustomerPublishReadiness, getDealQuality } from "@/lib/quality";
 import { calculateDealScore } from "@/lib/scoring";
+import { isSourcingExecutionRun } from "@/lib/sourcingRunKinds";
 import { getSupabaseServiceClient } from "@/lib/supabase";
 import { parseSpecsFromTitle } from "@/lib/specParser";
 import type {
@@ -49,6 +51,37 @@ type ProductFilters = {
 
 const now = () => new Date().toISOString();
 
+function normalizeKeywordKey(keyword: string) {
+  return keyword.trim().toLowerCase();
+}
+
+export const DEFAULT_SOURCING_KEYWORDS: KeywordInput[] = [
+  { keyword: "갤럭시북", category: "laptop", min_price: 400000, max_price: 1800000, min_discount_rate: 0.1 },
+  { keyword: "LG 그램", category: "laptop", min_price: 600000, max_price: 2200000, min_discount_rate: 0.1 },
+  { keyword: "레노버 아이디어패드", category: "laptop", min_price: 350000, max_price: 1400000, min_discount_rate: 0.12 },
+  { keyword: "레노버 리전", category: "laptop", min_price: 700000, max_price: 2400000, min_discount_rate: 0.15 },
+  { keyword: "HP 빅터스", category: "laptop", min_price: 600000, max_price: 1800000, min_discount_rate: 0.15 },
+  { keyword: "ASUS TUF", category: "laptop", min_price: 700000, max_price: 2200000, min_discount_rate: 0.15 },
+  { keyword: "맥북", category: "laptop", min_price: 700000, max_price: 2600000, min_discount_rate: 0.08 },
+  { keyword: "MSI 노트북", category: "laptop", min_price: 600000, max_price: 2200000, min_discount_rate: 0.15 },
+  { keyword: "QHD 모니터", category: "monitor", min_price: 150000, max_price: 800000, min_discount_rate: 0.12 },
+  { keyword: "4K 모니터", category: "monitor", min_price: 200000, max_price: 1100000, min_discount_rate: 0.12 },
+  { keyword: "144Hz 모니터", category: "monitor", min_price: 150000, max_price: 900000, min_discount_rate: 0.12 },
+  { keyword: "27인치 모니터", category: "monitor", min_price: 100000, max_price: 700000, min_discount_rate: 0.1 },
+  { keyword: "로보락", category: "robot_vacuum", min_price: 300000, max_price: 1600000, min_discount_rate: 0.12 },
+  { keyword: "드리미 로봇청소기", category: "robot_vacuum", min_price: 250000, max_price: 1500000, min_discount_rate: 0.12 },
+  { keyword: "샤오미 로봇청소기", category: "robot_vacuum", min_price: 150000, max_price: 900000, min_discount_rate: 0.12 },
+  { keyword: "다이슨 무선청소기", category: "cordless_vacuum", min_price: 250000, max_price: 1200000, min_discount_rate: 0.1 },
+  { keyword: "삼성 제트", category: "cordless_vacuum", min_price: 200000, max_price: 1000000, min_discount_rate: 0.12 },
+  { keyword: "LG 코드제로", category: "cordless_vacuum", min_price: 250000, max_price: 1200000, min_discount_rate: 0.12 },
+  { keyword: "삼성 공기청정기", category: "air_purifier", min_price: 100000, max_price: 900000, min_discount_rate: 0.1 },
+  { keyword: "LG 공기청정기", category: "air_purifier", min_price: 150000, max_price: 1000000, min_discount_rate: 0.1 },
+  { keyword: "위닉스 공기청정기", category: "air_purifier", min_price: 80000, max_price: 600000, min_discount_rate: 0.1 },
+  { keyword: "위닉스 제습기", category: "dehumidifier", min_price: 100000, max_price: 700000, min_discount_rate: 0.1 },
+  { keyword: "LG 제습기", category: "dehumidifier", min_price: 150000, max_price: 900000, min_discount_rate: 0.1 },
+  { keyword: "삼성 제습기", category: "dehumidifier", min_price: 150000, max_price: 900000, min_discount_rate: 0.1 }
+];
+
 function makeKeyword(keyword: string, category: Category, min_price: number | null, max_price: number | null, min_discount_rate: number | null): SourcingKeyword {
   const stamp = now();
   return {
@@ -65,32 +98,9 @@ function makeKeyword(keyword: string, category: Category, min_price: number | nu
 }
 
 function createInitialKeywords(): SourcingKeyword[] {
-  return [
-  makeKeyword("갤럭시북", "laptop", 400000, 1800000, 0.1),
-  makeKeyword("LG 그램", "laptop", 600000, 2200000, 0.1),
-  makeKeyword("레노버 아이디어패드", "laptop", 350000, 1400000, 0.12),
-  makeKeyword("레노버 리전", "laptop", 700000, 2400000, 0.15),
-  makeKeyword("HP 빅터스", "laptop", 600000, 1800000, 0.15),
-  makeKeyword("ASUS TUF", "laptop", 700000, 2200000, 0.15),
-  makeKeyword("맥북", "laptop", 700000, 2600000, 0.08),
-  makeKeyword("MSI 노트북", "laptop", 600000, 2200000, 0.15),
-  makeKeyword("QHD 모니터", "monitor", 150000, 800000, 0.12),
-  makeKeyword("4K 모니터", "monitor", 200000, 1100000, 0.12),
-  makeKeyword("144Hz 모니터", "monitor", 150000, 900000, 0.12),
-  makeKeyword("27인치 모니터", "monitor", 100000, 700000, 0.1),
-  makeKeyword("로보락", "robot_vacuum", 300000, 1600000, 0.12),
-  makeKeyword("드리미 로봇청소기", "robot_vacuum", 250000, 1500000, 0.12),
-  makeKeyword("샤오미 로봇청소기", "robot_vacuum", 150000, 900000, 0.12),
-  makeKeyword("다이슨 무선청소기", "cordless_vacuum", 250000, 1200000, 0.1),
-  makeKeyword("삼성 제트", "cordless_vacuum", 200000, 1000000, 0.12),
-  makeKeyword("LG 코드제로", "cordless_vacuum", 250000, 1200000, 0.12),
-  makeKeyword("삼성 공기청정기", "air_purifier", 100000, 900000, 0.1),
-  makeKeyword("LG 공기청정기", "air_purifier", 150000, 1000000, 0.1),
-  makeKeyword("위닉스 공기청정기", "air_purifier", 80000, 600000, 0.1),
-  makeKeyword("위닉스 제습기", "dehumidifier", 100000, 700000, 0.1),
-  makeKeyword("LG 제습기", "dehumidifier", 150000, 900000, 0.1),
-  makeKeyword("삼성 제습기", "dehumidifier", 150000, 900000, 0.1)
-  ];
+  return DEFAULT_SOURCING_KEYWORDS.map((input) =>
+    makeKeyword(input.keyword, input.category, input.min_price ?? null, input.max_price ?? null, input.min_discount_rate ?? null)
+  );
 }
 
 function makeProduct(input: ProductInput): SourcedProduct {
@@ -127,6 +137,29 @@ function makeProduct(input: ProductInput): SourcedProduct {
   };
 }
 
+const weakConditionGrades = new Set<ConditionGrade>(["확인필요", "알수없음"]);
+
+function isWeakConditionGrade(value: ConditionGrade | null | undefined) {
+  return !value || weakConditionGrades.has(value);
+}
+
+function preserveExistingReviewFields(existing: SourcedProduct, payload: SourcedProduct) {
+  return {
+    return_price: payload.return_price ?? existing.return_price,
+    new_price: payload.new_price ?? existing.new_price,
+    naver_lowest_price: payload.naver_lowest_price ?? existing.naver_lowest_price,
+    stock_count: payload.stock_count ?? existing.stock_count,
+    source_price: payload.source_price ?? existing.source_price,
+    condition_grade:
+      isWeakConditionGrade(payload.condition_grade) && !isWeakConditionGrade(existing.condition_grade)
+        ? existing.condition_grade
+        : payload.condition_grade,
+    admin_memo: existing.admin_memo,
+    public_note: existing.public_note,
+    affiliate_url: isUsableAffiliateUrl(existing.affiliate_url) ? existing.affiliate_url : payload.affiliate_url
+  };
+}
+
 function createInitialProducts(): SourcedProduct[] {
   return demoCatalog.map((item) =>
     makeProduct({
@@ -147,183 +180,6 @@ function createInitialProducts(): SourcedProduct[] {
       }
     })
   );
-
-  return [
-  makeProduct({
-    source: "mock",
-    source_product_id: "seed-ideapad",
-    category: "laptop",
-    keyword: "레노버 아이디어패드",
-    title: "레노버 아이디어패드 5 16GB 512GB Ryzen 7 Win11 반품-최상",
-    brand: "Lenovo",
-    model_name: "IdeaPad 5",
-    image_url: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?q=80&w=900&auto=format&fit=crop",
-    source_url: "https://www.coupang.com/np/goldbox",
-    coupang_url: "https://www.coupang.com/np/goldbox",
-    affiliate_url: "https://link.coupang.com/a/dPyGuoKdSm",
-    source_price: 742000,
-    return_price: 742000,
-    new_price: 969000,
-    naver_lowest_price: 965000,
-    condition_grade: "최상",
-    stock_count: 1,
-    sourcing_status: "published",
-    is_published: true,
-    public_note: "사무, 대학생, 재택용으로 균형이 좋은 샘플 딜입니다."
-  }),
-  makeProduct({
-    source: "mock",
-    source_product_id: "seed-monitor",
-    category: "monitor",
-    keyword: "QHD 모니터",
-    title: "LG 27인치 QHD 모니터 144Hz IPS 반품-상",
-    brand: "LG",
-    model_name: "27QHD144",
-    image_url: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?q=80&w=900&auto=format&fit=crop",
-    source_url: "https://www.coupang.com/np/goldbox",
-    coupang_url: "https://www.coupang.com/np/goldbox",
-    affiliate_url: "https://link.coupang.com/a/dPyGuoKdSm",
-    source_price: 249000,
-    return_price: 229000,
-    new_price: 319000,
-    naver_lowest_price: 312000,
-    condition_grade: "상",
-    stock_count: 3,
-    sourcing_status: "published",
-    is_published: true
-  }),
-  makeProduct({
-    source: "mock",
-    source_product_id: "seed-roborock",
-    category: "robot_vacuum",
-    keyword: "로보락",
-    title: "로보락 로봇청소기 자동먼지비움 물걸레 도킹스테이션 반품-최상",
-    brand: "Roborock",
-    model_name: "Q Revo",
-    image_url: "https://images.unsplash.com/photo-1603618090561-412154b4bd1b?q=80&w=900&auto=format&fit=crop",
-    source_url: "https://www.coupang.com/np/goldbox",
-    coupang_url: "https://www.coupang.com/np/goldbox",
-    affiliate_url: "https://link.coupang.com/a/dPyGuoKdSm",
-    source_price: 689000,
-    return_price: 649000,
-    new_price: 849000,
-    naver_lowest_price: 835000,
-    condition_grade: "최상",
-    stock_count: 1,
-    sourcing_status: "published",
-    is_published: true
-  }),
-  makeProduct({
-    source: "mock",
-    source_product_id: "seed-galaxybook",
-    category: "laptop",
-    keyword: "갤럭시북",
-    title: "삼성 갤럭시북4 16GB 512GB Core Ultra 5 Win11 반품-최상",
-    brand: "Samsung",
-    model_name: "Galaxy Book4",
-    image_url: "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?q=80&w=900&auto=format&fit=crop",
-    source_url: "https://www.coupang.com/np/goldbox",
-    coupang_url: "https://www.coupang.com/np/goldbox",
-    affiliate_url: "https://link.coupang.com/a/dPyGuoKdSm",
-    source_price: 879000,
-    return_price: 859000,
-    new_price: 1199000,
-    naver_lowest_price: 1168000,
-    condition_grade: "최상",
-    stock_count: 2,
-    sourcing_status: "published",
-    is_published: true,
-    public_note: "반품등급과 가격 차이가 모두 확인된 사무·학습용 후보입니다."
-  }),
-  makeProduct({
-    source: "mock",
-    source_product_id: "seed-monitor-4k",
-    category: "monitor",
-    keyword: "4K 모니터",
-    title: "삼성 32인치 4K UHD 모니터 60Hz 반품-미개봉",
-    brand: "Samsung",
-    model_name: "U32",
-    image_url: "https://images.unsplash.com/photo-1527443195645-1133f7f28990?q=80&w=900&auto=format&fit=crop",
-    source_url: "https://www.coupang.com/np/goldbox",
-    coupang_url: "https://www.coupang.com/np/goldbox",
-    affiliate_url: "https://link.coupang.com/a/dPyGuoKdSm",
-    source_price: 289000,
-    return_price: 279000,
-    new_price: 389000,
-    naver_lowest_price: 374000,
-    condition_grade: "미개봉",
-    stock_count: 1,
-    sourcing_status: "published",
-    is_published: true,
-    public_note: "문서 작업과 콘솔 연결용으로 무난한 4K 모니터 후보입니다."
-  }),
-  makeProduct({
-    source: "mock",
-    source_product_id: "seed-dyson-vacuum",
-    category: "cordless_vacuum",
-    keyword: "다이슨 무선청소기",
-    title: "다이슨 V12 무선청소기 배터리 거치대 필터 포함 반품-상",
-    brand: "Dyson",
-    model_name: "V12",
-    image_url: "https://images.unsplash.com/photo-1558317374-067fb5f30001?q=80&w=900&auto=format&fit=crop",
-    source_url: "https://www.coupang.com/np/goldbox",
-    coupang_url: "https://www.coupang.com/np/goldbox",
-    affiliate_url: "https://link.coupang.com/a/dPyGuoKdSm",
-    source_price: 519000,
-    return_price: 489000,
-    new_price: 699000,
-    naver_lowest_price: 679000,
-    condition_grade: "상",
-    stock_count: 2,
-    sourcing_status: "published",
-    is_published: true,
-    public_note: "배터리와 필터 구성품 확인이 된 경우에만 추천하는 무선청소기 딜입니다."
-  }),
-  makeProduct({
-    source: "mock",
-    source_product_id: "seed-air-winix",
-    category: "air_purifier",
-    keyword: "위닉스 공기청정기",
-    title: "위닉스 공기청정기 21평형 HEPA 필터 반품-미개봉",
-    brand: "Winix",
-    model_name: "Tower Prime",
-    image_url: "https://images.unsplash.com/photo-1585771724684-38269d6639fd?q=80&w=900&auto=format&fit=crop",
-    source_url: "https://www.coupang.com/np/goldbox",
-    coupang_url: "https://www.coupang.com/np/goldbox",
-    affiliate_url: "https://link.coupang.com/a/dPyGuoKdSm",
-    source_price: 189000,
-    return_price: 179000,
-    new_price: 249000,
-    naver_lowest_price: 239000,
-    condition_grade: "미개봉",
-    stock_count: 4,
-    sourcing_status: "published",
-    is_published: true,
-    public_note: "필터 비용까지 감안해도 가격 차이가 의미 있는 생활가전 후보입니다."
-  }),
-  makeProduct({
-    source: "mock",
-    source_product_id: "seed-lg-dehumidifier",
-    category: "dehumidifier",
-    keyword: "LG 제습기",
-    title: "LG 제습기 20L 연속배수 반품-최상",
-    brand: "LG",
-    model_name: "D20",
-    image_url: "https://images.unsplash.com/photo-1586208958839-06c17cacdf08?q=80&w=900&auto=format&fit=crop",
-    source_url: "https://www.coupang.com/np/goldbox",
-    coupang_url: "https://www.coupang.com/np/goldbox",
-    affiliate_url: "https://link.coupang.com/a/dPyGuoKdSm",
-    source_price: 399000,
-    return_price: 369000,
-    new_price: 489000,
-    naver_lowest_price: 469000,
-    condition_grade: "최상",
-    stock_count: 2,
-    sourcing_status: "published",
-    is_published: true,
-    public_note: "여름철 수요가 오르기 전 가격 차이가 좋은 제습기 후보입니다."
-  })
-  ];
 }
 
 type MemoryState = {
@@ -414,10 +270,16 @@ function hydrateDemoCatalog(state: MemoryState): MemoryState {
       existing.is_published = true;
       existing.is_rejected = false;
       existing.rejection_reason = null;
-      const hasPlaceholderAffiliateUrl = !existing.affiliate_url || existing.affiliate_url.includes("example.com");
+      const hasPlaceholderAffiliateUrl = !isUsableAffiliateUrl(existing.affiliate_url);
       existing.affiliate_url = hasPlaceholderAffiliateUrl ? seed.affiliate_url : existing.affiliate_url;
-      existing.source_url = !existing.source_url || existing.source_url.includes("example.com") ? seed.source_url : existing.source_url;
-      existing.coupang_url = !existing.coupang_url || existing.coupang_url.includes("example.com") ? seed.coupang_url : existing.coupang_url;
+      existing.source_url =
+        !existing.source_url || existing.source_url.includes("example.com") || isGenericCoupangLandingUrl(existing.source_url)
+          ? seed.source_url
+          : existing.source_url;
+      existing.coupang_url =
+        !existing.coupang_url || existing.coupang_url.includes("example.com") || isGenericCoupangLandingUrl(existing.coupang_url)
+          ? seed.coupang_url
+          : existing.coupang_url;
       existing.public_note = existing.public_note ?? seed.public_note;
       existing.image_url = existing.image_url ?? seed.image_url;
       if (!state.scores.some((score) => score.product_id === existing.id)) {
@@ -513,16 +375,56 @@ export async function listKeywords(options?: { activeOnly?: boolean }) {
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
-export async function createKeyword(input: KeywordInput) {
+export async function ensureDefaultSourcingKeywords() {
+  const existing = await listKeywords();
+  if (existing.length > 0) return { inserted_count: 0, skipped: true, keyword_count: existing.length };
+
   const client = getSupabaseServiceClient();
   if (client) {
-    const { data, error } = await client.from("sourcing_keywords").insert(input).select("*").single();
+    const { data, error } = await client
+      .from("sourcing_keywords")
+      .upsert(DEFAULT_SOURCING_KEYWORDS.map((keyword) => ({ ...keyword, is_active: keyword.is_active ?? true })), {
+        onConflict: "keyword_key,category",
+        ignoreDuplicates: true
+      })
+      .select("*");
     if (error) throw error;
+    return { inserted_count: data?.length ?? 0, skipped: false, keyword_count: data?.length ?? 0 };
+  }
+
+  const created = createInitialKeywords();
+  memoryKeywords.unshift(...created);
+  persistMemoryState();
+  return { inserted_count: created.length, skipped: false, keyword_count: created.length };
+}
+
+export async function createKeyword(input: KeywordInput) {
+  const normalizedInput = {
+    ...input,
+    keyword: input.keyword.trim()
+  };
+  const client = getSupabaseServiceClient();
+  if (client) {
+    const { data, error } = await client.from("sourcing_keywords").insert(normalizedInput).select("*").single();
+    if (error) {
+      if (error.code === "23505") {
+        const { data: keywords, error: selectError } = await client.from("sourcing_keywords").select("*").eq("category", input.category);
+        if (selectError) throw selectError;
+        const existing = (keywords ?? []).find((keyword) => normalizeKeywordKey(String(keyword.keyword ?? "")) === normalizeKeywordKey(normalizedInput.keyword));
+        if (existing) return existing as SourcingKeyword;
+      }
+      throw error;
+    }
     return data as SourcingKeyword;
   }
 
-  const keyword = makeKeyword(input.keyword, input.category, input.min_price ?? null, input.max_price ?? null, input.min_discount_rate ?? null);
-  keyword.is_active = input.is_active ?? true;
+  const existing = memoryKeywords.find(
+    (keyword) => keyword.category === normalizedInput.category && normalizeKeywordKey(keyword.keyword) === normalizeKeywordKey(normalizedInput.keyword)
+  );
+  if (existing) return existing;
+
+  const keyword = makeKeyword(normalizedInput.keyword, normalizedInput.category, normalizedInput.min_price ?? null, normalizedInput.max_price ?? null, normalizedInput.min_discount_rate ?? null);
+  keyword.is_active = normalizedInput.is_active ?? true;
   memoryKeywords.unshift(keyword);
   persistMemoryState();
   return keyword;
@@ -595,6 +497,23 @@ export async function createProductSnapshot(product: SourcedProduct, changeFlags
   return snapshot;
 }
 
+function snapshotErrorMessage(error: unknown) {
+  return error instanceof Error && error.message ? error.message.slice(0, 300) : "PRODUCT_SNAPSHOT_SAVE_FAILED";
+}
+
+async function createProductSnapshotSafely(product: SourcedProduct, changeFlags: SnapshotChangeFlag[] = []) {
+  if (changeFlags.length === 0) return;
+  try {
+    await createProductSnapshot(product, changeFlags);
+  } catch (error) {
+    console.warn("PRODUCT_SNAPSHOT_SAVE_FAILED", {
+      product_id: product.id,
+      flags: changeFlags,
+      error: snapshotErrorMessage(error)
+    });
+  }
+}
+
 export async function listProductSnapshots(productId: string, limit = 12) {
   const client = getSupabaseServiceClient();
   if (client) {
@@ -651,9 +570,7 @@ export async function upsertSourcedProduct(input: ProductInput) {
         is_published: existing.is_published,
         is_rejected: existing.is_rejected,
         rejection_reason: existing.rejection_reason,
-        admin_memo: existing.admin_memo,
-        public_note: existing.public_note,
-        affiliate_url: existing.affiliate_url ?? payload.affiliate_url
+        ...preserveExistingReviewFields(existing, payload)
       };
       const { data, error } = await client
         .from("sourced_products")
@@ -663,14 +580,14 @@ export async function upsertSourcedProduct(input: ProductInput) {
         .single();
       if (error) throw error;
       const product = data as SourcedProduct;
-      await createProductSnapshot(product, getSnapshotChangeFlags(existing, product));
+      await createProductSnapshotSafely(product, getSnapshotChangeFlags(existing, product));
       return { product, inserted: false };
     }
 
     const { data, error } = await client.from("sourced_products").insert(insertPayload).select("*").single();
     if (error) throw error;
     const product = data as SourcedProduct;
-    await createProductSnapshot(product, ["NEW_PRODUCT"]);
+    await createProductSnapshotSafely(product, ["NEW_PRODUCT"]);
     return { product, inserted: true };
   }
 
@@ -686,15 +603,13 @@ export async function upsertSourcedProduct(input: ProductInput) {
     memoryProducts[existingIndex] = {
       ...memoryProducts[existingIndex],
       ...payload,
+      ...preserveExistingReviewFields(memoryProducts[existingIndex], payload),
       id: memoryProducts[existingIndex].id,
       created_at: memoryProducts[existingIndex].created_at,
       sourcing_status: memoryProducts[existingIndex].sourcing_status,
       is_published: memoryProducts[existingIndex].is_published,
       is_rejected: memoryProducts[existingIndex].is_rejected,
       rejection_reason: memoryProducts[existingIndex].rejection_reason,
-      admin_memo: memoryProducts[existingIndex].admin_memo,
-      public_note: memoryProducts[existingIndex].public_note,
-      affiliate_url: memoryProducts[existingIndex].affiliate_url ?? payload.affiliate_url,
       updated_at: now()
     };
     memorySnapshots.unshift(makeSnapshot(memoryProducts[existingIndex], getSnapshotChangeFlags(previous, memoryProducts[existingIndex])));
@@ -722,7 +637,7 @@ export async function updateProduct(id: string, patch: Partial<SourcedProduct>) 
     if (error) throw error;
     const product = data as SourcedProduct;
     const changeFlags = getSnapshotChangeFlags(beforeData as SourcedProduct | null, product);
-    if (changeFlags.length > 0) await createProductSnapshot(product, changeFlags);
+    await createProductSnapshotSafely(product, changeFlags);
     return product;
   }
 
@@ -815,6 +730,30 @@ export async function listSourcingRuns(limit = 10) {
   return memoryRuns.slice(0, limit);
 }
 
+export async function listSourcingExecutionRuns(limit = 10) {
+  const client = getSupabaseServiceClient();
+  if (client) {
+    const { data, error } = await client.from("sourcing_runs").select("*").order("started_at", { ascending: false }).limit(Math.max(limit * 3, limit));
+    if (error) throw error;
+    return ((data ?? []) as SourcingRun[]).filter(isSourcingExecutionRun).slice(0, limit);
+  }
+
+  return memoryRuns.filter(isSourcingExecutionRun).slice(0, limit);
+}
+
+export async function getLatestSourcingRunByStatus(status: string) {
+  const client = getSupabaseServiceClient();
+  if (client) {
+    const { data, error } = await client.from("sourcing_runs").select("*").eq("status", status).order("started_at", { ascending: false }).limit(1).maybeSingle();
+    if (error) throw error;
+    return (data as SourcingRun | null) ?? null;
+  }
+
+  return memoryRuns
+    .filter((run) => run.status === status)
+    .sort((a, b) => b.started_at.localeCompare(a.started_at))[0] ?? null;
+}
+
 export async function createTelegramLog(input: Omit<TelegramLog, "id" | "created_at">) {
   const log: TelegramLog = {
     id: randomUUID(),
@@ -868,7 +807,15 @@ export async function createAffiliateEvent(input: AffiliateEventInput) {
   const client = getSupabaseServiceClient();
   if (client) {
     const { data, error } = await client.from("affiliate_events").insert(event).select("*").single();
-    if (error) throw error;
+    if (error) {
+      if (event.product_id && error.code === "23503") {
+        const fallbackEvent = { ...event, product_id: null };
+        const fallback = await client.from("affiliate_events").insert(fallbackEvent).select("*").single();
+        if (fallback.error) throw fallback.error;
+        return fallback.data as AffiliateEvent;
+      }
+      throw error;
+    }
     return data as AffiliateEvent;
   }
 
@@ -916,14 +863,14 @@ export async function getRevenueMetrics() {
         title: product.title,
         category: product.category,
         score: product.latest_score?.total_score ?? 0,
-        has_affiliate_url: Boolean(product.affiliate_url),
+        has_affiliate_url: isUsableAffiliateUrl(product.affiliate_url),
         impressions,
         detail_views: detailViews,
         affiliate_clicks: affiliateClicks,
         telegram_clicks: telegramClicks,
         detail_ctr: ratio(detailViews, impressions),
         affiliate_ctr: ratio(affiliateClicks, detailViews),
-        cta_ready: Boolean(product.affiliate_url && product.is_published && product.sourcing_status === "published")
+        cta_ready: getCustomerPublishReadiness(product).ready && product.is_published && product.sourcing_status === "published"
       };
     })
     .sort((a, b) => b.affiliate_clicks - a.affiliate_clicks || b.detail_views - a.detail_views)
@@ -955,10 +902,11 @@ export async function getRevenueMetrics() {
       affiliate_clicks: channelEvents.filter((event) => event.event_type === "affiliate_click").length,
       telegram_clicks: channelEvents.filter((event) => event.event_type === "telegram_detail_click").length
     };
-  });
+  }).sort((a, b) => b.affiliate_clicks - a.affiliate_clicks || b.detail_views - a.detail_views || b.impressions - a.impressions);
 
-  const missingAffiliateUrl = publishedProducts.filter((product) => !product.affiliate_url).length;
-  const ctaReady = publishedProducts.length - missingAffiliateUrl;
+  const missingAffiliateUrl = publishedProducts.filter((product) => !isUsableAffiliateUrl(product.affiliate_url)).length;
+  const publicQualityBlocked = publishedProducts.filter((product) => !getCustomerPublishReadiness(product).ready).length;
+  const ctaReady = publishedProducts.length - publicQualityBlocked;
 
   return {
     totals,
@@ -971,6 +919,7 @@ export async function getRevenueMetrics() {
     },
     ctaReady,
     missingAffiliateUrl,
+    publicQualityBlocked,
     productMetrics,
     categoryMetrics,
     channelMetrics,
@@ -980,15 +929,20 @@ export async function getRevenueMetrics() {
 
 export async function getAdminMetrics() {
   const products = await listProducts();
-  const runs = await listSourcingRuns(5);
+  const runs = await listSourcingExecutionRuns(5);
   const latestRun = runs[0] ?? null;
   const total = products.length;
-  const published = products.filter((product) => product.is_published && product.sourcing_status === "published").length;
+  const publishedProducts = products.filter((product) => product.is_published && product.sourcing_status === "published");
+  const publicReady = publishedProducts.filter((product) => getCustomerPublishReadiness(product).ready).length;
+  const publishedStatusCount = publishedProducts.length;
+  const published = publicReady;
+  const hiddenPublishedWithoutAffiliate = publishedProducts.filter((product) => !isUsableAffiliateUrl(product.affiliate_url)).length;
+  const hiddenPublishedWithQualityBlockers = Math.max(0, publishedStatusCount - publicReady - hiddenPublishedWithoutAffiliate);
   const needsReview = products.filter((product) => product.sourcing_status === "needs_review").length;
   const approved = products.filter((product) => product.sourcing_status === "approved").length;
   const unknownCondition = products.filter((product) => product.condition_grade === "확인필요" || product.condition_grade === "알수없음").length;
   const missingReturnPrice = products.filter((product) => product.return_price == null).length;
-  const missingAffiliateUrl = products.filter((product) => product.is_published && !product.affiliate_url).length;
+  const missingAffiliateUrl = hiddenPublishedWithoutAffiliate;
   const badPrice = products.filter((product) => {
     const dealPrice = product.return_price ?? product.source_price;
     return Boolean(product.naver_lowest_price && dealPrice && dealPrice > product.naver_lowest_price);
@@ -1027,6 +981,10 @@ export async function getAdminMetrics() {
   return {
     total,
     published,
+    publishedStatusCount,
+    publicReady,
+    hiddenPublishedWithoutAffiliate,
+    hiddenPublishedWithQualityBlockers,
     needsReview,
     approved,
     highScore,

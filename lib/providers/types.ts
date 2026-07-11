@@ -21,7 +21,19 @@ export interface ProviderProduct {
 }
 
 export interface ProviderSearchResult {
-  status: "ok" | "API_NOT_CONFIGURED" | "DISABLED" | "ROBOTS_DISALLOWED" | "error";
+  status:
+    | "ok"
+    | "API_NOT_CONFIGURED"
+    | "DISABLED"
+    | "ROBOTS_DISALLOWED"
+    | "ROBOTS_UNAVAILABLE"
+    | "INVALID_TEMPLATE"
+    | "UNSUPPORTED_CONTENT_TYPE"
+    | "CONTENT_TOO_LARGE"
+    | "REDIRECT_BLOCKED"
+    | "CRAWL_DELAY_TOO_HIGH"
+    | "error";
   products: ProviderProduct[];
   error?: string;
+  meta?: Record<string, JsonValue>;
 }

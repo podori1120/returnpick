@@ -1,6 +1,6 @@
 import { getCategoryLabel } from "@/lib/category";
 import { getDealPrice, getDiscountRate, getPrimaryUseCase, getReferencePrice } from "@/lib/dealIntelligence";
-import { getDealQuality } from "@/lib/quality";
+import { getCustomerPublishReadiness, getDealQuality } from "@/lib/quality";
 import { getLatestScore } from "@/lib/scoring";
 import type { Category, ConditionGrade, RiskFlag, Verdict, ProductWithScore, JsonValue } from "@/lib/types";
 
@@ -12,6 +12,8 @@ export type PublicDeal = {
   brand: string | null;
   model_name: string | null;
   image_url: string | null;
+  source_url: string | null;
+  coupang_url: string | null;
   affiliate_url: string | null;
   condition_grade: ConditionGrade;
   stock_count: number | null;
@@ -41,6 +43,10 @@ export type PublicDeal = {
   detail_url: string;
 };
 
+export function isPublicDealReady(product: ProductWithScore) {
+  return product.is_published && product.sourcing_status === "published" && getCustomerPublishReadiness(product).ready;
+}
+
 export function toPublicDeal(product: ProductWithScore): PublicDeal {
   const score = getLatestScore(product);
   const quality = getDealQuality(product);
@@ -54,6 +60,8 @@ export function toPublicDeal(product: ProductWithScore): PublicDeal {
     brand: product.brand,
     model_name: product.model_name,
     image_url: product.image_url,
+    source_url: product.source_url,
+    coupang_url: product.coupang_url,
     affiliate_url: product.affiliate_url,
     condition_grade: product.condition_grade,
     stock_count: product.stock_count,

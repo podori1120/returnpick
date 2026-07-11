@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Clock3 } from "lucide-react";
+import { getStoredJsonArray } from "@/lib/clientTracking";
 import { formatPrice } from "@/lib/format";
 import type { PublicDeal } from "@/lib/publicDeal";
 
@@ -19,17 +20,17 @@ export default function RecentDealsRail() {
 
   useEffect(() => {
     async function load() {
-      let recent: RecentDeal[] = [];
-      try {
-        recent = JSON.parse(window.localStorage.getItem(storageKey) || "[]") as RecentDeal[];
-      } catch {
-        recent = [];
-      }
+      const recent = getStoredJsonArray<RecentDeal>(storageKey);
       const ids = recent.map((item) => item.id).slice(0, 6);
       if (!ids.length) return;
-      const response = await fetch(`/api/products/compare?ids=${encodeURIComponent(ids.join(","))}`, { cache: "no-store" });
-      const body = (await response.json()) as { products?: PublicDeal[] };
-      setProducts(body.products ?? []);
+      try {
+        const response = await fetch(`/api/products/compare?ids=${encodeURIComponent(ids.join(","))}`, { cache: "no-store" });
+        const body = (await response.json().catch(() => ({}))) as { products?: PublicDeal[]; error?: string };
+        if (!response.ok || body.error) return;
+        setProducts(body.products ?? []);
+      } catch {
+        // Recently viewed deals are a convenience rail; hide it if loading fails.
+      }
     }
 
     load();

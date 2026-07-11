@@ -5,12 +5,13 @@ import DealCard from "@/components/DealCard";
 import RecentDealsRail from "@/components/RecentDealsRail";
 import { categoryOptions } from "@/lib/category";
 import { listProducts } from "@/lib/dataStore";
+import { isPublicDealReady } from "@/lib/publicDeal";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const products = (await listProducts({ published: true }))
-    .filter((product) => product.sourcing_status === "published")
+    .filter(isPublicDealReady)
     .sort((a, b) => (b.latest_score?.total_score ?? 0) - (a.latest_score?.total_score ?? 0));
   const featured = products.slice(0, 6);
   const counts = categoryOptions.map((category) => ({
@@ -32,13 +33,29 @@ export default async function HomePage() {
               <Link className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink" href="/deals">
                 검수 완료 딜 보기 <ArrowRight size={16} aria-hidden />
               </Link>
+              <Link className="focus-ring rounded-lg border border-pine bg-white px-5 py-3 text-sm font-black text-pine hover:bg-pine hover:text-white" href="/products/approval-sample">
+                승인용 추천 상품
+              </Link>
               <Link className="focus-ring rounded-lg border border-line px-5 py-3 text-sm font-black hover:bg-mist" href="/guide/return-checklist">
                 수령 체크리스트
               </Link>
             </div>
           </div>
           <div className="rounded-lg border border-line bg-mist p-4">
-            {featured[0] ? <DealCard product={featured[0]} /> : <div className="p-6 text-sm font-bold text-steel">게시된 딜이 없습니다.</div>}
+            {featured[0] ? (
+              <DealCard product={featured[0]} />
+            ) : (
+              <div className="rounded-lg border border-line bg-white p-6">
+                <p className="text-sm font-black text-pine">구매 CTA 검수 중</p>
+                <h2 className="mt-2 text-2xl font-black">파트너스 링크가 준비된 상품만 공개합니다</h2>
+                <p className="mt-3 text-sm font-semibold leading-6 text-steel">
+                  제휴 링크가 없는 기존 후보는 관리자 보강 대상으로 남기고, 구매 버튼이 정상 작동하는 상품만 사용자 화면에 보여줍니다.
+                </p>
+                <Link className="focus-ring mt-5 inline-flex items-center gap-2 rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink" href="/products/approval-sample">
+                  승인용 추천 상품 보기 <ArrowRight size={16} aria-hidden />
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </section>

@@ -1,3 +1,4 @@
+import { buildCoupangSearchUrl } from "@/lib/coupangLink";
 import type { Category, ConditionGrade } from "@/lib/types";
 
 export type DemoProduct = {
@@ -11,7 +12,7 @@ export type DemoProduct = {
   image_url: string;
   source_url: string;
   coupang_url: string;
-  affiliate_url: string;
+  affiliate_url: string | null;
   source_price: number;
   return_price: number | null;
   new_price: number;
@@ -30,17 +31,15 @@ const images: Record<Category, string> = {
   dehumidifier: "https://images.unsplash.com/photo-1586208958839-06c17cacdf08?q=80&w=900&auto=format&fit=crop"
 };
 
-const coupangLandingUrl = "https://www.coupang.com/np/goldbox";
-const coupangPartnersUrl = "https://link.coupang.com/a/dPyGuoKdSm";
-
 function product(input: Omit<DemoProduct, "source" | "image_url" | "source_url" | "coupang_url" | "affiliate_url">): DemoProduct {
+  const coupangSearchUrl = buildCoupangSearchUrl(input);
   return {
     ...input,
     source: "mock",
     image_url: images[input.category],
-    source_url: coupangLandingUrl,
-    coupang_url: coupangLandingUrl,
-    affiliate_url: coupangPartnersUrl
+    source_url: coupangSearchUrl,
+    coupang_url: coupangSearchUrl,
+    affiliate_url: null
   };
 }
 

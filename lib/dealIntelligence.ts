@@ -1,5 +1,6 @@
 import { categoryOptions, getCategoryLabel } from "@/lib/category";
 import { calculateDiscountRate } from "@/lib/format";
+import { getPriceReferenceInfo } from "@/lib/priceReference";
 import { getDealQuality } from "@/lib/quality";
 import type { Category, ProductWithScore } from "@/lib/types";
 
@@ -57,7 +58,7 @@ function numberSpec(product: ProductWithScore, key: string) {
 }
 
 export function getReferencePrice(product: ProductWithScore) {
-  return product.naver_lowest_price ?? product.new_price ?? product.source_price ?? null;
+  return getPriceReferenceInfo(product).value;
 }
 
 export function getDealPrice(product: ProductWithScore) {

@@ -4,6 +4,7 @@ import { getCategoryLabel } from "@/lib/category";
 import { getDealPrice, getDiscountRate, getPrimaryUseCase, getReferencePrice } from "@/lib/dealIntelligence";
 import { formatPercent, formatPrice } from "@/lib/format";
 import { getDealQuality } from "@/lib/quality";
+import { getPurchaseDecision } from "@/lib/purchaseDecision";
 import { getLatestScore } from "@/lib/scoring";
 import type { ProductWithScore } from "@/lib/types";
 import CompareButton from "@/components/CompareButton";
@@ -17,6 +18,7 @@ export default function DealCard({ product }: { product: ProductWithScore }) {
   const discount = getDiscountRate(product);
   const quality = getDealQuality(product);
   const primaryUseCase = getPrimaryUseCase(product);
+  const decision = getPurchaseDecision(product);
   const isVerifiedReturn = Boolean(product.return_price && !["확인필요", "알수없음"].includes(product.condition_grade));
   const firstReason = score?.reasons?.[0] ?? product.public_note;
   const primaryCheck = quality.blockers[0] ?? quality.warnings[0];
@@ -85,6 +87,18 @@ export default function DealCard({ product }: { product: ProductWithScore }) {
             <p className="text-xs font-bold text-steel">기준가</p>
             <p className="font-black">{formatPrice(reference)}</p>
           </div>
+        </div>
+        <div className="rounded-lg border border-line bg-mist p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-black text-steel">구매 판단</p>
+              <p className="mt-1 text-sm font-black text-ink">{decision.verdict}</p>
+            </div>
+            <span className="rounded-md bg-white px-2.5 py-1 text-xs font-black text-pine">{decision.confidence}</span>
+          </div>
+          <p className="mt-2 line-clamp-1 text-xs font-bold text-steel">
+            {decision.goodSignals[0] ?? decision.cautions[0] ?? "상세에서 가격과 반품 조건을 확인하세요."}
+          </p>
         </div>
         <div className="grid grid-cols-[1fr_auto] gap-2">
           <Link
