@@ -165,6 +165,7 @@ function checkEnvGroup(name, keys, severity = "required") {
 const requiredFiles = [
   "app/api/admin/sourcing/run/route.ts",
   "app/api/admin/api-readiness/route.ts",
+  "app/api/admin/editorial-campaign/route.ts",
   "app/api/admin/affiliate-links/backfill/route.ts",
   "app/api/admin/affiliate-links/import/route.ts",
   "app/api/admin/affiliate-links/verify/route.ts",
@@ -192,6 +193,7 @@ const requiredFiles = [
   "components/TelegramPreview.tsx",
   "lib/affiliateLinkBackfill.ts",
   "lib/coupangAffiliateLinkVerifier.ts",
+  "lib/editorialCampaign.ts",
   "lib/approvalSample.ts",
   "lib/adminNavigation.ts",
   "lib/apiReadiness.ts",
@@ -2910,10 +2912,6 @@ if (fileExists("lib/telegram.ts")) {
     "telegram: editorial first-sale campaign",
     telegram.includes("buildEditorialPickTelegramMessage") &&
       telegram.includes("sendTelegramEditorialPick") &&
-      telegram.includes("approvalSampleProduct.detailPath") &&
-      telegram.includes("utm_source=telegram&utm_medium=channel&utm_campaign=novatech_s1_window_cleaner") &&
-      telegram.includes("가격, 재고, 배송 조건은 구매 직전 쿠팡 페이지를 기준으로 확인하세요") &&
-      telegram.includes("EDITORIAL_CAMPAIGN_LINK_NOT_CONFIGURED") &&
       telegram.includes('type: "editorial_pick"') &&
       telegram.includes("approvalSampleProduct.editorialTelegramTarget") &&
       telegram.includes("TELEGRAM_EDITORIAL_COOLDOWN_MS") &&
@@ -2932,6 +2930,25 @@ if (fileExists("lib/telegram.ts")) {
       telegram.includes("\uBC18\uD488\uAC00:") &&
       telegram.includes("\uCFE0\uD321 \uD30C\uD2B8\uB108\uC2A4 \uD65C\uB3D9\uC758 \uC77C\uD658"),
     "Telegram message generation stays below Telegram length limits while preserving readable Korean copy, detail URL, and affiliate notice",
+    "required"
+  );
+}
+
+if (fileExists("lib/editorialCampaign.ts")) {
+  const editorialCampaign = readText("lib/editorialCampaign.ts");
+  check(
+    "editorial campaign: disclosed channel kit",
+    editorialCampaign.includes("buildEditorialCampaignKit") &&
+      editorialCampaign.includes("buildEditorialPickTelegramMessage") &&
+      editorialCampaign.includes('trackedDetailUrl("telegram", "channel")') &&
+      editorialCampaign.includes('trackedDetailUrl("naver_blog", "owned")') &&
+      editorialCampaign.includes("utm_source=${source}&utm_medium=${medium}&utm_campaign=${CAMPAIGN_ID}") &&
+      editorialCampaign.includes("[제휴 안내]") &&
+      editorialCampaign.includes("쿠팡 파트너스 활동의 일환") &&
+      editorialCampaign.includes("가격, 재고, 배송 조건은 구매 직전 쿠팡 페이지를 기준으로 확인하세요") &&
+      editorialCampaign.includes("EDITORIAL_CAMPAIGN_LINK_NOT_CONFIGURED") &&
+      !editorialCampaign.includes("https://link.coupang.com/"),
+    "fixed Telegram and Naver Blog copy uses channel UTM links, visible disclosure, and no direct hidden affiliate destination",
     "required"
   );
 }
@@ -2993,18 +3010,38 @@ if (fileExists("components/TelegramPreview.tsx")) {
   );
 }
 
+if (fileExists("app/api/admin/editorial-campaign/route.ts")) {
+  const editorialCampaignRoute = readText("app/api/admin/editorial-campaign/route.ts");
+  check(
+    "admin api: fixed editorial campaign kit",
+    editorialCampaignRoute.includes("requireAdmin(request)") &&
+      editorialCampaignRoute.includes("buildEditorialCampaignKit()") &&
+      editorialCampaignRoute.includes("EDITORIAL_CAMPAIGN_LINK_NOT_CONFIGURED") &&
+      editorialCampaignRoute.includes("message.slice(0, 240)") &&
+      !editorialCampaignRoute.includes("request.json"),
+    "admin-only campaign API returns server-authored channel copy and accepts no arbitrary message or destination input",
+    "required"
+  );
+}
+
 if (fileExists("components/AdminEditorialTelegramCampaign.tsx") && fileExists("app/admin/page.tsx")) {
   const editorialCampaign = readText("components/AdminEditorialTelegramCampaign.tsx");
   const adminPage = readText("app/admin/page.tsx");
   check(
-    "admin: editorial Telegram preview-first flow",
-    editorialCampaign.includes('campaign: "editorial_pick"') &&
-      editorialCampaign.includes('disabled={!message || runningMode !== null}') &&
-      editorialCampaign.includes("발송 버튼은 미리보기 성공 후 활성화됩니다") &&
+    "admin: editorial channel kit preview-first flow",
+    editorialCampaign.includes('/api/admin/editorial-campaign') &&
+      editorialCampaign.includes("navigator.clipboard.writeText") &&
+      editorialCampaign.includes('activeChannel') &&
+      editorialCampaign.includes('"naverBlog"') &&
+      editorialCampaign.includes("네이버 블로그 원고") &&
+      editorialCampaign.includes("본문 복사") &&
+      editorialCampaign.includes('campaign: "editorial_pick"') &&
+      editorialCampaign.includes('mode: "send"') &&
+      editorialCampaign.includes("if (!kit) return") &&
       editorialCampaign.includes("TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID") &&
       editorialCampaign.includes('role="status"') &&
       adminPage.includes("<AdminEditorialTelegramCampaign password={password} />"),
-    "admins can preview the fixed first-sale campaign before an explicit send and receive inline configuration or network feedback",
+    "admins can preview and copy fixed Telegram or Naver Blog copy before an explicit Telegram send",
     "required"
   );
 }

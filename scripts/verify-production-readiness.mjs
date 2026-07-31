@@ -63,6 +63,7 @@ const adminUiRequiredText = [
   "링크 보강 큐로 이동",
   "품질 보강 후보로 이동",
   "/api/admin/session",
+  "/api/admin/editorial-campaign",
   "returnpick_admin_password"
 ];
 const maxAdminScriptChunksToScan = 25;

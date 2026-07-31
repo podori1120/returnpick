@@ -1,6 +1,6 @@
 import { createTelegramLog, getProductById, listTelegramLogs } from "@/lib/dataStore";
 import { approvalSampleProduct } from "@/lib/approvalSample";
-import { isCoupangPartnersLink } from "@/lib/coupangLink";
+import { buildEditorialPickTelegramMessage } from "@/lib/editorialCampaign";
 import { formatPercent, formatPrice } from "@/lib/format";
 import { isPublicDealReady } from "@/lib/publicDeal";
 import { getLatestScore } from "@/lib/scoring";
@@ -91,35 +91,7 @@ export function buildTelegramMessage(product: ProductWithScore) {
   return fitTelegramMessage(message, detailUrl);
 }
 
-export function buildEditorialPickTelegramMessage() {
-  if (!isCoupangPartnersLink(process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL)) {
-    throw new Error("EDITORIAL_CAMPAIGN_LINK_NOT_CONFIGURED");
-  }
-
-  const siteUrl = getSiteUrl().replace(/\/$/, "");
-  const detailUrl = `${siteUrl}${approvalSampleProduct.detailPath}?utm_source=telegram&utm_medium=channel&utm_campaign=novatech_s1_window_cleaner`;
-  const message = [
-    "🔥 [리턴픽 직접 검수 추천]",
-    "",
-    approvalSampleProduct.name,
-    approvalSampleProduct.subtitle,
-    "",
-    "추천 이유:",
-    "- 넓거나 손이 닿기 어려운 유리창 청소 부담을 줄일 때 검토할 만합니다.",
-    "- 5800Pa 흡입력 표기와 자동 물 분사 기능을 함께 비교할 수 있습니다.",
-    "",
-    "구매 전 확인:",
-    "- 안전줄과 전원선 등 실제 포함 구성품을 확인하세요.",
-    "- 가격, 재고, 배송 조건은 구매 직전 쿠팡 페이지를 기준으로 확인하세요.",
-    "",
-    "자세히 보기:",
-    detailUrl,
-    "",
-    TELEGRAM_AFFILIATE_NOTICE
-  ].join("\n");
-
-  return fitTelegramMessage(message, detailUrl);
-}
+export { buildEditorialPickTelegramMessage } from "@/lib/editorialCampaign";
 
 type TelegramTarget = {
   type: "product" | "editorial_pick";
