@@ -4,6 +4,7 @@ import { getCoupangPartnersLinkIssue } from "@/lib/coupangLink";
 export type CoupangAffiliateLinkVerificationCode =
   | "RESOLVED_PRODUCT"
   | "RESOLVED_PRODUCT_ACCESS_LIMITED"
+  | "SHORT_LINK_ACCESS_LIMITED"
   | "INVALID_AFFILIATE_URL"
   | "REDIRECT_BLOCKED"
   | "REDIRECT_LIMIT"
@@ -170,6 +171,16 @@ export async function verifyCoupangAffiliateLinkResolution(value: string): Promi
         message: "상품 페이지 경로는 확인했지만 쿠팡 응답 상태가 정상적이지 않습니다.",
         final_url: finalUrl,
         product_id: productId,
+        http_status: status,
+        redirect_count: redirectCount
+      });
+    }
+
+    if (current.hostname === "link.coupang.com" && accessLimitedStatuses.has(status)) {
+      return result({
+        ok: false,
+        code: "SHORT_LINK_ACCESS_LIMITED",
+        message: "Vercel의 자동 확인 요청을 쿠팡이 제한했습니다. 브라우저로 직접 열어 상품 일치를 확인하세요.",
         http_status: status,
         redirect_count: redirectCount
       });

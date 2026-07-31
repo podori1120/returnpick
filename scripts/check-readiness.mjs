@@ -1168,6 +1168,7 @@ if (
       verifier.includes('url.hostname === "coupang.com" || url.hostname.endsWith(".coupang.com")') &&
       verifier.includes("url.port || url.username || url.password") &&
       verifier.includes("RESOLVED_PRODUCT_ACCESS_LIMITED") &&
+      verifier.includes("SHORT_LINK_ACCESS_LIMITED") &&
       verifier.includes("REDIRECT_BLOCKED"),
     "admin link checks follow only bounded HTTPS Coupang redirects, request no more than a byte before cancelling response bodies, and tolerate upstream access limits",
     "required"
@@ -1180,7 +1181,9 @@ if (
       verifyRoute.includes("verifyCoupangAffiliateLinkResolution") &&
       verifyRoute.includes('"Cache-Control": "no-store"') &&
       linkQueue.includes('/api/admin/affiliate-links/verify') &&
-      linkQueue.includes("실제 상품 확인") &&
+      linkQueue.includes("자동 목적지 확인") &&
+      linkQueue.includes("브라우저로 직접 열기") &&
+      linkQueue.includes('rel="nofollow sponsored noopener noreferrer"') &&
       linkQueue.includes("linkVerifications") &&
       linkQueue.includes("강제 차단 조건은 아닙니다"),
     "authenticated admins can inspect one pasted link without turning transient Coupang failures into a publish blocker",

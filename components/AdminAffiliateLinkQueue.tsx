@@ -710,15 +710,35 @@ export default function AdminAffiliateLinkQueue({
                         ? "승인용 샘플 링크는 이 상품에 저장하거나 게시할 수 없습니다."
                         : "쿠팡 파트너스에서 만든 상품별 링크를 붙여넣어 주세요."}
                   </p>
-                  <button
-                    className="focus-ring mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-black hover:bg-mist disabled:cursor-not-allowed disabled:opacity-50"
-                    onClick={() => verifyAffiliateUrl(product)}
-                    disabled={!isCoupangPartnersLink(inputValue) || checkingLinkId !== null}
-                    type="button"
-                  >
-                    <RefreshCw className={checkingLinkId === product.id ? "animate-spin" : ""} size={14} aria-hidden />
-                    {checkingLinkId === product.id ? "목적지 확인 중" : "실제 상품 확인"}
-                  </button>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <button
+                      className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-black hover:bg-mist disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => verifyAffiliateUrl(product)}
+                      disabled={!isCoupangPartnersLink(inputValue) || checkingLinkId !== null}
+                      type="button"
+                    >
+                      <RefreshCw className={checkingLinkId === product.id ? "animate-spin" : ""} size={14} aria-hidden />
+                      {checkingLinkId === product.id ? "목적지 확인 중" : "자동 목적지 확인"}
+                    </button>
+                    {isCoupangPartnersLink(inputValue) ? (
+                      <a
+                        className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-black hover:bg-mist"
+                        href={inputValue}
+                        target="_blank"
+                        rel="nofollow sponsored noopener noreferrer"
+                      >
+                        <ExternalLink size={14} aria-hidden /> 브라우저로 직접 열기
+                      </a>
+                    ) : (
+                      <button
+                        className="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-black opacity-50"
+                        disabled
+                        type="button"
+                      >
+                        <ExternalLink size={14} aria-hidden /> 브라우저로 직접 열기
+                      </button>
+                    )}
+                  </div>
                   {verification ? (
                     <div
                       className={
