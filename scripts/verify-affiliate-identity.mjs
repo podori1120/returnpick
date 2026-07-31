@@ -68,4 +68,12 @@ assert.equal(noExpected.status, "EXPECTED_ID_UNAVAILABLE");
 
 assert.equal(getAffiliateIdentityReadiness({ ...product, affiliate_url: "https://link.coupang.com/a/Changed1", raw_json: mergeAffiliateIdentityRecord(product, match) }).ready, false);
 
+const changedProductUrl = {
+  ...product,
+  coupang_url: "https://www.coupang.com/vp/products/999999?itemId=1",
+  raw_json: mergeAffiliateIdentityRecord(product, match)
+};
+assert.equal(getAffiliateIdentityReadiness(changedProductUrl).ready, false);
+assert.equal(getAffiliateIdentityReadiness(changedProductUrl).blocker, "파트너스 링크 상품번호 확인이 오래됐습니다");
+
 console.log("Affiliate identity checks passed: match, mismatch, access-limited resolution, manual confirmation, missing expected ID, and URL-change invalidation.");

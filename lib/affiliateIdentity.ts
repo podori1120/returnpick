@@ -111,11 +111,21 @@ export function mergeAffiliateIdentityRecord(product: Pick<ProductIdentitySource
   } satisfies SourcedProduct["raw_json"];
 }
 
-export function getAffiliateIdentityReadiness(product: Pick<ProductWithScore, "affiliate_url" | "raw_json">) {
+export function getAffiliateIdentityReadiness(
+  product: Pick<ProductWithScore, "affiliate_url" | "raw_json" | "coupang_url" | "source_url">
+) {
   const affiliateUrl = product.affiliate_url?.trim() ?? "";
   const record = readAffiliateIdentityRecord(product);
   if (!affiliateUrl || !record || record.affiliate_url !== affiliateUrl) {
     return { ready: false, status: null, blocker: "파트너스 링크 상품 일치 확인 필요" } as const;
+  }
+  const expected = getExpectedCoupangProductIdentity(product);
+  if (
+    expected.productId &&
+    (record.expected_product_id !== expected.productId ||
+      (record.status === "MATCH" && record.resolved_product_id !== expected.productId))
+  ) {
+    return { ready: false, status: record.status, blocker: "파트너스 링크 상품번호 확인이 오래됐습니다" } as const;
   }
   if (record.status === "MATCH" || record.status === "MANUAL_CONFIRMED") {
     return { ready: true, status: record.status, blocker: null } as const;

@@ -169,7 +169,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     );
   }
   if (hasAffiliateUrlPatch && patch.affiliate_url) {
-    const affiliateIdentity = getAffiliateIdentityReadiness({ affiliate_url: patch.affiliate_url, raw_json: current.raw_json });
+    const affiliateIdentity = getAffiliateIdentityReadiness({ ...current, affiliate_url: patch.affiliate_url });
     if (affiliateIdentity.status === "MISMATCH") {
       return NextResponse.json(
         {

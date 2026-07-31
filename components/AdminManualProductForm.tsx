@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CheckCircle2, ClipboardPlus, ExternalLink } from "lucide-react";
 import { categoryOptions } from "@/lib/category";
-import { isUsableCoupangProductUrl } from "@/lib/coupangLink";
+import { isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
 import type { Category } from "@/lib/types";
 
 function headers(password: string) {
@@ -14,6 +14,7 @@ const emptyForm = {
   title: "",
   category: "laptop" as Category,
   coupang_url: "",
+  affiliate_url: "",
   brand: "",
   model_name: "",
   image_url: "",
@@ -27,6 +28,8 @@ export default function AdminManualProductForm({ password, onCreated }: { passwo
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [createdProductId, setCreatedProductId] = useState<string | null>(null);
   const urlReady = isUsableCoupangProductUrl(form.coupang_url.trim());
+  const affiliateUrlValue = form.affiliate_url.trim();
+  const affiliateUrlReady = !affiliateUrlValue || isUsableAffiliateUrl(affiliateUrlValue);
 
   function update(field: Exclude<keyof typeof emptyForm, "category">, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -113,6 +116,24 @@ export default function AdminManualProductForm({ password, onCreated }: { passwo
           </span>
         </label>
         <label className="text-sm font-bold text-steel sm:col-span-2">
+          쿠팡 파트너스 링크 (선택)
+          <input
+            aria-invalid={affiliateUrlValue.length > 0 && !affiliateUrlReady}
+            className="focus-ring mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink"
+            value={form.affiliate_url}
+            onChange={(event) => update("affiliate_url", event.target.value)}
+            placeholder="https://link.coupang.com/a/..."
+            type="url"
+          />
+          <span className={affiliateUrlValue.length === 0 ? "mt-1 block text-xs font-semibold text-steel" : affiliateUrlReady ? "mt-1 block text-xs font-bold text-pine" : "mt-1 block text-xs font-semibold text-coral"}>
+            {affiliateUrlValue.length === 0
+              ? "없으면 링크 보강 큐에서 나중에 입력할 수 있습니다."
+              : affiliateUrlReady
+                ? "저장 후 상품별 링크 목적지 확인을 통과해야 게시할 수 있습니다."
+                : "https://link.coupang.com/a/... 형식의 실제 파트너스 링크를 입력하세요."}
+          </span>
+        </label>
+        <label className="text-sm font-bold text-steel sm:col-span-2">
           공개 이미지 URL (선택)
           <input className="focus-ring mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink" value={form.image_url} onChange={(event) => update("image_url", event.target.value)} placeholder="https://.../product-image.jpg" type="url" />
         </label>
@@ -128,7 +149,7 @@ export default function AdminManualProductForm({ password, onCreated }: { passwo
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
         <p className="text-xs font-semibold leading-5 text-steel">추가 후 상태는 검토 필요입니다. 게시하려면 상품별 파트너스 링크, 가격·등급·이미지 확인을 모두 통과해야 합니다.</p>
-        <button className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-4 py-2.5 text-sm font-black text-white hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60" disabled={saving || form.title.trim().length < 5 || !urlReady} onClick={() => void submit()} type="button">
+        <button className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-4 py-2.5 text-sm font-black text-white hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60" disabled={saving || form.title.trim().length < 5 || !urlReady || !affiliateUrlReady} onClick={() => void submit()} type="button">
           <ClipboardPlus size={16} aria-hidden /> {saving ? "추가 중" : "검토 후보 추가"}
         </button>
       </div>

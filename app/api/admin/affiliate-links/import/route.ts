@@ -93,7 +93,7 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const affiliateIdentity = getAffiliateIdentityReadiness({ affiliate_url: affiliateUrl, raw_json: product.raw_json });
+      const affiliateIdentity = getAffiliateIdentityReadiness({ ...product, affiliate_url: affiliateUrl });
       if (affiliateIdentity.status === "MISMATCH") {
         skippedCount += 1;
         items.push({ product_id: productId, title: product.title, status: "skipped", reason: "AFFILIATE_TARGET_MISMATCH", affiliate_url: affiliateUrl });

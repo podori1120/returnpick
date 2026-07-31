@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { calculateDealScore } from "@/lib/scoring";
 import { createDealScore, listProducts, upsertSourcedProduct } from "@/lib/dataStore";
 import { extractCoupangProductId } from "@/lib/affiliateIdentity";
-import { isUsableCoupangProductUrl } from "@/lib/coupangLink";
+import { getCoupangPartnersLinkIssue, isApprovalSampleAffiliateUrl, isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
 import { getProductImageUrlIssue, isUsableProductImageUrl } from "@/lib/productImageUrl";
 import { isCategory, isSourcingStatus, requireAdmin, sanitizeText } from "@/lib/validators";
 import { parseSpecsFromTitle } from "@/lib/specParser";
@@ -48,6 +48,7 @@ export async function POST(request: Request) {
     const title = boundedText(body.title, 240);
     const category = body.category;
     const coupangUrl = boundedText(body.coupang_url, 2_000);
+    const affiliateUrl = boundedText(body.affiliate_url, 2_000);
     const imageUrl = boundedText(body.image_url, 2_000);
 
     if (title.length < 5) {
@@ -61,6 +62,22 @@ export async function POST(request: Request) {
         {
           error: "COUPANG_PRODUCT_URL_REQUIRED",
           message: "쿠팡 상품 상세 URL(https://www.coupang.com/vp/products/...)을 입력하세요. 검색 결과·공통 랜딩 주소는 후보로 저장하지 않습니다."
+        },
+        { status: 400 }
+      );
+    }
+
+    if (affiliateUrl && isApprovalSampleAffiliateUrl(affiliateUrl)) {
+      return NextResponse.json(
+        { error: "APPROVAL_SAMPLE_LINK_NOT_ALLOWED", message: "승인용 샘플 링크는 심사용 페이지 전용이라 실제 후보에 저장할 수 없습니다." },
+        { status: 400 }
+      );
+    }
+    if (affiliateUrl && !isUsableAffiliateUrl(affiliateUrl)) {
+      return NextResponse.json(
+        {
+          error: "INVALID_AFFILIATE_URL",
+          message: `쿠팡 파트너스 단축 링크를 확인하세요. (${getCoupangPartnersLinkIssue(affiliateUrl) ?? "https://link.coupang.com/a/... 형식 필요"})`
         },
         { status: 400 }
       );
@@ -89,7 +106,7 @@ export async function POST(request: Request) {
       image_url: imageUrl || null,
       source_url: coupangUrl,
       coupang_url: coupangUrl,
-      affiliate_url: null,
+      affiliate_url: affiliateUrl || null,
       source_price: null,
       return_price: null,
       new_price: null,
@@ -101,6 +118,7 @@ export async function POST(request: Request) {
         manual_entry: {
           created_at: new Date().toISOString(),
           product_page_url: coupangUrl,
+          affiliate_link_provided: Boolean(affiliateUrl),
           source: "admin_manual"
         }
       },
@@ -119,7 +137,11 @@ export async function POST(request: Request) {
         product: result.product,
         score,
         inserted: result.inserted,
-        message: result.inserted ? "실제 쿠팡 상품을 검토 대기 후보로 추가했습니다." : "기존 상품에 상품 상세 URL 정보를 반영했습니다."
+        message: result.inserted
+          ? affiliateUrl
+            ? "실제 쿠팡 상품과 파트너스 링크를 검토 대기 후보로 추가했습니다. 링크 목적지 확인 후 게시할 수 있습니다."
+            : "실제 쿠팡 상품을 검토 대기 후보로 추가했습니다."
+          : "기존 상품에 상품 상세 URL 정보를 반영했습니다."
       },
       { status: result.inserted ? 201 : 200 }
     );

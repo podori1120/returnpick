@@ -364,8 +364,9 @@ if (fileExists("package.json") && fileExists("lib/affiliateIdentity.ts") && file
       identity.includes('"MANUAL_CONFIRMED"') &&
       identity.includes("getAffiliateIdentityReadiness") &&
       identityCheck.includes("URL-change invalidation") &&
+      identityCheck.includes("changedProductUrl") &&
       identityCheck.includes("access-limited resolution"),
-    "affiliate identity tests cover resolved matches, hard mismatches, access limits, explicit manual confirmation, and changed-link invalidation",
+    "affiliate identity tests cover resolved matches, hard mismatches, access limits, explicit manual confirmation, changed-link invalidation, and changed-product invalidation",
     "required"
   );
 }
@@ -657,6 +658,9 @@ if (fileExists("app/api/admin/products/route.ts") && fileExists("components/Admi
       adminProductsRoute.includes("requireAdmin(request)") &&
       adminProductsRoute.includes("isUsableCoupangProductUrl") &&
       adminProductsRoute.includes("extractCoupangProductId") &&
+      adminProductsRoute.includes("getCoupangPartnersLinkIssue") &&
+      adminProductsRoute.includes("isUsableAffiliateUrl") &&
+      adminProductsRoute.includes("isApprovalSampleAffiliateUrl") &&
       adminProductsRoute.includes('source: "manual_admin"') &&
       adminProductsRoute.includes('sourcing_status: "needs_review"') &&
       adminProductsRoute.includes("upsertSourcedProduct") &&
@@ -665,8 +669,11 @@ if (fileExists("app/api/admin/products/route.ts") && fileExists("components/Admi
       manualProductForm.includes("검토 후보 추가") &&
       manualProductForm.includes("상품 ID") &&
       manualProductForm.includes("#admin-affiliate-links") &&
+      manualProductForm.includes("affiliate_url") &&
+      manualProductForm.includes("쿠팡 파트너스 링크 (선택)") &&
+      manualProductForm.includes("목적지 확인") &&
       adminPage.includes("AdminManualProductForm"),
-    "an authenticated admin can seed a real Coupang product into needs_review while keeping missing return data unfilled and reusing the existing review/publish gates",
+    "an authenticated admin can seed a real Coupang product with an optional strict Partners link into needs_review while keeping missing return data unfilled and reusing the existing review/publish gates",
     "required"
   );
 }
@@ -1618,6 +1625,8 @@ if (
     identity.includes("getExpectedCoupangProductIdentity") &&
       identity.includes("readAffiliateIdentityRecord") &&
       identity.includes("record.affiliate_url !== affiliateUrl") &&
+      identity.includes("record.expected_product_id !== expected.productId") &&
+      identity.includes("record.resolved_product_id !== expected.productId") &&
       quality.includes("getAffiliateIdentityReadiness") &&
       quality.includes("affiliateIdentity.blocker") &&
       productRoute.includes("AFFILIATE_TARGET_MISMATCH") &&
