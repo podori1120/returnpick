@@ -7,7 +7,7 @@ create table if not exists returnpick_schema_meta (
 );
 
 insert into returnpick_schema_meta (key, value, updated_at)
-values ('schema_version', '2026-05-31-strict-affiliate-links', now())
+values ('schema_version', '2026-07-31-telegram-target-logs', now())
 on conflict (key)
 do update set value = excluded.value, updated_at = now();
 
@@ -109,11 +109,17 @@ create table if not exists sourcing_runs (
 create table if not exists telegram_logs (
   id uuid primary key default gen_random_uuid(),
   product_id uuid references sourced_products(id) on delete set null,
+  target_type text,
+  target_key text,
   message text,
   status text,
   error text,
   created_at timestamptz default now()
 );
+
+alter table telegram_logs
+  add column if not exists target_type text,
+  add column if not exists target_key text;
 
 create table if not exists affiliate_events (
   id uuid primary key default gen_random_uuid(),
@@ -189,6 +195,7 @@ create index if not exists sourcing_runs_started_idx on sourcing_runs (started_a
 create index if not exists sourcing_runs_status_started_idx on sourcing_runs (status, started_at desc);
 create index if not exists telegram_logs_created_idx on telegram_logs (created_at desc);
 create index if not exists telegram_logs_product_created_idx on telegram_logs (product_id, created_at desc);
+create index if not exists telegram_logs_target_created_idx on telegram_logs (target_type, target_key, created_at desc);
 create index if not exists affiliate_events_created_idx on affiliate_events (created_at desc);
 create index if not exists affiliate_events_product_created_idx on affiliate_events (product_id, created_at desc);
 create index if not exists affiliate_events_type_created_idx on affiliate_events (event_type, created_at desc);

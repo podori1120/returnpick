@@ -758,6 +758,8 @@ export async function createTelegramLog(input: Omit<TelegramLog, "id" | "created
   const log: TelegramLog = {
     id: randomUUID(),
     product_id: input.product_id,
+    target_type: input.target_type ?? (input.product_id ? "product" : null),
+    target_key: input.target_key ?? input.product_id ?? null,
     message: input.message,
     status: input.status,
     error: input.error,

@@ -1,4 +1,6 @@
-import { createTelegramLog, getProductById } from "@/lib/dataStore";
+import { createTelegramLog, getProductById, listTelegramLogs } from "@/lib/dataStore";
+import { approvalSampleProduct } from "@/lib/approvalSample";
+import { isCoupangPartnersLink } from "@/lib/coupangLink";
 import { formatPercent, formatPrice } from "@/lib/format";
 import { isPublicDealReady } from "@/lib/publicDeal";
 import { getLatestScore } from "@/lib/scoring";
@@ -7,6 +9,7 @@ import type { ProductWithScore } from "@/lib/types";
 
 const TELEGRAM_SEND_TIMEOUT_MS = 10000;
 const TELEGRAM_MESSAGE_LIMIT = 3900;
+const TELEGRAM_EDITORIAL_COOLDOWN_MS = 15 * 60 * 1000;
 const TELEGRAM_AFFILIATE_NOTICE =
   "제휴 안내:\n이 메시지의 링크는 쿠팡 파트너스 활동의 일환이며, 구매가 발생하면 운영자가 일정액의 수수료를 받을 수 있습니다.";
 
@@ -88,26 +91,72 @@ export function buildTelegramMessage(product: ProductWithScore) {
   return fitTelegramMessage(message, detailUrl);
 }
 
-export async function sendTelegramForProduct(productId: string) {
-  const product = await getProductById(productId);
-  if (!product) throw new Error("PRODUCT_NOT_FOUND");
-  if (!isPublicDealReady(product)) {
-    throw new Error("ONLY_PUBLIC_CUSTOMER_READY_PRODUCTS_CAN_BE_SENT");
+export function buildEditorialPickTelegramMessage() {
+  if (!isCoupangPartnersLink(process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL)) {
+    throw new Error("EDITORIAL_CAMPAIGN_LINK_NOT_CONFIGURED");
   }
 
-  const message = buildTelegramMessage(product);
+  const siteUrl = getSiteUrl().replace(/\/$/, "");
+  const detailUrl = `${siteUrl}${approvalSampleProduct.detailPath}?utm_source=telegram&utm_medium=channel&utm_campaign=novatech_s1_window_cleaner`;
+  const message = [
+    "🔥 [리턴픽 직접 검수 추천]",
+    "",
+    approvalSampleProduct.name,
+    approvalSampleProduct.subtitle,
+    "",
+    "추천 이유:",
+    "- 넓거나 손이 닿기 어려운 유리창 청소 부담을 줄일 때 검토할 만합니다.",
+    "- 5800Pa 흡입력 표기와 자동 물 분사 기능을 함께 비교할 수 있습니다.",
+    "",
+    "구매 전 확인:",
+    "- 안전줄과 전원선 등 실제 포함 구성품을 확인하세요.",
+    "- 가격, 재고, 배송 조건은 구매 직전 쿠팡 페이지를 기준으로 확인하세요.",
+    "",
+    "자세히 보기:",
+    detailUrl,
+    "",
+    TELEGRAM_AFFILIATE_NOTICE
+  ].join("\n");
+
+  return fitTelegramMessage(message, detailUrl);
+}
+
+type TelegramTarget = {
+  type: "product" | "editorial_pick";
+  key: string;
+};
+
+async function assertEditorialSendCooldown(target: TelegramTarget) {
+  if (target.type !== "editorial_pick") return;
+  const cutoff = Date.now() - TELEGRAM_EDITORIAL_COOLDOWN_MS;
+  const logs = await listTelegramLogs(200);
+  const recentlySent = logs.some(
+    (log) =>
+      log.target_type === target.type &&
+      log.target_key === target.key &&
+      log.status === "sent" &&
+      Date.parse(log.created_at) >= cutoff
+  );
+  if (recentlySent) throw new Error("TELEGRAM_CAMPAIGN_RECENTLY_SENT");
+}
+
+async function sendTelegramMessage(message: string, productId: string | null, target: TelegramTarget) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
 
   if (!token || !chatId) {
     await createTelegramLog({
-      product_id: product.id,
+      product_id: productId,
+      target_type: target.type,
+      target_key: target.key,
       message,
       status: "API_NOT_CONFIGURED",
       error: "TELEGRAM_BOT_TOKEN 또는 TELEGRAM_CHAT_ID가 없습니다."
     });
     return { status: "API_NOT_CONFIGURED" as const, message };
   }
+
+  await assertEditorialSendCooldown(target);
 
   let response: Response;
   try {
@@ -122,16 +171,32 @@ export async function sendTelegramForProduct(productId: string) {
     });
   } catch (error) {
     const safeError = telegramSendFailureMessage(error);
-    await createTelegramLog({ product_id: product.id, message, status: "error", error: safeError });
+    await createTelegramLog({ product_id: productId, target_type: target.type, target_key: target.key, message, status: "error", error: safeError });
     throw new Error(safeError);
   }
 
   if (!response.ok) {
     const error = await telegramErrorMessage(response);
-    await createTelegramLog({ product_id: product.id, message, status: "error", error });
+    await createTelegramLog({ product_id: productId, target_type: target.type, target_key: target.key, message, status: "error", error });
     throw new Error(error);
   }
 
-  await createTelegramLog({ product_id: product.id, message, status: "sent", error: null });
+  await createTelegramLog({ product_id: productId, target_type: target.type, target_key: target.key, message, status: "sent", error: null });
   return { status: "sent" as const, message };
+}
+
+export async function sendTelegramForProduct(productId: string) {
+  const product = await getProductById(productId);
+  if (!product) throw new Error("PRODUCT_NOT_FOUND");
+  if (!isPublicDealReady(product)) {
+    throw new Error("ONLY_PUBLIC_CUSTOMER_READY_PRODUCTS_CAN_BE_SENT");
+  }
+
+  const message = buildTelegramMessage(product);
+  return sendTelegramMessage(message, product.id, { type: "product", key: product.id });
+}
+
+export async function sendTelegramEditorialPick() {
+  const message = buildEditorialPickTelegramMessage();
+  return sendTelegramMessage(message, null, { type: "editorial_pick", key: approvalSampleProduct.editorialTelegramTarget });
 }

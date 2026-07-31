@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import AdminApiReadinessPanel from "@/components/AdminApiReadinessPanel";
 import AdminAffiliateLinkQueue from "@/components/AdminAffiliateLinkQueue";
 import AdminCandidateTable from "@/components/AdminCandidateTable";
+import AdminEditorialTelegramCampaign from "@/components/AdminEditorialTelegramCampaign";
 import AdminKeywordManager from "@/components/AdminKeywordManager";
 import AdminLaunchRunner from "@/components/AdminLaunchRunner";
 import AdminLaunchStatusBar from "@/components/AdminLaunchStatusBar";
@@ -70,6 +71,7 @@ export default function AdminPage() {
       <AdminApiReadinessPanel password={password} />
       <AdminLaunchRunner password={password} onCompleted={() => setRefreshToken((value) => value + 1)} />
       <AdminOpsDashboard password={password} refreshToken={refreshToken} />
+      <AdminEditorialTelegramCampaign password={password} />
       <AdminSchedulerPanel password={password} refreshToken={refreshToken} onCompleted={() => setRefreshToken((value) => value + 1)} />
       <AdminPriceBackfillPanel password={password} onCompleted={() => setRefreshToken((value) => value + 1)} />
       <AdminAffiliateLinkQueue password={password} refreshToken={refreshToken} onCompleted={() => setRefreshToken((value) => value + 1)} />

@@ -184,6 +184,7 @@ const requiredFiles = [
   "components/AdminLaunchRunner.tsx",
   "components/AdminKeywordManager.tsx",
   "components/AdminCandidateTable.tsx",
+  "components/AdminEditorialTelegramCampaign.tsx",
   "components/AdminPriceBackfillPanel.tsx",
   "components/AdminProductEditor.tsx",
   "components/AffiliateEventTracker.tsx",
@@ -747,7 +748,7 @@ if (fileExists("sql/schema.sql")) {
   const schema = readText("sql/schema.sql");
   check(
     "schema version marker",
-    schema.includes("returnpick_schema_meta") && schema.includes("2026-05-31-strict-affiliate-links") && schema.includes("schema_version"),
+    schema.includes("returnpick_schema_meta") && schema.includes("2026-07-31-telegram-target-logs") && schema.includes("schema_version"),
     "schema.sql writes a launch-ready schema version marker for admin readiness",
     "required"
   );
@@ -790,6 +791,7 @@ if (fileExists("sql/schema.sql")) {
     "sourcing_runs_status_started_idx",
     "telegram_logs_created_idx",
     "telegram_logs_product_created_idx",
+    "telegram_logs_target_created_idx",
     "affiliate_events_created_idx",
     "affiliate_events_product_created_idx",
     "affiliate_events_type_created_idx",
@@ -2868,8 +2870,23 @@ if (fileExists("lib/telegram.ts")) {
       telegram.includes("AbortController") &&
       telegram.includes("telegramErrorMessage") &&
       telegram.includes("telegramSendFailureMessage") &&
-      telegram.includes("createTelegramLog({ product_id: product.id, message, status: \"error\", error: safeError })"),
+      telegram.includes("createTelegramLog({ product_id: productId, target_type: target.type, target_key: target.key, message, status: \"error\", error: safeError })"),
     "Telegram send uses a bounded request and logs safe failure summaries for HTTP errors, network errors, and timeouts",
+    "required"
+  );
+  check(
+    "telegram: editorial first-sale campaign",
+    telegram.includes("buildEditorialPickTelegramMessage") &&
+      telegram.includes("sendTelegramEditorialPick") &&
+      telegram.includes("approvalSampleProduct.detailPath") &&
+      telegram.includes("utm_source=telegram&utm_medium=channel&utm_campaign=novatech_s1_window_cleaner") &&
+      telegram.includes("가격, 재고, 배송 조건은 구매 직전 쿠팡 페이지를 기준으로 확인하세요") &&
+      telegram.includes("EDITORIAL_CAMPAIGN_LINK_NOT_CONFIGURED") &&
+      telegram.includes('type: "editorial_pick"') &&
+      telegram.includes("approvalSampleProduct.editorialTelegramTarget") &&
+      telegram.includes("TELEGRAM_EDITORIAL_COOLDOWN_MS") &&
+      telegram.includes("TELEGRAM_CAMPAIGN_RECENTLY_SENT"),
+    "the pre-API editorial campaign links to the disclosed ReturnPick detail, records a stable target, and rejects rapid duplicate sends",
     "required"
   );
   check(
@@ -2916,6 +2933,17 @@ if (fileExists("app/api/admin/telegram/route.ts")) {
     "admin Telegram API returns bounded JSON errors and rejects invalid modes",
     "required"
   );
+  check(
+    "admin api: editorial Telegram target allowlist",
+    telegramRoute.includes('body.campaign !== "editorial_pick"') &&
+      telegramRoute.includes("INVALID_TELEGRAM_CAMPAIGN") &&
+      telegramRoute.includes("AMBIGUOUS_TELEGRAM_TARGET") &&
+      telegramRoute.includes('body.campaign === "editorial_pick"') &&
+      telegramRoute.includes("buildEditorialPickTelegramMessage") &&
+      telegramRoute.includes("sendTelegramEditorialPick"),
+    "the admin endpoint accepts only the fixed server-authored editorial campaign and never accepts arbitrary message text or URLs",
+    "required"
+  );
 }
 
 if (fileExists("components/TelegramPreview.tsx")) {
@@ -2929,6 +2957,22 @@ if (fileExists("components/TelegramPreview.tsx")) {
       telegramPreview.includes("텔레그램 미리보기를 생성했습니다") &&
       telegramPreview.includes("TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID"),
     "admin Telegram panel shows preview/send progress, API errors, and network failures",
+    "required"
+  );
+}
+
+if (fileExists("components/AdminEditorialTelegramCampaign.tsx") && fileExists("app/admin/page.tsx")) {
+  const editorialCampaign = readText("components/AdminEditorialTelegramCampaign.tsx");
+  const adminPage = readText("app/admin/page.tsx");
+  check(
+    "admin: editorial Telegram preview-first flow",
+    editorialCampaign.includes('campaign: "editorial_pick"') &&
+      editorialCampaign.includes('disabled={!message || runningMode !== null}') &&
+      editorialCampaign.includes("발송 버튼은 미리보기 성공 후 활성화됩니다") &&
+      editorialCampaign.includes("TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID") &&
+      editorialCampaign.includes('role="status"') &&
+      adminPage.includes("<AdminEditorialTelegramCampaign password={password} />"),
+    "admins can preview the fixed first-sale campaign before an explicit send and receive inline configuration or network feedback",
     "required"
   );
 }

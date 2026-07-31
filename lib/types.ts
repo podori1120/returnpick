@@ -153,6 +153,8 @@ export interface SourcingRun {
 export interface TelegramLog {
   id: string;
   product_id: string | null;
+  target_type?: string | null;
+  target_key?: string | null;
   message: string | null;
   status: string | null;
   error: string | null;

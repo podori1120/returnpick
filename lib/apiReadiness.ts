@@ -15,7 +15,7 @@ import { isStrongAdminPassword } from "@/lib/validators";
 type ReadinessState = "ready" | "missing" | "partial" | "disabled";
 type ReadinessMode = "pre_approval" | "api_ready" | "launch_ready";
 
-const EXPECTED_SCHEMA_VERSION = "2026-05-31-strict-affiliate-links";
+const EXPECTED_SCHEMA_VERSION = "2026-07-31-telegram-target-logs";
 
 export type ApiReadinessItem = {
   id: string;
@@ -1770,6 +1770,7 @@ export async function runApiConnectionChecks(): Promise<ApiConnectionCheck[]> {
       { table: "sourcing_keywords", columns: "id,keyword,keyword_key,category,is_active" },
       { table: "sourced_products", columns: "id,affiliate_url,naver_lowest_price,condition_grade,sourcing_status" },
       { table: "deal_scores", columns: "id,product_id,total_score,risk_flags,score_detail" },
+      { table: "telegram_logs", columns: "id,product_id,target_type,target_key,status,created_at" },
       { table: "affiliate_events", columns: "id,event_type,channel,utm_source,anon_session_id" },
       { table: "product_snapshots", columns: "id,product_id,change_flags,observed_at" }
     ];
