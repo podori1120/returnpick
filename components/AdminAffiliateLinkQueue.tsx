@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Copy, ExternalLink, Link2, RefreshCw, Search, Upload, Wand2 } from "lucide-react";
 import { getCategoryLabel } from "@/lib/category";
-import { buildCoupangSearchUrl, isApprovalSampleAffiliateUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
+import { buildCoupangSearchUrl, isApprovalSampleAffiliateUrl, isCoupangPartnersLink, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { formatPrice } from "@/lib/format";
 import type { ProductWithScore } from "@/lib/types";
 
@@ -68,6 +68,23 @@ type BulkImportResult = {
 };
 
 type BulkImportResponse = BulkImportResult & {
+  error?: string;
+  message?: string;
+};
+
+type AffiliateLinkVerification = {
+  ok: boolean;
+  code: string;
+  message: string;
+  final_url?: string;
+  product_id?: string;
+  http_status?: number;
+  redirect_count: number;
+  checked_at: string;
+};
+
+type AffiliateLinkVerificationResponse = {
+  verification?: AffiliateLinkVerification;
   error?: string;
   message?: string;
 };
@@ -196,6 +213,8 @@ export default function AdminAffiliateLinkQueue({
   const [backfillResult, setBackfillResult] = useState<BackfillResult | null>(null);
   const [bulkImportRunning, setBulkImportRunning] = useState(false);
   const [bulkImportResult, setBulkImportResult] = useState<BulkImportResult | null>(null);
+  const [checkingLinkId, setCheckingLinkId] = useState<string | null>(null);
+  const [linkVerifications, setLinkVerifications] = useState<Record<string, AffiliateLinkVerification & { checked_url: string }>>({});
   const [notice, setNotice] = useState<{ type: "info" | "success" | "error"; message: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -246,6 +265,68 @@ export default function AdminAffiliateLinkQueue({
     await navigator.clipboard.writeText(product.title);
     setCopiedId(product.id);
     window.setTimeout(() => setCopiedId((current) => (current === product.id ? null : current)), 1500);
+  }
+
+  async function verifyAffiliateUrl(product: ProductWithScore) {
+    const affiliateUrl = inputs[product.id]?.trim() ?? "";
+    if (!isCoupangPartnersLink(affiliateUrl)) {
+      setLinkVerifications((current) => ({
+        ...current,
+        [product.id]: {
+          ok: false,
+          code: "INVALID_AFFILIATE_URL",
+          message: "https://link.coupang.com/a/... 형식의 파트너스 링크를 먼저 입력하세요.",
+          redirect_count: 0,
+          checked_at: new Date().toISOString(),
+          checked_url: affiliateUrl
+        }
+      }));
+      return;
+    }
+
+    setCheckingLinkId(product.id);
+    setLinkVerifications((current) => {
+      const next = { ...current };
+      delete next[product.id];
+      return next;
+    });
+    try {
+      const response = await fetch("/api/admin/affiliate-links/verify", {
+        method: "POST",
+        headers: headers(password),
+        body: JSON.stringify({ affiliate_url: affiliateUrl })
+      });
+      const data = (await response.json().catch(() => ({}))) as AffiliateLinkVerificationResponse;
+      if (!response.ok || !data.verification) {
+        setLinkVerifications((current) => ({
+          ...current,
+          [product.id]: {
+            ok: false,
+            code: data.error ?? "LINK_VERIFICATION_FAILED",
+            message: data.message ?? "링크 목적지를 확인하지 못했습니다.",
+            redirect_count: 0,
+            checked_at: new Date().toISOString(),
+            checked_url: affiliateUrl
+          }
+        }));
+        return;
+      }
+      setLinkVerifications((current) => ({ ...current, [product.id]: { ...data.verification!, checked_url: affiliateUrl } }));
+    } catch {
+      setLinkVerifications((current) => ({
+        ...current,
+        [product.id]: {
+          ok: false,
+          code: "LINK_VERIFICATION_NETWORK_ERROR",
+          message: "네트워크 문제로 링크 목적지를 확인하지 못했습니다.",
+          redirect_count: 0,
+          checked_at: new Date().toISOString(),
+          checked_url: affiliateUrl
+        }
+      }));
+    } finally {
+      setCheckingLinkId(null);
+    }
   }
 
   function buildBulkTemplate() {
@@ -575,6 +656,7 @@ export default function AdminAffiliateLinkQueue({
           const inputValue = inputs[product.id] ?? "";
           const approvalSampleAffiliate = isApprovalSampleAffiliateUrl(inputValue);
           const linkReady = isUsableAffiliateUrl(inputValue) && !approvalSampleAffiliate;
+          const verification = linkVerifications[product.id]?.checked_url === inputValue.trim() ? linkVerifications[product.id] : null;
           const searchUrl = buildCoupangSearchUrl(product);
           return (
             <article key={product.id} className="rounded-lg border border-line p-4">
@@ -610,17 +692,52 @@ export default function AdminAffiliateLinkQueue({
                     <input
                       className="focus-ring mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink"
                       value={inputValue}
-                      onChange={(event) => setInputs((current) => ({ ...current, [product.id]: event.target.value }))}
+                      onChange={(event) => {
+                        setInputs((current) => ({ ...current, [product.id]: event.target.value }));
+                        setLinkVerifications((current) => {
+                          const next = { ...current };
+                          delete next[product.id];
+                          return next;
+                        });
+                      }}
                       placeholder="https://link.coupang.com/a/..."
                     />
                   </label>
                   <p className={linkReady ? "mt-2 text-xs font-bold text-pine" : "mt-2 text-xs font-bold text-coral"}>
                     {linkReady
-                      ? "저장하면 구매 CTA 공개 준비가 됩니다. 실제 상품으로 열리는지는 쿠팡 파트너스에서 한 번 확인하세요."
+                      ? "저장하면 구매 CTA 공개 준비가 됩니다. 실제 상품 확인 후 저장하는 것을 권장합니다."
                       : approvalSampleAffiliate
                         ? "승인용 샘플 링크는 이 상품에 저장하거나 게시할 수 없습니다."
                         : "쿠팡 파트너스에서 만든 상품별 링크를 붙여넣어 주세요."}
                   </p>
+                  <button
+                    className="focus-ring mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-black hover:bg-mist disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => verifyAffiliateUrl(product)}
+                    disabled={!isCoupangPartnersLink(inputValue) || checkingLinkId !== null}
+                    type="button"
+                  >
+                    <RefreshCw className={checkingLinkId === product.id ? "animate-spin" : ""} size={14} aria-hidden />
+                    {checkingLinkId === product.id ? "목적지 확인 중" : "실제 상품 확인"}
+                  </button>
+                  {verification ? (
+                    <div
+                      className={
+                        verification.ok
+                          ? "mt-2 rounded-lg bg-pine/10 p-3 text-xs font-bold text-pine"
+                          : verification.code === "INVALID_AFFILIATE_URL" || verification.code === "REDIRECT_BLOCKED"
+                            ? "mt-2 rounded-lg bg-red-50 p-3 text-xs font-bold text-red-700"
+                            : "mt-2 rounded-lg bg-lemon/30 p-3 text-xs font-bold text-ink"
+                      }
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <p>{verification.message}</p>
+                      {verification.product_id ? (
+                        <p className="mt-1">상품번호 {verification.product_id} · HTTP {verification.http_status ?? "확인필요"} · 이동 {verification.redirect_count}회</p>
+                      ) : null}
+                      <p className="mt-1 font-semibold">자동 확인 결과는 참고 신호이며 저장·게시의 강제 차단 조건은 아닙니다.</p>
+                    </div>
+                  ) : null}
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     <button
                       className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-black hover:bg-mist disabled:cursor-not-allowed disabled:opacity-50"

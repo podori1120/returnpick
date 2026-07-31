@@ -167,6 +167,7 @@ const requiredFiles = [
   "app/api/admin/api-readiness/route.ts",
   "app/api/admin/affiliate-links/backfill/route.ts",
   "app/api/admin/affiliate-links/import/route.ts",
+  "app/api/admin/affiliate-links/verify/route.ts",
   "app/api/admin/keywords/route.ts",
   "app/api/admin/launch/route.ts",
   "app/api/admin/prices/backfill/route.ts",
@@ -187,6 +188,7 @@ const requiredFiles = [
   "components/AffiliateEventTracker.tsx",
   "components/TelegramPreview.tsx",
   "lib/affiliateLinkBackfill.ts",
+  "lib/coupangAffiliateLinkVerifier.ts",
   "lib/approvalSample.ts",
   "lib/adminNavigation.ts",
   "lib/apiReadiness.ts",
@@ -1134,10 +1136,52 @@ if (fileExists("lib/coupangLink.ts")) {
       coupangLink.includes("partnerShortPathPattern") &&
       coupangLink.includes("suspiciousPartnerCodePattern") &&
       coupangLink.includes('url.hostname !== "link.coupang.com"') &&
+      coupangLink.includes("PARTNERS_LINK_CREDENTIALS_NOT_ALLOWED") &&
+      coupangLink.includes("PARTNERS_LINK_DEFAULT_PORT_REQUIRED") &&
       coupangLink.includes("isApprovalSampleAffiliateUrl") &&
       coupangLink.includes("!isApprovalSampleAffiliateUrl(value)") &&
       !coupangLink.includes('return url.hostname === "link.coupang.com" || isUsableCoupangProductUrl(value)'),
     "affiliate_url requires a strict product-level Coupang Partners short link, not a regular product URL, approval sample link, or obvious test code",
+    "required"
+  );
+}
+
+if (
+  fileExists("lib/coupangAffiliateLinkVerifier.ts") &&
+  fileExists("app/api/admin/affiliate-links/verify/route.ts") &&
+  fileExists("components/AdminAffiliateLinkQueue.tsx")
+) {
+  const verifier = readText("lib/coupangAffiliateLinkVerifier.ts");
+  const verifyRoute = readText("app/api/admin/affiliate-links/verify/route.ts");
+  const linkQueue = readText("components/AdminAffiliateLinkQueue.tsx");
+  check(
+    "affiliate link verification: bounded Coupang-only resolution",
+    verifier.includes('import "server-only"') &&
+      verifier.includes("MAX_REDIRECTS = 3") &&
+      verifier.includes("TOTAL_TIMEOUT_MS = 8_000") &&
+      verifier.includes('redirect: "manual"') &&
+      verifier.includes('method: "HEAD"') &&
+      verifier.includes("AbortController") &&
+      verifier.includes("response.body?.cancel()") &&
+      verifier.includes('url.hostname === "coupang.com" || url.hostname.endsWith(".coupang.com")') &&
+      verifier.includes("url.port || url.username || url.password") &&
+      verifier.includes("RESOLVED_PRODUCT_ACCESS_LIMITED") &&
+      verifier.includes("REDIRECT_BLOCKED"),
+    "admin link checks follow only bounded HTTPS Coupang redirects, cancel response bodies, and tolerate upstream access limits",
+    "required"
+  );
+  check(
+    "affiliate link verification: protected endpoint and advisory UI",
+    verifyRoute.includes("requireAdmin(request)") &&
+      verifyRoute.includes("MAX_PAYLOAD_BYTES") &&
+      verifyRoute.includes("new TextEncoder().encode(rawBody).byteLength") &&
+      verifyRoute.includes("verifyCoupangAffiliateLinkResolution") &&
+      verifyRoute.includes('"Cache-Control": "no-store"') &&
+      linkQueue.includes('/api/admin/affiliate-links/verify') &&
+      linkQueue.includes("실제 상품 확인") &&
+      linkQueue.includes("linkVerifications") &&
+      linkQueue.includes("강제 차단 조건은 아닙니다"),
+    "authenticated admins can inspect one pasted link without turning transient Coupang failures into a publish blocker",
     "required"
   );
 }

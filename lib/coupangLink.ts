@@ -98,6 +98,8 @@ export function getCoupangPartnersLinkIssue(value: string | null | undefined) {
   const url = parseUrl(value);
   if (!url) return "INVALID_URL";
   if (url.protocol !== "https:") return "PARTNERS_LINK_MUST_USE_HTTPS";
+  if (url.username || url.password) return "PARTNERS_LINK_CREDENTIALS_NOT_ALLOWED";
+  if (url.port) return "PARTNERS_LINK_DEFAULT_PORT_REQUIRED";
   if (url.hostname !== "link.coupang.com") return "PARTNERS_LINK_HOST_REQUIRED";
   if (isGenericCoupangLandingUrl(value)) return "GENERIC_PARTNERS_LINK_NOT_ALLOWED";
 
