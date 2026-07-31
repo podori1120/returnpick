@@ -1321,12 +1321,13 @@ if (
     "editorial pick: bounded product-less attribution",
     eventRoute.includes('context: "editorial_pick"') &&
       eventRoute.includes('pathname: "/picks/novatech-s1-window-cleaner"') &&
-      eventRoute.includes('affiliateClickChannel: "web_editorial_pick"') &&
-      eventRoute.includes('telegramDetailChannel: "telegram_editorial_pick"') &&
+      eventRoute.includes('affiliateClickChannels: ["web_editorial_pick", "telegram_editorial_pick"]') &&
+      eventRoute.includes('telegramDetailChannels: ["telegram_editorial_pick"]') &&
+      eventRoute.includes("allowedChannels.includes(channel)") &&
       eventTracker.includes("EditorialPickViewTracker") &&
       eventTracker.includes('context: "editorial_pick"') &&
       eventTracker.includes('channel: isTelegramLanding ? "telegram_editorial_pick" : "web_editorial_pick"'),
-    "only the allowlisted editorial path can record product-less views and explicit affiliate clicks",
+    "only the allowlisted editorial path can record product-less views and explicit web or Telegram affiliate clicks",
     "required"
   );
   check(
@@ -2322,6 +2323,20 @@ if (fileExists("components/AdminOpsDashboard.tsx")) {
       dataStore.includes("channelMetrics") &&
       dataStore.includes("b.affiliate_clicks - a.affiliate_clicks"),
     "admin revenue dashboard shows which explicit detail-page CTA placement generates Coupang clicks",
+    "required"
+  );
+  check(
+    "admin: acquisition source conversion metrics",
+    opsDashboard.includes("sourceMetrics") &&
+      opsDashboard.includes("sourceLabel") &&
+      opsDashboard.includes("유입 채널별 전환") &&
+      opsDashboard.includes("네이버 블로그") &&
+      opsDashboard.includes("상세 → 쿠팡") &&
+      dataStore.includes("function attributionSource") &&
+      dataStore.includes('return "direct"') &&
+      dataStore.includes("sourceMetrics") &&
+      dataStore.includes("affiliate_ctr: ratio(affiliateClicks, detailViews)"),
+    "admin revenue dashboard separates acquisition-source conversion from CTA placement metrics",
     "required"
   );
 }

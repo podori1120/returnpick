@@ -896,7 +896,7 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
         {readiness.items.map((item) => {
           const meta = stateMeta(item.state);
           return (
-            <article key={item.id} className="rounded-lg border border-line p-4">
+            <article key={item.id} className="min-w-0 break-words rounded-lg border border-line p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <KeyRound className="text-pine" size={17} aria-hidden />
@@ -908,7 +908,7 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
               </div>
               <p className="mt-2 text-sm font-semibold leading-6 text-steel">{item.message}</p>
               {item.missingEnv.length ? (
-                <p className="mt-2 text-xs font-black leading-5 text-coral">누락: {item.missingEnv.join(", ")}</p>
+                <p className="mt-2 break-all text-xs font-black leading-5 text-coral">누락: {item.missingEnv.join(", ")}</p>
               ) : (
                 <p className="mt-2 text-xs font-black leading-5 text-pine">필수 값 입력 완료</p>
               )}

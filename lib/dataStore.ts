@@ -842,6 +842,13 @@ function ratio(numerator: number, denominator: number) {
   return Math.round((numerator / denominator) * 1000) / 10;
 }
 
+function attributionSource(event: AffiliateEvent) {
+  const utmSource = event.utm_source?.trim().toLowerCase();
+  if (utmSource) return utmSource;
+  if (event.channel?.startsWith("telegram")) return "telegram";
+  return "direct";
+}
+
 export async function getRevenueMetrics() {
   const [products, events] = await Promise.all([listProducts({ published: true }), listAffiliateEvents()]);
   const publishedProducts = products.filter((product) => product.sourcing_status === "published");
@@ -906,6 +913,18 @@ export async function getRevenueMetrics() {
     };
   }).sort((a, b) => b.affiliate_clicks - a.affiliate_clicks || b.detail_views - a.detail_views || b.impressions - a.impressions);
 
+  const sourceMetrics = Array.from(new Set(events.map(attributionSource))).map((source) => {
+    const sourceEvents = events.filter((event) => attributionSource(event) === source);
+    const detailViews = sourceEvents.filter((event) => event.event_type === "detail_view" || event.event_type === "telegram_detail_click").length;
+    const affiliateClicks = sourceEvents.filter((event) => event.event_type === "affiliate_click").length;
+    return {
+      source,
+      detail_views: detailViews,
+      affiliate_clicks: affiliateClicks,
+      affiliate_ctr: ratio(affiliateClicks, detailViews)
+    };
+  }).sort((a, b) => b.affiliate_clicks - a.affiliate_clicks || b.detail_views - a.detail_views);
+
   const missingAffiliateUrl = publishedProducts.filter((product) => !isUsableAffiliateUrl(product.affiliate_url)).length;
   const publicQualityBlocked = publishedProducts.filter((product) => !getCustomerPublishReadiness(product).ready).length;
   const ctaReady = publishedProducts.length - publicQualityBlocked;
@@ -925,6 +944,7 @@ export async function getRevenueMetrics() {
     productMetrics,
     categoryMetrics,
     channelMetrics,
+    sourceMetrics,
     knownProductEventCount: events.filter((event) => event.product_id && productMap.has(event.product_id)).length
   };
 }

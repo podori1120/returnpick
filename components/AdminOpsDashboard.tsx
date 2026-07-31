@@ -96,6 +96,12 @@ type RevenueMetrics = {
     affiliate_clicks: number;
     telegram_clicks: number;
   }>;
+  sourceMetrics: Array<{
+    source: string;
+    detail_views: number;
+    affiliate_clicks: number;
+    affiliate_ctr: number;
+  }>;
 };
 
 type MetricsResponse = {
@@ -138,6 +144,15 @@ function channelLabel(channel: string) {
     telegram_detail_mobile_sticky: "텔레그램 모바일 하단 CTA"
   };
   return labels[channel] ?? channel.replace(/_/g, " ");
+}
+
+function sourceLabel(source: string) {
+  const labels: Record<string, string> = {
+    direct: "직접 방문",
+    naver_blog: "네이버 블로그",
+    telegram: "텔레그램"
+  };
+  return labels[source] ?? source.replace(/_/g, " ");
 }
 
 export default function AdminOpsDashboard({ password, refreshToken }: { password: string; refreshToken: number }) {
@@ -224,6 +239,10 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
     .filter((item) => item.affiliate_clicks > 0)
     .sort((a, b) => b.affiliate_clicks - a.affiliate_clicks || b.detail_views - a.detail_views)
     .slice(0, 4);
+  const topTrafficSources = [...(revenueMetrics?.sourceMetrics ?? [])]
+    .filter((item) => item.detail_views > 0 || item.affiliate_clicks > 0)
+    .sort((a, b) => b.affiliate_clicks - a.affiliate_clicks || b.detail_views - a.detail_views)
+    .slice(0, 5);
   const recoveryActions = [
     {
       key: "affiliate",
@@ -404,14 +423,30 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
             <p className="mt-4 text-sm font-semibold text-steel">
               텔레그램 유입 {revenueMetrics.totals.telegram_detail_click} · CTA 준비 {revenueMetrics.ctaReady} · 링크 보강 대기 {hiddenPublishedCount}
             </p>
-            <div className="mt-4 rounded-lg border border-line bg-white p-3">
+            <div className="mt-5 border-t border-line pt-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-black text-steel">유입 채널별 전환</p>
+                <span className="text-[11px] font-black text-steel">상세 → 쿠팡</span>
+              </div>
+              <div className="mt-3 space-y-2">
+                {topTrafficSources.map((item) => (
+                  <div key={item.source} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 text-xs font-bold">
+                    <span className="min-w-0 truncate">{sourceLabel(item.source)}</span>
+                    <span className="shrink-0 text-steel">상세 {item.detail_views} · 클릭 {item.affiliate_clicks}</span>
+                    <span className="w-12 shrink-0 text-right font-black text-pine">{item.affiliate_ctr}%</span>
+                  </div>
+                ))}
+                {!topTrafficSources.length ? <p className="text-xs font-bold text-steel">아직 채널별 유입 데이터가 없습니다.</p> : null}
+              </div>
+            </div>
+            <div className="mt-5 border-t border-line pt-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs font-black text-steel">CTA 위치별 클릭</p>
-                <span className="rounded-md bg-mist px-2 py-1 text-[11px] font-black text-steel">상세 페이지</span>
+                <span className="text-[11px] font-black text-steel">상세 페이지</span>
               </div>
               <div className="mt-3 space-y-2">
                 {topCtaChannels.map((item) => (
-                  <div key={item.channel} className="flex items-center justify-between gap-3 rounded-md bg-mist px-2 py-1.5 text-xs font-bold">
+                  <div key={item.channel} className="flex items-center justify-between gap-3 text-xs font-bold">
                     <span className="min-w-0 truncate">{channelLabel(item.channel)}</span>
                     <span className="shrink-0 font-black text-pine">{item.affiliate_clicks}회</span>
                   </div>

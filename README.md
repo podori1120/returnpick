@@ -255,7 +255,7 @@ curl -X POST http://localhost:3000/api/admin/sourcing/run \
 
 사이트의 구매 전환은 강제 이동이나 숨은 리다이렉트가 아니라 사용자가 명확히 누른 `쿠팡에서 가격 확인` 버튼으로만 발생합니다. 클릭 이벤트는 `affiliate_events`에 익명 세션 기준으로 저장하며, IP나 개인정보는 저장하지 않습니다. 유입 referrer는 출처 분석에 필요한 origin/path만 저장하고 쿼리스트링과 해시는 제거합니다. `channel`과 `utm_source`는 영문/숫자/점/하이픈/언더스코어 라벨만 저장하고, 익명 세션은 브라우저가 만든 UUID 형식만 받습니다. 이벤트는 `published` 상태이고 상품별 쿠팡 파트너스 링크가 준비된 공개 상품에 대해서만 저장합니다. 브라우저가 localStorage나 sendBeacon을 막아도 추적만 조용히 실패하고 쿠팡 이동은 계속 진행되도록 구성했습니다. `sendBeacon`이 큐에 넣지 못한 경우에는 `keepalive` fetch로 한 번 더 시도하지만, 이 실패도 구매 이동을 막지 않습니다.
 
-상세 페이지의 구매 버튼은 위치별로 `web_detail_hero`, `web_detail_decision`, `web_detail_price`, `web_detail_sidebar`, `web_detail_mobile_sticky` 같은 안전한 `channel` 라벨을 붙여 기록합니다. 텔레그램 유입이면 같은 위치에 `telegram_` 접두가 붙습니다. `telegram_detail_click`은 현재 상세 페이지 URL에 `utm_source=telegram`이 직접 붙어 들어온 경우에만 기록하고, 이후 둘러본 다른 딜은 일반 `detail_view`로 세되 저장된 UTM은 구매 클릭 attribution에만 남깁니다. 관리자 수익 퍼널은 이 값을 `CTA 위치별 클릭`으로 보여주므로, 어떤 버튼 배치가 실제 쿠팡 이동을 만드는지 보고 상세 화면을 조정할 수 있습니다.
+상세 페이지의 구매 버튼은 위치별로 `web_detail_hero`, `web_detail_decision`, `web_detail_price`, `web_detail_sidebar`, `web_detail_mobile_sticky` 같은 안전한 `channel` 라벨을 붙여 기록합니다. 텔레그램 유입이면 같은 위치에 `telegram_` 접두가 붙습니다. `telegram_detail_click`은 현재 상세 페이지 URL에 `utm_source=telegram`이 직접 붙어 들어온 경우에만 기록하고, 이후 둘러본 다른 딜은 일반 `detail_view`로 세되 저장된 UTM은 구매 클릭 attribution에만 남깁니다. 관리자 수익 퍼널은 `channel`을 `CTA 위치별 클릭`으로, `utm_source`를 `유입 채널별 전환`으로 분리해 보여줍니다. 따라서 네이버 블로그·텔레그램·직접 방문 중 어느 유입이 쿠팡 클릭으로 이어졌는지와 어떤 버튼 배치가 클릭을 만들었는지를 섞지 않고 판단할 수 있습니다.
 
 `check:readiness`는 공개 상세, 구매 판단 패널, 비교함, 제휴 고지, 쿠팡 CTA 헬퍼의 핵심 문구가 깨진 한글로 바뀌지 않았는지도 확인합니다. 구매 버튼 근처 문구가 깨지면 고객 신뢰와 쿠팡 이동률이 바로 떨어지므로, 배포 전 readiness에서 `public purchase copy readable Korean` 항목이 통과하는지 확인하세요.
 

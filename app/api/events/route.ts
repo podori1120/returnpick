@@ -9,16 +9,16 @@ const manualTrackingSurfaces = [
   {
     context: "approval_sample",
     pathname: "/products/approval-sample",
-    affiliateClickChannel: "web_approval_sample",
-    detailViewChannel: null,
-    telegramDetailChannel: null
+    affiliateClickChannels: ["web_approval_sample"],
+    detailViewChannels: [],
+    telegramDetailChannels: []
   },
   {
     context: "editorial_pick",
     pathname: "/picks/novatech-s1-window-cleaner",
-    affiliateClickChannel: "web_editorial_pick",
-    detailViewChannel: "web_editorial_pick",
-    telegramDetailChannel: "telegram_editorial_pick"
+    affiliateClickChannels: ["web_editorial_pick", "telegram_editorial_pick"],
+    detailViewChannels: ["web_editorial_pick"],
+    telegramDetailChannels: ["telegram_editorial_pick"]
   }
 ] as const;
 
@@ -67,15 +67,15 @@ function isManualAffiliateTrackingRequest(request: Request, body: Record<string,
   const surface = manualTrackingSurfaces.find((item) => item.context === body.context);
   if (!surface) return false;
 
-  const expectedChannel =
+  const allowedChannels: readonly string[] =
     body.event_type === "affiliate_click"
-      ? surface.affiliateClickChannel
+      ? surface.affiliateClickChannels
       : body.event_type === "detail_view"
-        ? surface.detailViewChannel
+        ? surface.detailViewChannels
         : body.event_type === "telegram_detail_click"
-          ? surface.telegramDetailChannel
-          : null;
-  if (!expectedChannel || channel !== expectedChannel) return false;
+          ? surface.telegramDetailChannels
+          : [];
+  if (!channel || !allowedChannels.includes(channel)) return false;
 
   const requestReferrer = request.headers.get("referer");
   if (!requestReferrer) return false;
