@@ -59,6 +59,7 @@ const sitemapRequiredPaths = [
 
 const adminUiRequiredText = [
   "상품별 링크 보강",
+  "상품 이미지 URL",
   "품질 보강 대기",
   "유입 채널별 전환",
   "링크 보강 큐로 이동",
