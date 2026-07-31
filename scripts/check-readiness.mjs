@@ -178,6 +178,7 @@ const requiredFiles = [
   "app/api/admin/session/route.ts",
   "app/api/admin/telegram/route.ts",
   "app/api/cron/sourcing/route.ts",
+  "app/api/cron/affiliate-backfill/route.ts",
   "app/api/cron/telegram-digest/route.ts",
   "app/api/events/route.ts",
   "app/deals/category/[category]/page.tsx",
@@ -239,6 +240,7 @@ const requiredFiles = [
   "scripts/run-production-launch.mjs",
   "scripts/verify-git-deploy-readiness.mjs",
   "scripts/verify-github-hourly-scheduler.mjs",
+  "scripts/verify-scheduled-affiliate-backfill.mjs",
   "scripts/verify-affiliate-identity.mjs",
   "scripts/verify-bootstrap-catalog-runtime.mjs",
   "scripts/verify-launch-capability-policy.mjs",
@@ -716,7 +718,10 @@ if (
       adminProductsRoute.includes("isApprovalSampleAffiliateUrl") &&
       adminProductsRoute.includes('source: "manual_admin"') &&
       adminProductsRoute.includes('sourcing_status: "needs_review"') &&
-      adminProductsRoute.includes("upsertSourcedProduct") &&
+      adminProductsRoute.includes("insertSourcedProduct") &&
+      adminProductsRoute.includes("findManualImportConflict") &&
+      adminProductsRoute.includes("EXISTING_PRODUCT_CONFLICT") &&
+      !adminProductsRoute.includes("upsertSourcedProduct") &&
       manualProductForm.includes("쿠팡 상품 상세 URL") &&
       manualProductForm.includes("반품등급, 반품가, 네이버 가격과 파트너스 링크는 추정하지 않고") &&
       manualProductForm.includes("검토 후보 추가") &&
@@ -726,8 +731,10 @@ if (
       manualProductForm.includes("affiliate_url") &&
       manualProductForm.includes("쿠팡 파트너스 링크 (선택)") &&
       manualProductForm.includes("목적지 확인") &&
+      manualProductForm.includes("기존 후보 ID") &&
+      manualProductForm.includes("새 입력으로 덮어쓰지 않았습니다") &&
       adminPage.includes("AdminManualProductForm"),
-    "an authenticated admin can seed a real Coupang product with an optional strict Partners link into needs_review while keeping missing return data unfilled and reusing the existing review/publish gates",
+    "an authenticated admin can append a real Coupang product with an optional strict Partners link into needs_review without overwriting an existing candidate",
     "required"
   );
   check(
@@ -1090,6 +1097,7 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-env.mjs"
       envRepairPlan.includes("Safe non-secret operational defaults") &&
       envRepairPlan.includes("CRON_USE_MOCK_FALLBACK") &&
       envRepairPlan.includes("SOURCING_TIME_BUDGET_MS") &&
+      envRepairPlan.includes("AFFILIATE_BACKFILL_LIMIT") &&
       envRepairPlan.includes("PUBLIC_WEB_CRAWL_ENABLED") &&
       envRepairPlan.includes("External hourly scheduler (GitHub Actions)") &&
       envRepairPlan.includes("RETURNPICK_CRON_SECRET") &&
@@ -1210,9 +1218,24 @@ if (fileExists("scripts/verify-github-hourly-scheduler.mjs")) {
       schedulerCheck.includes("RETURNPICK_CRON_SECRET") &&
       schedulerCheck.includes("RETURNPICK_SITE_URL") &&
       schedulerCheck.includes("/api/cron/sourcing") &&
+      schedulerCheck.includes("/api/cron/affiliate-backfill") &&
       schedulerCheck.includes("/api/cron/telegram-digest?limit=1") &&
       schedulerCheck.includes("local scripts cannot read GitHub repository secrets"),
     "operators can verify the hourly GitHub Actions scheduler wiring without printing or requiring secret values",
+    "required"
+  );
+}
+
+if (fileExists("scripts/verify-scheduled-affiliate-backfill.mjs")) {
+  const affiliateBackfillCheck = readText("scripts/verify-scheduled-affiliate-backfill.mjs");
+  const packageJson = readText("package.json");
+  check(
+    "scripts: scheduled affiliate backfill check command",
+    packageJson.includes('"affiliate-backfill:check": "node scripts/verify-scheduled-affiliate-backfill.mjs"') &&
+      affiliateBackfillCheck.includes("isolated route") &&
+      affiliateBackfillCheck.includes("hourly workflow order") &&
+      affiliateBackfillCheck.includes("readiness probe"),
+    "operators can verify the isolated product-level Partners link repair path without running a live backfill",
     "required"
   );
 }
@@ -2421,6 +2444,7 @@ if (fileExists("lib/apiReadiness.ts")) {
     "readiness: cron endpoint probe",
     readiness.includes("runCronProbeCheck") &&
       readiness.includes("/api/cron/sourcing?probe=1") &&
+      readiness.includes("/api/cron/affiliate-backfill?probe=1") &&
       readiness.includes("/api/cron/telegram-digest?probe=1") &&
       readiness.includes("job_started === false"),
     "admin readiness verifies deployed Cron endpoints with CRON_SECRET without starting jobs",
@@ -2660,6 +2684,7 @@ if (fileExists("components/AdminApiReadinessPanel.tsx")) {
       panel.includes("NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL") &&
       panel.includes("CRON_USE_MOCK_FALLBACK") &&
       panel.includes("SOURCING_TIME_BUDGET_MS") &&
+      panel.includes("AFFILIATE_BACKFILL_LIMIT") &&
       panel.includes("PUBLIC_WEB_CRAWL_ENABLED"),
     "admin can copy the required and operational Vercel environment variable template after approval",
     "required"
@@ -3907,6 +3932,7 @@ if (fileExists("vercel.json")) {
   const vercel = JSON.parse(readText("vercel.json"));
   const crons = Array.isArray(vercel.crons) ? vercel.crons : [];
   check("cron: sourcing Vercel deployable fallback", crons.some((cron) => cron.path === "/api/cron/sourcing" && cron.schedule === "0 0 * * *"), "/api/cron/sourcing 0 0 * * *", "required");
+  check("cron: affiliate backfill Vercel deployable fallback", crons.some((cron) => cron.path === "/api/cron/affiliate-backfill" && cron.schedule === "5 0 * * *"), "/api/cron/affiliate-backfill 5 0 * * *", "required");
   check(
     "cron: telegram digest Vercel deployable fallback",
     crons.some((cron) => cron.path === "/api/cron/telegram-digest" && cron.schedule === "10 0 * * *"),
@@ -3923,6 +3949,7 @@ if (fileExists(".github/workflows/returnpick-hourly.yml")) {
       hourlyWorkflow.includes("RETURNPICK_CRON_SECRET") &&
       hourlyWorkflow.includes("RETURNPICK_SITE_URL") &&
       hourlyWorkflow.includes("/api/cron/sourcing") &&
+      hourlyWorkflow.includes("/api/cron/affiliate-backfill") &&
       hourlyWorkflow.includes("/api/cron/telegram-digest?limit=1") &&
       hourlyWorkflow.includes("Authorization: Bearer") &&
       hourlyWorkflow.includes("--fail-with-body") &&
@@ -3943,13 +3970,16 @@ if (fileExists("lib/cron.ts")) {
   );
 }
 
-if (fileExists("app/api/cron/sourcing/route.ts") && fileExists("app/api/cron/telegram-digest/route.ts")) {
+if (fileExists("app/api/cron/sourcing/route.ts") && fileExists("app/api/cron/affiliate-backfill/route.ts") && fileExists("app/api/cron/telegram-digest/route.ts")) {
   const cronSourcingRoute = readText("app/api/cron/sourcing/route.ts");
+  const cronAffiliateBackfillRoute = readText("app/api/cron/affiliate-backfill/route.ts");
   const cronTelegramRoute = readText("app/api/cron/telegram-digest/route.ts");
   check(
     "cron: scheduled routes catch execution failures",
     cronSourcingRoute.includes("CRON_SOURCING_FAILED") &&
       cronSourcingRoute.includes("cronErrorJson") &&
+      cronAffiliateBackfillRoute.includes("CRON_AFFILIATE_BACKFILL_FAILED") &&
+      cronAffiliateBackfillRoute.includes("cronErrorJson") &&
       cronTelegramRoute.includes("CRON_TELEGRAM_DIGEST_FAILED") &&
       cronTelegramRoute.includes("cronErrorJson"),
     "scheduled sourcing and Telegram digest routes return bounded JSON when execution throws",
@@ -3961,6 +3991,7 @@ if (fileExists("lib/scheduler.ts")) {
   const scheduler = readText("lib/scheduler.ts");
   check("cron: production real-source default", scheduler.includes("getScheduledMockFallback") && scheduler.includes('process.env.NODE_ENV !== "production"'), "production cron does not use mock fallback unless explicitly enabled", "required");
   check("cron: sourcing time budget env", scheduler.includes("SOURCING_TIME_BUDGET_MS") && scheduler.includes("SOURCING_KEYWORD_LIMIT"), "cron sourcing can be bounded by env time and keyword limits", "required");
+  check("cron: affiliate link backfill isolation", scheduler.includes("runScheduledAffiliateBackfill") && scheduler.includes("backfillCoupangAffiliateLinks") && scheduler.includes("AFFILIATE_BACKFILL_LIMIT"), "scheduled Partners link repair runs in a separate bounded job after sourcing", "required");
   check("cron: keyword cursor resume", scheduler.includes("getNextSourcingKeywordOffset") && scheduler.includes("keywordOffset"), "scheduled sourcing resumes from the previous keyword cursor", "required");
   check("cron: persistent storage signal", scheduler.includes("persistent_storage") && scheduler.includes("hasSupabaseConfig"), "scheduler result exposes whether run logs are persisted", "required");
   check(
@@ -4032,8 +4063,10 @@ if (fileExists("app/api/admin/scheduler/run/route.ts")) {
     "admin: scheduler run bounded errors",
     schedulerRunRoute.includes("SCHEDULER_RUN_FAILED") &&
       schedulerRunRoute.includes("INVALID_SCHEDULER_JOB") &&
-      schedulerRunRoute.includes("positiveInteger"),
-    "admin manual scheduler execution returns safe JSON errors and clamps Telegram digest limits",
+      schedulerRunRoute.includes("positiveInteger") &&
+      schedulerRunRoute.includes('job === "affiliate_backfill"') &&
+      schedulerRunRoute.includes("runScheduledAffiliateBackfill"),
+    "admin manual scheduler execution returns safe JSON errors, clamps Telegram digest limits, and exposes isolated link backfill",
     "required"
   );
 }
@@ -4225,6 +4258,7 @@ if (fileExists("components/AdminSchedulerPanel.tsx")) {
       schedulerPanel.includes("RETURNPICK_SITE_URL") &&
       schedulerPanel.includes("ReturnPick Hourly Scheduler") &&
       schedulerPanel.includes("/api/cron/sourcing") &&
+      schedulerPanel.includes("/api/cron/affiliate-backfill") &&
       schedulerPanel.includes("/api/cron/telegram-digest?limit=1"),
     "admin scheduler panel can copy the GitHub Actions hourly scheduler setup for Vercel Hobby operation",
     "required"

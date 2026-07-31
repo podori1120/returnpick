@@ -27,6 +27,7 @@ export default function AdminManualProductForm({ password, onCreated }: { passwo
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [createdProductId, setCreatedProductId] = useState<string | null>(null);
+  const [existingProductId, setExistingProductId] = useState<string | null>(null);
   const urlReady = isUsableCoupangProductUrl(form.coupang_url.trim());
   const affiliateUrlValue = form.affiliate_url.trim();
   const affiliateUrlReady = !affiliateUrlValue || isUsableAffiliateUrl(affiliateUrlValue);
@@ -39,14 +40,21 @@ export default function AdminManualProductForm({ password, onCreated }: { passwo
     setSaving(true);
     setNotice(null);
     setCreatedProductId(null);
+    setExistingProductId(null);
     try {
       const response = await fetch("/api/admin/products", {
         method: "POST",
         headers: headers(password),
         body: JSON.stringify(form)
       });
-      const data = (await response.json().catch(() => ({}))) as { message?: string; error?: string; product?: { id?: string | null } };
+      const data = (await response.json().catch(() => ({}))) as {
+        message?: string;
+        error?: string;
+        existing_product_id?: string | null;
+        product?: { id?: string | null };
+      };
       if (!response.ok) {
+        setExistingProductId(data.existing_product_id ?? null);
         setNotice({ type: "error", message: data.message ?? data.error ?? "후보를 추가하지 못했습니다." });
         return;
       }
@@ -78,6 +86,15 @@ export default function AdminManualProductForm({ password, onCreated }: { passwo
         <p className={`mt-4 rounded-lg border px-3 py-2 text-sm font-bold ${notice.type === "success" ? "border-pine/30 bg-pine/10 text-pine" : "border-coral/30 bg-coral/10 text-coral"}`} role="status">
           {notice.message}
         </p>
+      ) : null}
+
+      {existingProductId ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-lemon/50 bg-lemon/15 px-3 py-3 text-sm font-bold text-ink">
+          <p>기존 후보 ID <code className="break-all">{existingProductId}</code>를 유지했습니다. 새 입력으로 덮어쓰지 않았습니다.</p>
+          <a className="focus-ring shrink-0 rounded-lg border border-ink px-3 py-2 text-xs font-black hover:bg-white" href="#admin-candidate-review">
+            후보 검토 화면으로 이동
+          </a>
+        </div>
       ) : null}
 
       {createdProductId ? (

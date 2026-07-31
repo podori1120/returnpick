@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runScheduledSourcing, runScheduledTelegramDigest } from "@/lib/scheduler";
+import { runScheduledAffiliateBackfill, runScheduledSourcing, runScheduledTelegramDigest } from "@/lib/scheduler";
 import { requireAdmin } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +30,11 @@ export async function POST(request: Request) {
 
     if (job === "telegram_digest") {
       const result = await runScheduledTelegramDigest(positiveInteger(body.limit, 1));
+      return NextResponse.json({ result });
+    }
+
+    if (job === "affiliate_backfill") {
+      const result = await runScheduledAffiliateBackfill();
       return NextResponse.json({ result });
     }
 

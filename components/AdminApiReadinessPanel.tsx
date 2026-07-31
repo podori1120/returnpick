@@ -57,6 +57,7 @@ const vercelEnvRows = [
   { group: "자동 운영", name: "CRON_USE_MOCK_FALLBACK", value: "false", note: "승인 후 운영에서는 false 유지" },
   { group: "자동 운영", name: "SOURCING_TIME_BUDGET_MS", value: "52000", note: "서버리스 시간 제한 전 안전 종료 예산" },
   { group: "자동 운영", name: "SOURCING_KEYWORD_LIMIT", value: "", note: "초기 운영에서 키워드 수를 제한할 때만 입력" },
+  { group: "자동 운영", name: "AFFILIATE_BACKFILL_LIMIT", value: "10", note: "매시 상품별 파트너스 링크 자동 보강 건수, 최대 20" },
   { group: "공개 URL", name: "NEXT_PUBLIC_SITE_URL", value: process.env.NEXT_PUBLIC_SITE_URL ?? "", note: "예: https://returnpick.vercel.app" },
   {
     group: "공개 URL",

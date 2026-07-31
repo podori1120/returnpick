@@ -5,6 +5,10 @@
       "schedule": "0 0 * * *"
     },
     {
+      "path": "/api/cron/affiliate-backfill",
+      "schedule": "5 0 * * *"
+    },
+    {
       "path": "/api/cron/telegram-digest",
       "schedule": "10 0 * * *"
     }

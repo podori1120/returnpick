@@ -60,6 +60,11 @@ const operationalDefaults = [
     name: "SOURCING_KEYWORD_LIMIT",
     defaultValue: "",
     action: "Leave blank unless first launch is slow; use a small number like 8 only when throttling is needed."
+  },
+  {
+    name: "AFFILIATE_BACKFILL_LIMIT",
+    defaultValue: "10",
+    action: "Limit the number of missing product-level Partners links repaired per hourly run; keep this at or below 20."
   }
 ];
 

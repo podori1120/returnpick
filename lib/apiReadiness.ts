@@ -1392,6 +1392,7 @@ async function runCronProbeCheck(): Promise<ApiConnectionCheck> {
 
   const probes = [
     { id: "sourcing", url: `${siteUrl}/api/cron/sourcing?probe=1` },
+    { id: "affiliate_backfill", url: `${siteUrl}/api/cron/affiliate-backfill?probe=1` },
     { id: "telegram_digest", url: `${siteUrl}/api/cron/telegram-digest?probe=1` }
   ];
 

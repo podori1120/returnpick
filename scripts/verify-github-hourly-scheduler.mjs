@@ -41,6 +41,7 @@ function checkWorkflow(text) {
     ["secret name", has(text, "RETURNPICK_CRON_SECRET")],
     ["site variable name", has(text, "RETURNPICK_SITE_URL")],
     ["protected sourcing endpoint", has(text, "/api/cron/sourcing")],
+    ["protected affiliate backfill endpoint", has(text, "/api/cron/affiliate-backfill")],
     ["protected telegram endpoint", has(text, "/api/cron/telegram-digest?limit=1")],
     ["authorization header", has(text, "Authorization: Bearer") && has(text, "CRON_SECRET")],
     ["fail on http errors", has(text, "--fail-with-body") && has(text, "--max-time 75")],

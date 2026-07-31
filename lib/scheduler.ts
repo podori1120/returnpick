@@ -9,6 +9,7 @@ import { runSourcing } from "@/lib/sourcing";
 import { getNextSourcingKeywordOffset, getRunNextKeywordOffset } from "@/lib/sourcingCursor";
 import { hasSupabaseConfig } from "@/lib/supabase";
 import { sendTelegramForProduct } from "@/lib/telegram";
+import { backfillCoupangAffiliateLinks } from "@/lib/affiliateLinkBackfill";
 
 export function getScheduledMockFallback() {
   const value = process.env.CRON_USE_MOCK_FALLBACK;
@@ -28,6 +29,10 @@ export function getScheduledSourcingKeywordLimit() {
 
 export function getScheduledSourcingTimeBudgetMs() {
   return positiveIntegerFromEnv("SOURCING_TIME_BUDGET_MS") ?? 52000;
+}
+
+export function getScheduledAffiliateBackfillLimit() {
+  return Math.min(20, positiveIntegerFromEnv("AFFILIATE_BACKFILL_LIMIT") ?? 10);
 }
 
 export type SchedulerBlockingItem = {
@@ -182,6 +187,43 @@ export async function runScheduledSourcing() {
     inserted_count: run.inserted_count,
     updated_count: run.updated_count,
     error_count: run.error_count
+  };
+}
+
+export async function runScheduledAffiliateBackfill() {
+  const limit = getScheduledAffiliateBackfillLimit();
+  const gate = await getScheduledAutomationGate();
+  if (gate.shouldGate) {
+    return {
+      type: "affiliate_backfill",
+      status: "not_ready",
+      skipped_reason: gate.skippedReason,
+      readiness_mode: gate.readiness.mode,
+      blocking_item_ids: gate.readiness.blockingItemIds,
+      blocking_items: getSchedulerBlockingItems(gate.readiness),
+      blocking_env: gate.readiness.blockingEnv,
+      operator_action: getSchedulerOperatorAction(gate.skippedReason, gate.readiness),
+      first_launch_confirmed: gate.firstLaunchConfirmed,
+      launch_confirmation_id: gate.launchConfirmation?.id ?? null,
+      limit,
+      persistent_storage: hasSupabaseConfig(),
+      scanned_count: 0,
+      updated_count: 0,
+      skipped_count: 0,
+      error_count: 0,
+      dry_run: false,
+      items: []
+    };
+  }
+
+  const result = await backfillCoupangAffiliateLinks({ limit, dryRun: false });
+  return {
+    type: "affiliate_backfill",
+    ...result,
+    first_launch_confirmed: gate.firstLaunchConfirmed,
+    launch_confirmation_id: gate.launchConfirmation?.id ?? null,
+    limit,
+    persistent_storage: hasSupabaseConfig()
   };
 }
 

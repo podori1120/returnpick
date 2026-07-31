@@ -22,6 +22,7 @@
     "env:vercel:launch": "npm run env:pull:production && npm run env:vercel && npm run env:check:launch",
     "launch:production": "node scripts/run-production-launch.mjs",
     "scheduler:check": "node scripts/verify-github-hourly-scheduler.mjs",
+    "affiliate-backfill:check": "node scripts/verify-scheduled-affiliate-backfill.mjs",
     "scoring:check": "node scripts/verify-scoring-rules.mjs",
     "freshness:check": "node scripts/verify-deal-freshness.mjs",
     "manual-import:check": "node scripts/verify-manual-import-safety.mjs",

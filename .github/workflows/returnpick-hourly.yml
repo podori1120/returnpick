@@ -59,6 +59,7 @@ jobs:
           }
 
           call_returnpick "/api/cron/sourcing"
+          call_returnpick "/api/cron/affiliate-backfill"
 
           if [[ "${RUN_TELEGRAM:-true}" != "false" ]]; then
             call_returnpick "/api/cron/telegram-digest?limit=1"

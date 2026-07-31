@@ -631,14 +631,16 @@ API 승인 전 첫 매출 유입은 `/admin`의 `채널별 첫 매출 배포 키
 ReturnPick은 Vercel Cron 또는 외부 스케줄러로 반복 운영할 수 있습니다. 현재 `vercel.json`은 Vercel Hobby 계정에서도 배포가 막히지 않도록 하루 1회 안전 기본값으로 등록되어 있습니다.
 
 - `/api/cron/sourcing`: 기본 Vercel Cron은 매일 00:00 UTC에 활성 키워드 기준으로 후보를 다시 수집하고 점수화합니다.
+- `/api/cron/affiliate-backfill`: 기본 Vercel Cron은 매일 00:05 UTC에 승인 후 상품별 쿠팡 상품 URL을 파트너스 딥링크로 보강합니다. 수집 함수와 분리해 새 후보가 수익 링크 없이 계속 쌓이는 일을 줄입니다.
 - `/api/cron/telegram-digest`: 기본 Vercel Cron은 매일 00:10 UTC에 아직 텔레그램에 보낸 적 없는 고객공개 가능 상품 중 점수 높은 상품을 1건 발송합니다.
 
-1시간마다 자동 수집과 텔레그램 후보 발송을 유지하려면 Vercel Pro 이상에서 두 작업을 `0 * * * *`로 바꾸거나, cron-job.org, GitHub Actions, 서버 Cron 같은 외부 스케줄러가 아래 두 주소를 1시간마다 호출하게 설정하세요. 이때 `Authorization: Bearer CRON_SECRET값` 헤더를 반드시 넣어야 합니다.
+1시간마다 자동 수집, 상품별 제휴 링크 보강과 텔레그램 후보 발송을 유지하려면 Vercel Pro 이상에서 작업을 `0 * * * *`로 바꾸거나, cron-job.org, GitHub Actions, 서버 Cron 같은 외부 스케줄러가 아래 세 주소를 순서대로 호출하게 설정하세요. 이때 `Authorization: Bearer CRON_SECRET값` 헤더를 반드시 넣어야 합니다.
 
 - `https://배포주소/api/cron/sourcing`
+- `https://배포주소/api/cron/affiliate-backfill`
 - `https://배포주소/api/cron/telegram-digest`
 
-이 저장소에는 `.github/workflows/returnpick-hourly.yml`도 포함되어 있습니다. GitHub에 연결해 두면 Vercel Hobby에서도 GitHub Actions가 1시간마다 위 두 Cron API를 호출할 수 있습니다.
+이 저장소에는 `.github/workflows/returnpick-hourly.yml`도 포함되어 있습니다. GitHub에 연결해 두면 Vercel Hobby에서도 GitHub Actions가 1시간마다 위 세 Cron API를 수집 → 링크 보강 → 텔레그램 순서로 호출할 수 있습니다.
 
 GitHub Actions 1시간 스케줄러 설정:
 
@@ -646,7 +648,7 @@ GitHub Actions 1시간 스케줄러 설정:
 2. Repository secret `RETURNPICK_CRON_SECRET`에 Vercel의 `CRON_SECRET`과 같은 값을 넣습니다.
 3. Repository variable `RETURNPICK_SITE_URL`에 `https://returnpick.vercel.app`을 넣습니다. 값을 넣지 않아도 워크플로 기본값은 `https://returnpick.vercel.app`입니다.
 4. Actions 탭에서 `ReturnPick Hourly Scheduler`를 수동 실행해 200 응답을 확인합니다.
-5. 이후 매시 정각마다 `/api/cron/sourcing`을 먼저 호출하고, 이어서 `/api/cron/telegram-digest?limit=1`을 호출합니다.
+5. 이후 매시 정각마다 `/api/cron/sourcing`을 먼저 호출하고, `/api/cron/affiliate-backfill`을 실행한 다음 `/api/cron/telegram-digest?limit=1`을 호출합니다.
 
 관리자 페이지의 `자동 운영 센터`에서도 `GitHub Actions 설정 복사` 버튼으로 같은 설정값과 점검 절차를 복사할 수 있습니다.
 
@@ -667,13 +669,14 @@ CRON_SECRET=
 CRON_USE_MOCK_FALLBACK=false
 SOURCING_TIME_BUDGET_MS=52000
 SOURCING_KEYWORD_LIMIT=
+AFFILIATE_BACKFILL_LIMIT=10
 ```
 
 `CRON_SECRET`은 Vercel 프로젝트 환경변수에 16자 이상 랜덤 문자열로 설정합니다. Vercel Cron이 호출할 때 이 값이 `Authorization: Bearer ...` 헤더로 전달되며, API는 이 헤더가 맞을 때만 실행됩니다. 로컬 개발 환경에서는 `CRON_SECRET`이 없어도 테스트 호출이 가능합니다.
 
-Cron 라우트는 `?probe=1`을 붙이면 인증만 확인하고 실제 소싱이나 텔레그램 발송은 시작하지 않습니다. `/admin`의 실제 연결 테스트는 `NEXT_PUBLIC_SITE_URL/api/cron/sourcing?probe=1`과 `/api/cron/telegram-digest?probe=1`을 `CRON_SECRET`으로 호출해, 배포 alias와 Cron 인증이 맞는지 첫 가동 전에 확인합니다.
+Cron 라우트는 `?probe=1`을 붙이면 인증만 확인하고 실제 소싱·링크 보강·텔레그램 발송은 시작하지 않습니다. `/admin`의 실제 연결 테스트는 `NEXT_PUBLIC_SITE_URL/api/cron/sourcing?probe=1`, `/api/cron/affiliate-backfill?probe=1`, `/api/cron/telegram-digest?probe=1`을 `CRON_SECRET`으로 호출해, 배포 alias와 Cron 인증이 맞는지 첫 가동 전에 확인합니다. `AFFILIATE_BACKFILL_LIMIT`은 매시 링크 보강 최대 건수이며 기본값 10, 최대 20입니다.
 
-예약 실행 중 예외가 발생해도 Cron 라우트는 일반 HTML 오류 대신 `CRON_SOURCING_FAILED` 또는 `CRON_TELEGRAM_DIGEST_FAILED` JSON을 반환합니다. 응답에는 실행 시각, 작업 종류, 안전하게 잘린 오류 메시지만 포함되며 API 키나 토큰 원문은 노출하지 않습니다.
+예약 실행 중 예외가 발생해도 Cron 라우트는 일반 HTML 오류 대신 `CRON_SOURCING_FAILED`, `CRON_AFFILIATE_BACKFILL_FAILED` 또는 `CRON_TELEGRAM_DIGEST_FAILED` JSON을 반환합니다. 응답에는 실행 시각, 작업 종류, 안전하게 잘린 오류 메시지만 포함되며 API 키나 토큰 원문은 노출하지 않습니다.
 
 운영 배포의 Cron 소싱은 기본적으로 실제 API/허용 소스만 사용합니다. 승인 전 테스트 목적으로만 목업 후보를 자동 수집에 섞고 싶다면 `CRON_USE_MOCK_FALLBACK=true`를 명시하고, 최종승인 후에는 `false`로 돌리세요. 관리자 페이지의 `자동 운영 센터`에서 현재 Cron이 `실제 소스만 사용` 상태인지 바로 확인할 수 있습니다.
 

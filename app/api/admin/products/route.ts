@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { calculateDealScore } from "@/lib/scoring";
-import { createDealScore, listProducts, upsertSourcedProduct } from "@/lib/dataStore";
+import { createDealScore, insertSourcedProduct, listProducts } from "@/lib/dataStore";
 import { extractCoupangProductId } from "@/lib/affiliateIdentity";
 import { getCoupangPartnersLinkIssue, isApprovalSampleAffiliateUrl, isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
 import { getProductImageUrlIssue, isUsableProductImageUrl } from "@/lib/productImageUrl";
+import { findManualImportConflict } from "@/lib/manualImportIdentity";
 import { isCategory, isSourcingStatus, requireAdmin, sanitizeText } from "@/lib/validators";
 import { parseSpecsFromTitle } from "@/lib/specParser";
 
@@ -95,7 +96,28 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await upsertSourcedProduct({
+    const existingConflict = findManualImportConflict(await listProducts(), {
+      sourceProductId,
+      category,
+      title
+    });
+    if (existingConflict) {
+      const message =
+        existingConflict.code === "EXISTING_COUPANG_PRODUCT_ID"
+          ? "이미 등록된 쿠팡 상품번호입니다. 기존 후보를 자동으로 수정하지 않았습니다. 후보 검토 화면에서 기존 상품을 명시적으로 수정하세요."
+          : "같은 카테고리·상품명 후보가 이미 있습니다. 기존 후보를 자동으로 수정하지 않았습니다. 후보 검토 화면에서 기존 상품을 명시적으로 수정하세요.";
+      return NextResponse.json(
+        {
+          error: "EXISTING_PRODUCT_CONFLICT",
+          reason: existingConflict.code,
+          existing_product_id: existingConflict.product_id,
+          message
+        },
+        { status: 409 }
+      );
+    }
+
+    const result = await insertSourcedProduct({
       source: "manual_admin",
       source_product_id: sourceProductId,
       category,
@@ -137,14 +159,12 @@ export async function POST(request: Request) {
       {
         product: result.product,
         score,
-        inserted: result.inserted,
-        message: result.inserted
-          ? affiliateUrl
-            ? "실제 쿠팡 상품과 파트너스 링크를 검토 대기 후보로 추가했습니다. 링크 목적지 확인 후 게시할 수 있습니다."
-            : "실제 쿠팡 상품을 검토 대기 후보로 추가했습니다."
-          : "기존 상품에 상품 상세 URL 정보를 반영했습니다."
+        inserted: true,
+        message: affiliateUrl
+          ? "실제 쿠팡 상품과 파트너스 링크를 검토 대기 후보로 추가했습니다. 링크 목적지 확인 후 게시할 수 있습니다."
+          : "실제 쿠팡 상품을 검토 대기 후보로 추가했습니다."
       },
-      { status: result.inserted ? 201 : 200 }
+      { status: 201 }
     );
   } catch (error) {
     return adminProductsErrorResponse(error);

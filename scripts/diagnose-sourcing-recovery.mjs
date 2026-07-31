@@ -362,6 +362,18 @@ async function main() {
     add("PASS", "SOURCING_KEYWORD_LIMIT", "blank; full active keyword rotation allowed");
   }
 
+  const affiliateBackfillLimit = envValue("AFFILIATE_BACKFILL_LIMIT");
+  if (affiliateBackfillLimit) {
+    const parsed = Number(affiliateBackfillLimit);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 20) {
+      add("FAIL", "AFFILIATE_BACKFILL_LIMIT", "must be an integer from 1 to 20 or blank");
+    } else {
+      add("PASS", "AFFILIATE_BACKFILL_LIMIT", `${parsed} product links per run`);
+    }
+  } else {
+    add("PASS", "AFFILIATE_BACKFILL_LIMIT", "blank; scheduler defaults to 10 product links per run");
+  }
+
   if (envValue("CRON_USE_MOCK_FALLBACK") === "true") {
     add("WARN", "CRON_USE_MOCK_FALLBACK", "true");
     action("Set CRON_USE_MOCK_FALLBACK=false for production after API keys are approved.");

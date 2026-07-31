@@ -81,6 +81,10 @@ function validatePositiveInteger(value) {
   return /^\d+$/.test(value) && Number(value) > 0;
 }
 
+function validateAffiliateBackfillLimit(value) {
+  return validatePositiveInteger(value) && Number(value) <= 20;
+}
+
 function splitList(value) {
   return String(value ?? "")
     .split(",")
@@ -128,6 +132,7 @@ const checks = [
   { name: "CRON_USE_MOCK_FALLBACK", required: false, validate: validateBooleanString, hint: "true or false" },
   { name: "SOURCING_TIME_BUDGET_MS", required: false, validate: validatePositiveInteger, hint: "positive integer milliseconds" },
   { name: "SOURCING_KEYWORD_LIMIT", required: false, validate: validatePositiveInteger, hint: "positive integer" },
+  { name: "AFFILIATE_BACKFILL_LIMIT", required: false, validate: validateAffiliateBackfillLimit, hint: "positive integer up to 20" },
   { name: "PUBLIC_WEB_CRAWL_ENABLED", required: false, validate: validateBooleanString, hint: "true or false" }
 ];
 
@@ -138,7 +143,7 @@ const envGroups = [
   },
   {
     label: "admin and scheduler",
-    names: ["ADMIN_PASSWORD", "CRON_SECRET", "CRON_USE_MOCK_FALLBACK", "SOURCING_TIME_BUDGET_MS", "SOURCING_KEYWORD_LIMIT"]
+    names: ["ADMIN_PASSWORD", "CRON_SECRET", "CRON_USE_MOCK_FALLBACK", "SOURCING_TIME_BUDGET_MS", "SOURCING_KEYWORD_LIMIT", "AFFILIATE_BACKFILL_LIMIT"]
   },
   {
     label: "Supabase",

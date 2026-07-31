@@ -186,12 +186,17 @@ function notReadyMessage(result: Record<string, any>) {
   return `운영 준비가 아직 완료되지 않아 자동 운영이 대기 중입니다.${blockers}`;
 }
 
-function scheduledResultMessage(job: "sourcing" | "telegram_digest", result: Record<string, any>) {
+function scheduledResultMessage(job: "sourcing" | "affiliate_backfill" | "telegram_digest", result: Record<string, any>) {
   if (result.status === "not_ready") return notReadyMessage(result);
 
   if (job === "sourcing") {
     const status = result.status ? `${result.status} · ` : "";
     return `소싱 완료: ${status}${result.found_count ?? 0}개 발견, ${result.inserted_count ?? 0}개 추가, ${result.updated_count ?? 0}개 갱신, ${result.error_count ?? 0}개 오류`;
+  }
+
+  if (job === "affiliate_backfill") {
+    const status = result.status ? `${result.status} · ` : "";
+    return `파트너스 링크 보강 완료: ${status}${result.scanned_count ?? 0}개 확인, ${result.updated_count ?? 0}개 저장, ${result.skipped_count ?? 0}개 대기, ${result.error_count ?? 0}개 오류`;
   }
 
   const skipped = result.skipped_reason ? ` · ${result.skipped_reason}` : "";
@@ -225,6 +230,7 @@ function githubSchedulerSetupText() {
     "4. Actions 탭에서 ReturnPick Hourly Scheduler를 수동 실행",
     "5. 실행 로그에서 아래 두 호출이 200 응답인지 확인",
     `   ${siteUrl}/api/cron/sourcing`,
+    `   ${siteUrl}/api/cron/affiliate-backfill`,
     `   ${siteUrl}/api/cron/telegram-digest?limit=1`,
     "",
     "참고: 운영 준비 전에는 LAUNCH_NOT_READY 또는 FIRST_LAUNCH_NOT_CONFIRMED로 안전하게 대기합니다."
@@ -259,10 +265,18 @@ export default function AdminSchedulerPanel({ password, refreshToken = 0, onComp
     void loadInsights();
   }, [password, refreshToken]);
 
-  async function runJob(job: "sourcing" | "telegram_digest") {
+  async function runJob(job: "sourcing" | "affiliate_backfill" | "telegram_digest") {
     setRunningJob(job);
     setLastResult(null);
-    setNotice({ type: "info", message: job === "sourcing" ? "스케줄 소싱을 실행 중입니다." : "텔레그램 다이제스트를 실행 중입니다." });
+    setNotice({
+      type: "info",
+      message:
+        job === "sourcing"
+          ? "스케줄 소싱을 실행 중입니다."
+          : job === "affiliate_backfill"
+            ? "파트너스 링크 자동 보강을 실행 중입니다."
+            : "텔레그램 다이제스트를 실행 중입니다."
+    });
     try {
       const response = await fetch("/api/admin/scheduler/run", {
         method: "POST",
@@ -459,6 +473,15 @@ export default function AdminSchedulerPanel({ password, refreshToken = 0, onComp
             title={insights.sourcing.scheduler_ready ? "지금 소싱" : "첫 가동 완료 후 실행할 수 있습니다"}
           >
             <Play size={16} aria-hidden /> 지금 소싱
+          </button>
+          <button
+            className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-sm font-black hover:bg-mist disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={Boolean(runningJob) || !insights.sourcing.scheduler_ready}
+            onClick={() => runJob("affiliate_backfill")}
+            type="button"
+            title={insights.sourcing.scheduler_ready ? "파트너스 링크 자동 보강" : "첫 가동 완료 후 실행할 수 있습니다"}
+          >
+            <RefreshCw size={16} aria-hidden /> 링크 자동 보강
           </button>
           <button
             className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-sm font-black hover:bg-mist disabled:cursor-not-allowed disabled:opacity-60"
