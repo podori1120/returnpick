@@ -56,12 +56,14 @@ async function fetchHeadersOnly(url: URL, timeoutMs: number) {
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, {
-      method: "HEAD",
+      method: "GET",
       redirect: "manual",
       cache: "no-store",
+      credentials: "omit",
       signal: controller.signal,
       headers: {
         Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1",
+        Range: "bytes=0-0",
         "User-Agent": "ReturnPickLinkCheck/0.1 (+https://returnpick.vercel.app/disclosure)"
       }
     });

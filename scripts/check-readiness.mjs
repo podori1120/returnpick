@@ -1160,14 +1160,16 @@ if (
       verifier.includes("MAX_REDIRECTS = 3") &&
       verifier.includes("TOTAL_TIMEOUT_MS = 8_000") &&
       verifier.includes('redirect: "manual"') &&
-      verifier.includes('method: "HEAD"') &&
+      verifier.includes('method: "GET"') &&
+      verifier.includes('Range: "bytes=0-0"') &&
+      verifier.includes('credentials: "omit"') &&
       verifier.includes("AbortController") &&
       verifier.includes("response.body?.cancel()") &&
       verifier.includes('url.hostname === "coupang.com" || url.hostname.endsWith(".coupang.com")') &&
       verifier.includes("url.port || url.username || url.password") &&
       verifier.includes("RESOLVED_PRODUCT_ACCESS_LIMITED") &&
       verifier.includes("REDIRECT_BLOCKED"),
-    "admin link checks follow only bounded HTTPS Coupang redirects, cancel response bodies, and tolerate upstream access limits",
+    "admin link checks follow only bounded HTTPS Coupang redirects, request no more than a byte before cancelling response bodies, and tolerate upstream access limits",
     "required"
   );
   check(
