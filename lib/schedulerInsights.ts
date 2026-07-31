@@ -1,6 +1,7 @@
 import { listProducts, listSourcingRuns, listTelegramLogs } from "@/lib/dataStore";
 import { isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { getDiscountRate } from "@/lib/dealIntelligence";
+import { getDealFreshness } from "@/lib/dealFreshness";
 import { getApiReadinessSummary } from "@/lib/apiReadiness";
 import { getCustomerPublishReadiness } from "@/lib/quality";
 import { isPublicDealReady } from "@/lib/publicDeal";
@@ -42,6 +43,9 @@ function productIssueLabels(product: ProductWithScore) {
   if (!product.return_price) issues.push("반품가 확인");
   if (["확인필요", "알수없음"].includes(product.condition_grade)) issues.push("반품등급 확인");
   if (product.stock_count === 0) issues.push("품절 처리");
+  const freshness = getDealFreshness(product);
+  if (freshness.status === "stale") issues.push("자동 수집 24시간 경과");
+  if (freshness.status === "unknown") issues.push("자동 수집 시각 확인");
   if ((getLatestScore(product)?.risk_flags.length ?? 0) > 2) issues.push("위험 플래그 재검토");
   return issues;
 }
@@ -68,10 +72,7 @@ export async function getSchedulerInsights() {
   const reviewQueue = allProducts.filter((product) => ["needs_review", "approved"].includes(product.sourcing_status));
   const missingAffiliate = published.filter((product) => !isUsableAffiliateUrl(product.affiliate_url));
   const qualityBlockedPublished = published.filter((product) => !isPublicDealReady(product));
-  const stalePublished = published.filter((product) => {
-    const snapshotAge = minutesSince(product.latest_snapshot?.observed_at ?? product.snapshots?.[0]?.observed_at);
-    return snapshotAge == null || snapshotAge > 24 * 60;
-  });
+  const stalePublished = published.filter((product) => getDealFreshness(product).status !== "fresh");
   const telegramCandidates = published
     .filter(isPublicDealReady)
     .filter((product) => product.stock_count !== 0)
@@ -104,7 +105,7 @@ export async function getSchedulerInsights() {
       score: getLatestScore(product)?.total_score ?? 0,
       issues: productIssueLabels(product),
       affiliate_ready: isUsableAffiliateUrl(product.affiliate_url),
-      snapshot_age_minutes: minutesSince(product.latest_snapshot?.observed_at ?? product.snapshots?.[0]?.observed_at)
+      snapshot_age_minutes: minutesSince(getDealFreshness(product).observedAt)
     }));
 
   return {

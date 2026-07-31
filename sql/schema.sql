@@ -7,7 +7,7 @@ create table if not exists returnpick_schema_meta (
 );
 
 insert into returnpick_schema_meta (key, value, updated_at)
-values ('schema_version', '2026-07-31-telegram-target-logs', now())
+values ('schema_version', '2026-07-31-product-observation-time', now())
 on conflict (key)
 do update set value = excluded.value, updated_at = now();
 
@@ -53,9 +53,13 @@ create table if not exists sourced_products (
   rejection_reason text,
   admin_memo text,
   public_note text,
+  last_observed_at timestamptz,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
+
+alter table sourced_products
+  add column if not exists last_observed_at timestamptz;
 
 create or replace function is_strict_coupang_partners_url(value text)
 returns boolean as $$
@@ -177,6 +181,8 @@ create unique index if not exists sourcing_keywords_keyword_category_key
 
 create index if not exists sourced_products_status_idx on sourced_products (sourcing_status);
 create index if not exists sourced_products_published_idx on sourced_products (is_published, sourcing_status);
+create index if not exists sourced_products_published_observed_idx
+  on sourced_products (is_published, last_observed_at desc);
 create index if not exists sourced_products_status_category_created_idx
   on sourced_products (sourcing_status, category, created_at desc);
 create index if not exists sourced_products_published_status_created_idx

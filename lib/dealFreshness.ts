@@ -32,8 +32,8 @@ export function getDealFreshnessFromTimestamps(values: Array<string | null | und
       status: "unknown",
       observedAt: null,
       ageHours: null,
-      label: "확인 시각 없음",
-      description: "가격·재고 관찰 시각이 없어 쿠팡에서 최신 조건을 먼저 확인해야 합니다."
+      label: "수집 시각 없음",
+      description: "자동 수집 시각이 없어 쿠팡에서 현재 가격·재고·반품 조건을 먼저 확인해야 합니다."
     };
   }
 
@@ -44,8 +44,8 @@ export function getDealFreshnessFromTimestamps(values: Array<string | null | und
       status: "fresh",
       observedAt: latest.value,
       ageHours,
-      label: "24시간 이내 확인",
-      description: "마지막 수집 기준입니다. 실시간 가격과 재고는 쿠팡에서 최종 확인하세요."
+      label: "24시간 내 수집",
+      description: "마지막 자동 수집 시각입니다. 현재 가격·재고·배송·반품 조건은 쿠팡에서 최종 확인하세요."
     };
   }
 
@@ -54,11 +54,15 @@ export function getDealFreshnessFromTimestamps(values: Array<string | null | und
     observedAt: latest.value,
     ageHours,
     label: "재확인 우선",
-    description: "마지막 수집 후 24시간이 지났습니다. 가격·재고·반품등급을 쿠팡에서 먼저 확인하세요."
+    description: "마지막 자동 수집 후 24시간이 지났습니다. 가격·재고·반품 조건을 쿠팡에서 먼저 확인하세요."
   };
 }
 
 export function getDealFreshness(product: ProductWithScore, nowMs = Date.now()) {
+  if (product.last_observed_at && Number.isFinite(new Date(product.last_observed_at).getTime())) {
+    return getDealFreshnessFromTimestamps([product.last_observed_at], nowMs);
+  }
+
   return getDealFreshnessFromTimestamps(
     [
       product.latest_snapshot?.observed_at,

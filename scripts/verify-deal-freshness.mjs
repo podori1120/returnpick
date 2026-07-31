@@ -12,7 +12,7 @@ const output = ts.transpileModule(source, {
 const loadedModule = { exports: {} };
 new Function("exports", "module", "require", output)(loadedModule.exports, loadedModule, require);
 
-const { getDealFreshnessFromTimestamps } = loadedModule.exports;
+const { getDealFreshness, getDealFreshnessFromTimestamps } = loadedModule.exports;
 const now = Date.parse("2026-07-31T12:00:00.000Z");
 
 assert.equal(getDealFreshnessFromTimestamps(["2026-07-31T11:00:00.000Z"], now).status, "fresh");
@@ -28,4 +28,14 @@ assert.equal(latest.status, "fresh");
 assert.equal(latest.observedAt, "2026-07-31T10:00:00.000Z");
 assert.equal(latest.ageHours, 2);
 
-console.log("Deal freshness checks passed: fresh boundary, stale state, unknown state, and latest observation selection.");
+const freshSnapshot = { observed_at: "2026-07-31T11:00:00.000Z" };
+assert.equal(
+  getDealFreshness({ last_observed_at: "2026-07-30T11:00:00.000Z", latest_snapshot: freshSnapshot }, now).status,
+  "stale"
+);
+assert.equal(getDealFreshness({ last_observed_at: null, latest_snapshot: freshSnapshot }, now).status, "fresh");
+assert.equal(getDealFreshness({ last_observed_at: "2026-07-31T11:00:00.000Z" }, now).status, "fresh");
+
+console.log(
+  "Deal freshness checks passed: 24-hour boundary, unknown state, source observation precedence, and legacy snapshot fallback."
+);

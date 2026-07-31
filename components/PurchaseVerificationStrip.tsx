@@ -16,11 +16,11 @@ export default function PurchaseVerificationStrip({ freshness }: { freshness: De
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <Clock3 size={17} className="text-pine" aria-hidden />
-          <p className="text-sm font-black">마지막 가격·재고 관찰</p>
+          <p className="text-sm font-black">마지막 상품 자동 수집</p>
           <span className={`rounded-md px-2 py-1 text-xs font-black ${freshnessTone(freshness.status)}`}>{freshness.label}</span>
         </div>
         <p className="mt-2 text-sm font-black text-ink">
-          {freshness.observedAt ? formatDate(freshness.observedAt) : "관찰 기록 확인필요"}
+          {freshness.observedAt ? formatDate(freshness.observedAt) : "자동 수집 기록 확인필요"}
         </p>
         <p className="mt-1 text-xs font-semibold leading-5 text-steel">{freshness.description}</p>
       </div>

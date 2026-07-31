@@ -798,7 +798,7 @@ if (fileExists("sql/schema.sql")) {
   const schema = readText("sql/schema.sql");
   check(
     "schema version marker",
-    schema.includes("returnpick_schema_meta") && schema.includes("2026-07-31-telegram-target-logs") && schema.includes("schema_version"),
+    schema.includes("returnpick_schema_meta") && schema.includes("2026-07-31-product-observation-time") && schema.includes("schema_version"),
     "schema.sql writes a launch-ready schema version marker for admin readiness",
     "required"
   );
@@ -833,10 +833,20 @@ if (fileExists("sql/schema.sql")) {
     "required"
   );
   check("schema keyword uniqueness", schema.includes("keyword_key") && schema.includes("sourcing_keywords_keyword_category_key"), "sourcing keywords are unique by normalized keyword and category", "required");
+  check(
+    "schema product observation time",
+    schema.includes("last_observed_at timestamptz") &&
+      schema.includes("add column if not exists last_observed_at timestamptz") &&
+      !schema.includes("last_observed_at timestamptz default now()") &&
+      schema.includes("sourced_products_published_observed_idx"),
+    "automatic resourcing has a nullable first-class observation time without making legacy rows falsely fresh",
+    "required"
+  );
   const operationalIndexes = [
     "sourced_products_status_category_created_idx",
     "sourced_products_published_status_created_idx",
     "sourced_products_public_affiliate_ready_idx",
+    "sourced_products_published_observed_idx",
     "sourcing_runs_started_idx",
     "sourcing_runs_status_started_idx",
     "telegram_logs_created_idx",
@@ -1561,11 +1571,12 @@ if (fileExists("lib/dealFreshness.ts") && fileExists("components/PurchaseVerific
   check(
     "public detail: observed data freshness beside purchase CTA",
     freshness.includes('export type DealFreshnessStatus = "fresh" | "stale" | "unknown"') &&
+      freshness.includes("product.last_observed_at") &&
       freshness.includes("product.latest_snapshot?.observed_at") &&
       freshness.includes("FRESH_WINDOW_MS = 24 * 60 * 60 * 1000") &&
       !freshness.includes("product.updated_at") &&
       verificationStrip.includes('data-freshness-status={freshness.status}') &&
-      verificationStrip.includes("마지막 가격·재고 관찰") &&
+      verificationStrip.includes("마지막 상품 자동 수집") &&
       verificationStrip.includes("동일 모델·용량·색상") &&
       verificationStrip.includes("현재 가격·재고·배송") &&
       verificationStrip.includes("반품등급·구성품·교환 조건") &&
@@ -3447,6 +3458,15 @@ if (fileExists("lib/schedulerInsights.ts")) {
     "required"
   );
   check(
+    "admin: scheduler insights use source observation time",
+    schedulerInsights.includes("getDealFreshness") &&
+      schedulerInsights.includes('freshness.status === "stale"') &&
+      schedulerInsights.includes('freshness.status === "unknown"') &&
+      schedulerInsights.includes('getDealFreshness(product).status !== "fresh"'),
+    "admin action queues explain stale or missing automatic source observations using the same 24-hour rule as the purchase page",
+    "required"
+  );
+  check(
     "admin: scheduler insights blocking item details",
     schedulerInsights.includes("getSchedulerBlockingItems") &&
       schedulerInsights.includes("getSchedulerOperatorAction") &&
@@ -3460,6 +3480,10 @@ if (fileExists("lib/schedulerInsights.ts")) {
 if (fileExists("app/api/admin/sourcing/run/route.ts") && fileExists("lib/dataStore.ts")) {
   const sourcingRunRoute = readText("app/api/admin/sourcing/run/route.ts");
   const dataStore = readText("lib/dataStore.ts");
+  const updateProductBody = dataStore.slice(
+    dataStore.indexOf("export async function updateProduct"),
+    dataStore.indexOf("export async function createDealScore")
+  );
   check(
     "admin: sourcing run list ignores launch markers",
     sourcingRunRoute.includes("listSourcingExecutionRuns") &&
@@ -3502,6 +3526,14 @@ if (fileExists("app/api/admin/sourcing/run/route.ts") && fileExists("lib/dataSto
       dataStore.includes("...preserveExistingReviewFields(existing, payload)") &&
       dataStore.includes("...preserveExistingReviewFields(memoryProducts[existingIndex], payload)"),
     "hourly resourcing keeps manual return price, condition, stock, public notes, verified images, and product-level affiliate links when providers return weak or empty values",
+    "required"
+  );
+  check(
+    "data store: source observation is automatic-only",
+    dataStore.includes("last_observed_at: input.last_observed_at ?? stamp") &&
+      dataStore.includes("export async function upsertSourcedProduct") &&
+      !updateProductBody.includes("last_observed_at"),
+    "automatic sourcing refreshes last_observed_at while ordinary admin edits do not impersonate a source observation",
     "required"
   );
 }

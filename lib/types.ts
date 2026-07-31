@@ -94,6 +94,7 @@ export interface SourcedProduct {
   rejection_reason: string | null;
   admin_memo: string | null;
   public_note: string | null;
+  last_observed_at: string | null;
   created_at: string;
   updated_at: string;
 }

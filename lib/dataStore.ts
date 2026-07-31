@@ -133,6 +133,7 @@ function makeProduct(input: ProductInput): SourcedProduct {
     rejection_reason: input.rejection_reason ?? null,
     admin_memo: input.admin_memo ?? null,
     public_note: input.public_note ?? null,
+    last_observed_at: input.last_observed_at ?? stamp,
     created_at: input.created_at ?? stamp,
     updated_at: input.updated_at ?? stamp
   };
