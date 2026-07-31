@@ -73,6 +73,8 @@ API 키가 없어도 로컬에서는 330개 안팎의 검수 샘플 카탈로그
 
 주의: 로컬 개발에서는 `ADMIN_PASSWORD`를 비워도 mock UI 확인이 가능하지만, Vercel 배포 환경에서는 `ADMIN_PASSWORD`가 없으면 관리자 API가 `ADMIN_PASSWORD_NOT_CONFIGURED`로 닫힙니다. 운영 배포 전 반드시 관리자 비밀번호를 등록하세요.
 
+브라우저 관리자 로그인은 `ADMIN_PASSWORD`를 한 번 확인한 뒤 8시간 동안 유효한 서명 세션을 `HttpOnly`, `Secure`, `SameSite=Strict` 쿠키로 발급합니다. 비밀번호는 localStorage에 저장하지 않으며, 예전 버전이 저장한 `returnpick_admin_password` 값도 관리자 화면 진입 시 삭제합니다. 운영 점검 CLI의 `x-admin-password` 헤더 방식은 자동화 호환용으로 계속 지원합니다.
+
 직접 `vercel deploy`로 배포할 때도 로컬 `.env.production`, `.env.local`, `.returnpick` 개발 저장소, 빌드 산출물이 업로드되지 않도록 `.vercelignore`를 포함했습니다. 실제 운영 키는 Vercel Environment Variables에만 넣고, 로컬 env 파일은 점검용으로만 사용하세요.
 
 운영 준비 기능이 로컬에만 있고 GitHub에는 빠지는 상황을 막기 위해 배포 전 아래 검사를 실행합니다. 핵심 운영 파일이 Git에 추적되는지, 작업트리가 깨끗한지, 현재 브랜치가 원격과 일치하는지 확인합니다. `deploy:production:launch`와 `deploy:production:go-live`도 이 검사를 가장 먼저 실행하고 실패하면 Vercel 배포를 시작하지 않습니다.

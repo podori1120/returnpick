@@ -61,7 +61,9 @@ const adminUiRequiredText = [
   "상품별 링크 보강",
   "품질 보강 대기",
   "링크 보강 큐로 이동",
-  "품질 보강 후보로 이동"
+  "품질 보강 후보로 이동",
+  "/api/admin/session",
+  "returnpick_admin_password"
 ];
 const maxAdminScriptChunksToScan = 25;
 const maxAdminScriptChunkCharacters = 1_500_000;
@@ -271,6 +273,20 @@ function checkAdminLaunchApiProtection(response, json) {
   }
 }
 
+function checkAdminSessionProtection(response, json) {
+  const errorText = String(json?.error ?? json?.code ?? json?.message ?? json?.raw_text ?? "").trim();
+  const expectedBlocks = ["UNAUTHORIZED", "ADMIN_PASSWORD_NOT_CONFIGURED", "ADMIN_PASSWORD_WEAK_CONFIGURATION"];
+  if (response.status === 404 || response.status === 405) {
+    fail("admin session protection", `/api/admin/session returned ${response.status}; session route may be missing`);
+  } else if (response.status < 400) {
+    fail("admin session protection", `/api/admin/session exposed an authenticated session without credentials (${response.status})`);
+  } else if (!expectedBlocks.some((code) => errorText.toUpperCase().includes(code))) {
+    fail("admin session protection", `/api/admin/session returned ${response.status} with an unexpected auth response: ${errorText || "empty body"}`);
+  } else {
+    pass("admin session protection", `unauthenticated session probe is blocked with ${response.status} (${errorText})`);
+  }
+}
+
 function staticScriptSourcesFromHtml(html) {
   return [
     ...new Set(
@@ -477,6 +493,15 @@ async function main() {
     checkPrivateRouteHeaders("admin api headers", api.response);
   } catch (error) {
     fail("admin api headers", error instanceof Error ? error.message : "fetch failed");
+  }
+
+  try {
+    const sessionApi = await readJson("/api/admin/session");
+    checkPrivateRouteHeaders("admin session api headers", sessionApi.response);
+    checkAdminSessionProtection(sessionApi.response, sessionApi.json);
+  } catch (error) {
+    fail("admin session api headers", error instanceof Error ? error.message : "GET failed");
+    fail("admin session protection", error instanceof Error ? error.message : "GET failed");
   }
 
   try {

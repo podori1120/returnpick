@@ -172,6 +172,7 @@ const requiredFiles = [
   "app/api/admin/launch/route.ts",
   "app/api/admin/prices/backfill/route.ts",
   "app/api/admin/products/route.ts",
+  "app/api/admin/session/route.ts",
   "app/api/admin/telegram/route.ts",
   "app/api/cron/sourcing/route.ts",
   "app/api/cron/telegram-digest/route.ts",
@@ -328,6 +329,8 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-readines
       productionVerifier.includes("checkPublicSecurityHeaders") &&
       productionVerifier.includes("checkPrivateRouteHeaders") &&
       productionVerifier.includes("checkAdminLaunchApiProtection") &&
+      productionVerifier.includes("checkAdminSessionProtection") &&
+      productionVerifier.includes("/api/admin/session") &&
       productionVerifier.includes("public security headers") &&
       productionVerifier.includes("admin route headers") &&
       productionVerifier.includes("admin api headers") &&
@@ -346,7 +349,7 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-readines
       productionVerifier.includes("requiredConnectionCheckIds") &&
       productionVerifier.includes("nofollow sponsored noopener noreferrer") &&
       productionVerifier.includes("--strict-scheduler"),
-    "production verifier checks approval-page evidence, disclosure evidence, robots/sitemap coverage, deployment headers, launch API protection, deployed admin repair UI chunks, admin live checks, required cards, scheduler health, and local production env files without embedding secrets",
+    "production verifier checks approval-page evidence, disclosure evidence, robots/sitemap coverage, deployment headers, launch/session API protection, deployed admin repair UI chunks, admin live checks, required cards, scheduler health, and local production env files without embedding secrets",
     "required"
   );
   check(
@@ -1724,6 +1727,35 @@ if (fileExists("lib/validators.ts")) {
       validators.includes("raw.length < 12") &&
       validators.includes("looksLikePlaceholder"),
     "production admin API rejects missing, short, or placeholder ADMIN_PASSWORD values before checking requests",
+    "required"
+  );
+  check(
+    "admin auth: signed scoped session",
+    validators.includes("ADMIN_SESSION_COOKIE") &&
+      validators.includes("ADMIN_SESSION_MAX_AGE_SECONDS") &&
+      validators.includes('createHmac("sha256"') &&
+      validators.includes("timingSafeEqual") &&
+      validators.includes("verifyAdminSessionToken") &&
+      validators.includes("ADMIN_SESSION_ORIGIN_MISMATCH"),
+    "browser admin authentication uses a bounded signed session and rejects cross-origin cookie mutations",
+    "required"
+  );
+}
+
+if (fileExists("app/api/admin/session/route.ts") && fileExists("components/AdminLogin.tsx")) {
+  const sessionRoute = readText("app/api/admin/session/route.ts");
+  const adminLogin = readText("components/AdminLogin.tsx");
+  check(
+    "admin auth: HttpOnly session lifecycle",
+    sessionRoute.includes('path: "/api/admin"') &&
+      sessionRoute.includes("httpOnly: true") &&
+      sessionRoute.includes('sameSite: "strict"') &&
+      sessionRoute.includes('secure: process.env.NODE_ENV === "production"') &&
+      sessionRoute.includes("maxAge: ADMIN_SESSION_MAX_AGE_SECONDS") &&
+      sessionRoute.includes("export async function DELETE") &&
+      adminLogin.includes('fetch("/api/admin/session"') &&
+      !adminLogin.includes("localStorage"),
+    "admin password is exchanged once for a scoped HttpOnly cookie and is not persisted by the login form",
     "required"
   );
 }
@@ -3278,6 +3310,15 @@ if (fileExists("components/AdminSchedulerPanel.tsx")) {
 
 if (fileExists("app/admin/page.tsx")) {
   const adminPage = readText("app/admin/page.tsx");
+  check(
+    "admin auth: legacy password storage removed",
+    adminPage.includes('fetch("/api/admin/session"') &&
+      adminPage.includes('window.localStorage.removeItem("returnpick_admin_password")') &&
+      !adminPage.includes("localStorage.setItem") &&
+      adminPage.includes('const password = ""'),
+    "admin clears the legacy saved password and uses the cookie session without forwarding the real password to child components",
+    "required"
+  );
   check(
     "admin: launch status bar mounted first",
     adminPage.includes("AdminLaunchStatusBar") &&

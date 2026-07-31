@@ -16,12 +16,27 @@ import AdminSourcingRunner from "@/components/AdminSourcingRunner";
 import { scrollToAdminAnchor } from "@/lib/adminNavigation";
 
 export default function AdminPage() {
-  const [password, setPassword] = useState<string | null>(null);
+  const [authState, setAuthState] = useState<"checking" | "anonymous" | "authenticated">("checking");
   const [refreshToken, setRefreshToken] = useState(0);
-  const handleLogin = useCallback((nextPassword: string) => setPassword(nextPassword), []);
+  const handleLogin = useCallback(() => setAuthState("authenticated"), []);
 
   useEffect(() => {
-    if (password === null) return;
+    window.localStorage.removeItem("returnpick_admin_password");
+    let cancelled = false;
+    fetch("/api/admin/session", { cache: "no-store" })
+      .then((response) => {
+        if (!cancelled) setAuthState(response.ok ? "authenticated" : "anonymous");
+      })
+      .catch(() => {
+        if (!cancelled) setAuthState("anonymous");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (authState !== "authenticated") return;
     let hashScrollTimer: number | undefined;
 
     function scrollToHashTarget() {
@@ -44,9 +59,14 @@ export default function AdminPage() {
       window.clearTimeout(hashScrollTimer);
       window.removeEventListener("hashchange", scrollToHashTarget);
     };
-  }, [password]);
+  }, [authState]);
 
-  if (password === null) return <AdminLogin onLogin={handleLogin} />;
+  if (authState === "checking") {
+    return <p className="mx-auto mt-16 max-w-md rounded-lg border border-line bg-white p-6 text-center text-sm font-bold text-steel shadow-soft">관리자 세션 확인 중</p>;
+  }
+  if (authState === "anonymous") return <AdminLogin onLogin={handleLogin} />;
+
+  const password = "";
 
   return (
     <main className="mx-auto max-w-7xl space-y-5 px-4 py-8 sm:px-6">
@@ -57,9 +77,12 @@ export default function AdminPage() {
         </div>
         <button
           className="focus-ring rounded-lg border border-line bg-white px-4 py-2 text-sm font-black hover:bg-mist"
-          onClick={() => {
-            window.localStorage.removeItem("returnpick_admin_password");
-            setPassword(null);
+          onClick={async () => {
+            try {
+              await fetch("/api/admin/session", { method: "DELETE" });
+            } finally {
+              setAuthState("anonymous");
+            }
           }}
           type="button"
         >
