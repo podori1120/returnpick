@@ -1981,6 +1981,14 @@ if (
     "customer-facing purchase, comparison, and affiliate disclosure copy stays readable Korean",
     "required"
   );
+  check(
+    "affiliate notice links to full disclosure",
+    affiliateNotice.includes('import Link from "next/link"') &&
+      affiliateNotice.includes('href="/disclosure"') &&
+      affiliateNotice.includes("쿠팡 파트너스 안내 자세히 보기"),
+    "the shared affiliate notice keeps a visible, internal handoff to the full disclosure page",
+    "required"
+  );
 }
 
 if (fileExists("lib/adminNavigation.ts") && fileExists("app/globals.css")) {
