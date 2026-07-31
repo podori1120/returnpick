@@ -75,6 +75,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 제휴 안내
               </Link>
               <Link className="text-pine hover:text-ink" href="/products/approval-sample">
+                파트너스 심사 페이지
+              </Link>
+              <Link className="text-pine hover:text-ink" href="/picks/novatech-s1-window-cleaner">
                 직접 검수 추천 상품
               </Link>
             </div>

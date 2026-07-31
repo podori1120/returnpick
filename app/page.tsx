@@ -34,7 +34,7 @@ export default async function HomePage() {
               <Link className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink" href="/deals">
                 검수 완료 딜 보기 <ArrowRight size={16} aria-hidden />
               </Link>
-              <Link className="focus-ring rounded-lg border border-pine bg-white px-5 py-3 text-sm font-black text-pine hover:bg-pine hover:text-white" href="/products/approval-sample">
+              <Link className="focus-ring rounded-lg border border-pine bg-white px-5 py-3 text-sm font-black text-pine hover:bg-pine hover:text-white" href="/picks/novatech-s1-window-cleaner">
                 직접 검수 추천 상품
               </Link>
               <Link className="focus-ring rounded-lg border border-line px-5 py-3 text-sm font-black hover:bg-mist" href="/guide/return-checklist">

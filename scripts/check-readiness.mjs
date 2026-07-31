@@ -176,6 +176,7 @@ const requiredFiles = [
   "app/api/cron/sourcing/route.ts",
   "app/api/cron/telegram-digest/route.ts",
   "app/api/events/route.ts",
+  "app/picks/novatech-s1-window-cleaner/page.tsx",
   "components/AdminLaunchStatusBar.tsx",
   "components/ApprovalSampleCard.tsx",
   "components/AdminApiReadinessPanel.tsx",
@@ -374,8 +375,9 @@ if (fileExists("app/robots.ts") && fileExists("app/sitemap.ts")) {
       sitemap.includes('/guide/return-checklist') &&
       sitemap.includes('/guide/safe-categories') &&
       sitemap.includes('/disclosure') &&
-      sitemap.includes('/products/approval-sample'),
-    "robots protects admin/API while sitemap exposes core public, guide, disclosure, and approval routes",
+      sitemap.includes('/picks/novatech-s1-window-cleaner') &&
+      !sitemap.includes('/products/approval-sample'),
+    "robots protects admin/API while sitemap exposes core public, guide, disclosure, and indexable editorial routes",
     "required"
   );
 }
@@ -1266,14 +1268,64 @@ if (
   check(
     "approval sample: measured explicit affiliate click",
     approvalButton.includes("trackAffiliateEvent") &&
-      approvalButton.includes('channel: "web_approval_sample"') &&
-      approvalButton.includes('context: "approval_sample"') &&
-      eventRoute.includes("isApprovalSampleTrackingRequest") &&
+      approvalButton.includes('channel = "web_approval_sample"') &&
+      approvalButton.includes('context = "approval_sample"') &&
+      eventRoute.includes("isManualAffiliateTrackingRequest") &&
       eventRoute.includes("NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL") &&
       eventRoute.includes('fetchSite !== "same-origin"') &&
-      eventRoute.includes('referrerUrl.pathname === "/products/approval-sample"') &&
+      eventRoute.includes("referrerUrl.origin !== requestUrl.origin") &&
+      eventRoute.includes('pathname: "/products/approval-sample"') &&
       opsDashboard.includes('web_approval_sample: "직접 검수 추천 CTA"'),
     "the manual approval product records only explicit same-page affiliate clicks and exposes the channel in admin metrics",
+    "required"
+  );
+}
+
+if (
+  fileExists("app/picks/novatech-s1-window-cleaner/page.tsx") &&
+  fileExists("app/api/events/route.ts") &&
+  fileExists("components/AffiliateEventTracker.tsx") &&
+  fileExists("app/sitemap.ts")
+) {
+  const editorialPickPage = readText("app/picks/novatech-s1-window-cleaner/page.tsx");
+  const eventRoute = readText("app/api/events/route.ts");
+  const eventTracker = readText("components/AffiliateEventTracker.tsx");
+  const sitemap = readText("app/sitemap.ts");
+  const approvalData = readText("lib/approvalSample.ts");
+  check(
+    "editorial pick: indexable verified product funnel",
+    editorialPickPage.includes('title: "Novatech S1 창문 로봇청소기 구매 전 체크"') &&
+      editorialPickPage.includes('robots: {') &&
+      editorialPickPage.includes('index: true') &&
+      editorialPickPage.includes('"@type": "Product"') &&
+      editorialPickPage.includes('"@type": "FAQPage"') &&
+      editorialPickPage.includes("approvalSampleProduct.coupangProductNumber") &&
+      editorialPickPage.includes('value: "쿠팡에서 실시간 확인"') &&
+      editorialPickPage.includes("이 포스팅은 쿠팡 파트너스 활동의 일환으로") &&
+      editorialPickPage.includes('context="editorial_pick"') &&
+      !editorialPickPage.includes('"offers"') &&
+      !editorialPickPage.includes("priceCurrency") &&
+      !editorialPickPage.includes("https://schema.org/InStock") &&
+      approvalData.includes('detailPath: "/picks/novatech-s1-window-cleaner"'),
+    "the customer-facing manual pick is indexable, disclosed, and contains no invented offer, price, stock, or availability data",
+    "required"
+  );
+  check(
+    "editorial pick: bounded product-less attribution",
+    eventRoute.includes('context: "editorial_pick"') &&
+      eventRoute.includes('pathname: "/picks/novatech-s1-window-cleaner"') &&
+      eventRoute.includes('affiliateClickChannel: "web_editorial_pick"') &&
+      eventRoute.includes('telegramDetailChannel: "telegram_editorial_pick"') &&
+      eventTracker.includes("EditorialPickViewTracker") &&
+      eventTracker.includes('context: "editorial_pick"') &&
+      eventTracker.includes('channel: isTelegramLanding ? "telegram_editorial_pick" : "web_editorial_pick"'),
+    "only the allowlisted editorial path can record product-less views and explicit affiliate clicks",
+    "required"
+  );
+  check(
+    "editorial pick: sitemap separates customer and review pages",
+    sitemap.includes('/picks/novatech-s1-window-cleaner') && !sitemap.includes('/products/approval-sample'),
+    "the indexable customer page is discoverable while the noindex Coupang review page stays out of the sitemap",
     "required"
   );
 }

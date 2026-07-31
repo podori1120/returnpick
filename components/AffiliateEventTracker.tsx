@@ -38,3 +38,19 @@ export function DealViewTracker({ productId, title }: { productId: string; title
 
   return null;
 }
+
+export function EditorialPickViewTracker() {
+  useEffect(() => {
+    const currentUtmSource = getCurrentUtmSource();
+    const utmSource = currentUtmSource ?? getUtmSource();
+    const isTelegramLanding = currentUtmSource === "telegram";
+    trackAffiliateEvent({
+      eventType: isTelegramLanding ? "telegram_detail_click" : "detail_view",
+      channel: isTelegramLanding ? "telegram_editorial_pick" : "web_editorial_pick",
+      utmSource,
+      context: "editorial_pick"
+    });
+  }, []);
+
+  return null;
+}

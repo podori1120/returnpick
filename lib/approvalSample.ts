@@ -9,6 +9,7 @@ export const approvalSampleProduct = {
   imageSrc: "/images/window-cleaning-robot-editorial.webp",
   imageAlt: "안전줄을 연결한 창문청소 로봇이 유리창에 부착된 연출 이미지",
   imageNotice: "제품 이해를 돕는 연출 이미지입니다. 실제 외관과 구성품은 쿠팡 상품 페이지에서 확인하세요.",
-  detailPath: "/products/approval-sample",
+  detailPath: "/picks/novatech-s1-window-cleaner",
+  approvalPath: "/products/approval-sample",
   highlights: ["5800Pa", "자동 물 분사", "안전줄 확인"]
 } as const;

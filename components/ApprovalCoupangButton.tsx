@@ -1,16 +1,27 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
-import { getUtmSource, trackAffiliateEvent } from "@/lib/clientTracking";
+import {
+  getCurrentUtmSource,
+  getUtmSource,
+  trackAffiliateEvent,
+  type ManualAffiliateEventContext
+} from "@/lib/clientTracking";
 
 export default function ApprovalCoupangButton({
   href,
   className = "focus-ring mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink",
-  label = "쿠팡에서 가격 확인"
+  label = "쿠팡에서 가격 확인",
+  channel = "web_approval_sample",
+  telegramChannel,
+  context = "approval_sample"
 }: {
   href: string;
   className?: string;
   label?: string;
+  channel?: string;
+  telegramChannel?: string;
+  context?: ManualAffiliateEventContext;
 }) {
   return (
     <a
@@ -19,11 +30,13 @@ export default function ApprovalCoupangButton({
       target="_blank"
       rel="nofollow sponsored noopener noreferrer"
       onClick={(event) => {
+        const currentUtmSource = getCurrentUtmSource();
+        const utmSource = currentUtmSource ?? getUtmSource();
         trackAffiliateEvent({
           eventType: "affiliate_click",
-          channel: "web_approval_sample",
-          utmSource: getUtmSource(),
-          context: "approval_sample"
+          channel: currentUtmSource === "telegram" && telegramChannel ? telegramChannel : channel,
+          utmSource,
+          context
         });
 
         if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;

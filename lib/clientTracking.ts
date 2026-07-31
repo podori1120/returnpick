@@ -1,5 +1,7 @@
 import type { AffiliateEventType } from "@/lib/types";
 
+export type ManualAffiliateEventContext = "approval_sample" | "editorial_pick";
+
 const sessionKey = "returnpick_anon_session_id";
 const utmSourceKey = "returnpick_utm_source";
 const utmSourceAtKey = "returnpick_utm_source_at";
@@ -112,7 +114,7 @@ export function trackAffiliateEvent(input: {
   eventType: AffiliateEventType;
   channel?: string;
   utmSource?: string | null;
-  context?: "approval_sample";
+  context?: ManualAffiliateEventContext;
 }) {
   if (typeof window === "undefined") return;
   try {

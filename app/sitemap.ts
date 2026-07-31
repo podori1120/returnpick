@@ -10,7 +10,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/guide/return-checklist", changeFrequency: "monthly", priority: 0.4 },
     { path: "/guide/safe-categories", changeFrequency: "monthly", priority: 0.4 },
     { path: "/disclosure", changeFrequency: "yearly", priority: 0.2 },
-    { path: "/products/approval-sample", changeFrequency: "monthly", priority: 0.3 }
+    { path: "/picks/novatech-s1-window-cleaner", changeFrequency: "weekly", priority: 0.8 }
   ];
 
   return entries.map((entry) => ({

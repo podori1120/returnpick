@@ -5,8 +5,22 @@ import { isPublicDealReady } from "@/lib/publicDeal";
 import type { AffiliateEventType } from "@/lib/types";
 
 const eventTypes = new Set<AffiliateEventType>(["impression", "detail_view", "affiliate_click", "telegram_detail_click", "share_copy"]);
-const approvalSampleEventContext = "approval_sample";
-const approvalSampleEventChannel = "web_approval_sample";
+const manualTrackingSurfaces = [
+  {
+    context: "approval_sample",
+    pathname: "/products/approval-sample",
+    affiliateClickChannel: "web_approval_sample",
+    detailViewChannel: null,
+    telegramDetailChannel: null
+  },
+  {
+    context: "editorial_pick",
+    pathname: "/picks/novatech-s1-window-cleaner",
+    affiliateClickChannel: "web_editorial_pick",
+    detailViewChannel: "web_editorial_pick",
+    telegramDetailChannel: "telegram_editorial_pick"
+  }
+] as const;
 
 function isEventType(value: unknown): value is AffiliateEventType {
   return typeof value === "string" && eventTypes.has(value as AffiliateEventType);
@@ -47,21 +61,32 @@ function cleanAnonSessionId(value: unknown) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(next) ? next : null;
 }
 
-function isApprovalSampleTrackingRequest(request: Request, body: Record<string, unknown>, channel: string | null) {
-  if (body.event_type !== "affiliate_click" || body.context !== approvalSampleEventContext || channel !== approvalSampleEventChannel) {
-    return false;
-  }
-
+function isManualAffiliateTrackingRequest(request: Request, body: Record<string, unknown>, channel: string | null) {
   if (!isCoupangPartnersLink(process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL)) return false;
+
+  const surface = manualTrackingSurfaces.find((item) => item.context === body.context);
+  if (!surface) return false;
+
+  const expectedChannel =
+    body.event_type === "affiliate_click"
+      ? surface.affiliateClickChannel
+      : body.event_type === "detail_view"
+        ? surface.detailViewChannel
+        : body.event_type === "telegram_detail_click"
+          ? surface.telegramDetailChannel
+          : null;
+  if (!expectedChannel || channel !== expectedChannel) return false;
 
   const requestReferrer = request.headers.get("referer");
   if (!requestReferrer) return false;
 
   try {
     const referrerUrl = new URL(requestReferrer);
+    const requestUrl = new URL(request.url);
     const fetchSite = request.headers.get("sec-fetch-site");
     if (fetchSite && fetchSite !== "same-origin") return false;
-    return referrerUrl.pathname === "/products/approval-sample";
+    if (referrerUrl.origin !== requestUrl.origin) return false;
+    return referrerUrl.pathname === surface.pathname;
   } catch {
     return false;
   }
@@ -77,20 +102,21 @@ export async function POST(request: Request) {
   if (!isEventType(body.event_type)) {
     return NextResponse.json({ error: "INVALID_EVENT_TYPE" }, { status: 400 });
   }
+  const eventType = body.event_type;
 
   const productId = cleanProductId(body.product_id);
   const channel = cleanTrackingLabel(body.channel, "web");
-  const approvalSampleClick = !productId && isApprovalSampleTrackingRequest(request, body, channel);
-  if (!productId && !approvalSampleClick) {
+  const manualAffiliateEvent = !productId && isManualAffiliateTrackingRequest(request, body, channel);
+  if (!productId && !manualAffiliateEvent) {
     return NextResponse.json({ ok: false, skipped: "PRODUCT_ID_REQUIRED" }, { status: 202 });
   }
 
   const referrer = cleanReferrer(body.referrer) ?? cleanReferrer(request.headers.get("referer"));
   try {
-    if (approvalSampleClick) {
+    if (manualAffiliateEvent) {
       const event = await createAffiliateEvent({
         product_id: null,
-        event_type: "affiliate_click",
+        event_type: eventType,
         channel,
         anon_session_id: cleanAnonSessionId(body.anon_session_id),
         referrer,
@@ -111,7 +137,7 @@ export async function POST(request: Request) {
 
     const event = await createAffiliateEvent({
       product_id: productId,
-      event_type: body.event_type,
+      event_type: eventType,
       channel,
       anon_session_id: cleanAnonSessionId(body.anon_session_id),
       referrer,

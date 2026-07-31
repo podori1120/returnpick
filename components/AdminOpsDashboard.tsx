@@ -123,6 +123,8 @@ function channelLabel(channel: string) {
   const labels: Record<string, string> = {
     web: "웹 기본",
     web_approval_sample: "직접 검수 추천 CTA",
+    web_editorial_pick: "추천 콘텐츠",
+    telegram_editorial_pick: "텔레그램 추천 콘텐츠",
     telegram: "텔레그램 기본",
     web_detail_hero: "상세 상단 CTA",
     telegram_detail_hero: "텔레그램 상단 CTA",
