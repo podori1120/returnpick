@@ -174,6 +174,7 @@ const requiredFiles = [
   "app/api/admin/launch/route.ts",
   "app/api/admin/prices/backfill/route.ts",
   "app/api/admin/products/route.ts",
+  "app/api/admin/products/import/route.ts",
   "app/api/admin/session/route.ts",
   "app/api/admin/telegram/route.ts",
   "app/api/cron/sourcing/route.ts",
@@ -191,6 +192,7 @@ const requiredFiles = [
   "components/AdminLaunchRunner.tsx",
   "components/AdminKeywordManager.tsx",
   "components/AdminCandidateTable.tsx",
+  "components/AdminManualProductBulkForm.tsx",
   "components/AdminEditorialTelegramCampaign.tsx",
   "components/AdminPriceBackfillPanel.tsx",
   "components/AdminProductEditor.tsx",
@@ -648,9 +650,19 @@ if (fileExists("app/deals/page.tsx")) {
   );
 }
 
-if (fileExists("app/api/admin/products/route.ts") && fileExists("components/AdminManualProductForm.tsx") && fileExists("app/admin/page.tsx")) {
+if (
+  fileExists("app/api/admin/products/route.ts") &&
+  fileExists("app/api/admin/products/import/route.ts") &&
+  fileExists("components/AdminManualProductForm.tsx") &&
+  fileExists("components/AdminManualProductBulkForm.tsx") &&
+  fileExists("components/AdminAffiliateLinkQueue.tsx") &&
+  fileExists("app/admin/page.tsx")
+) {
   const adminProductsRoute = readText("app/api/admin/products/route.ts");
+  const adminProductsImportRoute = readText("app/api/admin/products/import/route.ts");
   const manualProductForm = readText("components/AdminManualProductForm.tsx");
+  const manualProductBulkForm = readText("components/AdminManualProductBulkForm.tsx");
+  const affiliateLinkQueue = readText("components/AdminAffiliateLinkQueue.tsx");
   const adminPage = readText("app/admin/page.tsx");
   check(
     "admin sourcing: manual real-product draft intake",
@@ -669,11 +681,41 @@ if (fileExists("app/api/admin/products/route.ts") && fileExists("components/Admi
       manualProductForm.includes("검토 후보 추가") &&
       manualProductForm.includes("상품 ID") &&
       manualProductForm.includes("#admin-affiliate-links") &&
+      manualProductForm.includes("?candidate=${encodeURIComponent(createdProductId)}#admin-affiliate-links") &&
       manualProductForm.includes("affiliate_url") &&
       manualProductForm.includes("쿠팡 파트너스 링크 (선택)") &&
       manualProductForm.includes("목적지 확인") &&
       adminPage.includes("AdminManualProductForm"),
     "an authenticated admin can seed a real Coupang product with an optional strict Partners link into needs_review while keeping missing return data unfilled and reusing the existing review/publish gates",
+    "required"
+  );
+  check(
+    "admin sourcing: exact affiliate queue handoff",
+    affiliateLinkQueue.includes('new URLSearchParams(window.location.search).get("candidate")') &&
+      affiliateLinkQueue.includes("targetProductId") &&
+      affiliateLinkQueue.includes("bTarget - aTarget") &&
+      affiliateLinkQueue.includes("scrollToAdminAnchor(`admin-affiliate-product-${targetProductId}`)") &&
+      affiliateLinkQueue.includes('id={`admin-affiliate-product-${product.id}`}'),
+    "the manual intake success link focuses the exact new candidate without automatically verifying, opening, or publishing its affiliate destination",
+    "required"
+  );
+  check(
+    "admin sourcing: batch manual candidate intake",
+    adminProductsImportRoute.includes("requireAdmin(request)") &&
+      adminProductsImportRoute.includes("MAX_ROWS = 40") &&
+      adminProductsImportRoute.includes("isUsableCoupangProductUrl") &&
+      adminProductsImportRoute.includes("isUsableAffiliateUrl") &&
+      adminProductsImportRoute.includes("createDealScore") &&
+      adminProductsImportRoute.includes('return_price: null') &&
+      adminProductsImportRoute.includes('sourcing_status: "needs_review"') &&
+      adminProductsImportRoute.includes("is_published: false") &&
+      adminProductsImportRoute.includes("DUPLICATE_PRODUCT_ID") &&
+      manualProductBulkForm.includes("/api/admin/products/import") &&
+      manualProductBulkForm.includes("최대 40줄") &&
+      manualProductBulkForm.includes("후보 일괄 추가") &&
+      manualProductBulkForm.includes("검토 대기·비공개") &&
+      adminPage.includes("AdminManualProductBulkForm"),
+    "authenticated admins can add bounded real-product candidate rows in bulk while keeping every row unpublished and review-gated",
     "required"
   );
 }

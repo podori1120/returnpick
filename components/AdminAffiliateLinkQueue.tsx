@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Copy, ExternalLink, Link2, RefreshCw, Search, Upload, Wand2 } from "lucide-react";
 import { getAffiliateIdentityReadiness } from "@/lib/affiliateIdentity";
 import { getCategoryLabel } from "@/lib/category";
@@ -8,6 +8,7 @@ import { buildCoupangSearchUrl, isApprovalSampleAffiliateUrl, isCoupangPartnersL
 import { formatPrice } from "@/lib/format";
 import { getCustomerPublishReadiness } from "@/lib/quality";
 import { getNaverPriceTrust } from "@/lib/naverPriceTrust";
+import { scrollToAdminAnchor } from "@/lib/adminNavigation";
 import type { ProductWithScore } from "@/lib/types";
 
 function headers(password: string) {
@@ -237,6 +238,14 @@ export default function AdminAffiliateLinkQueue({
   const [linkVerifications, setLinkVerifications] = useState<Record<string, AffiliateLinkVerification & { checked_url: string }>>({});
   const [notice, setNotice] = useState<{ type: "info" | "success" | "error"; message: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [targetProductId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const candidateId = new URLSearchParams(window.location.search).get("candidate")?.trim() ?? "";
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidateId)
+      ? candidateId
+      : null;
+  });
+  const handledTargetRef = useRef<string | null>(null);
 
   async function loadProducts() {
     setLoading(true);
@@ -275,11 +284,13 @@ export default function AdminAffiliateLinkQueue({
         .filter((product) => (publishedOnly ? product.is_published || product.sourcing_status === "published" : true))
         .filter((product) => (query ? product.title.toLowerCase().includes(query.toLowerCase()) : true))
         .sort((a, b) => {
+          const aTarget = a.id === targetProductId ? 1 : 0;
+          const bTarget = b.id === targetProductId ? 1 : 0;
           const aPublished = a.is_published || a.sourcing_status === "published" ? 1 : 0;
           const bPublished = b.is_published || b.sourcing_status === "published" ? 1 : 0;
-          return bPublished - aPublished || (b.latest_score?.total_score ?? 0) - (a.latest_score?.total_score ?? 0);
+          return bTarget - aTarget || bPublished - aPublished || (b.latest_score?.total_score ?? 0) - (a.latest_score?.total_score ?? 0);
         }),
-    [products, publishedOnly, query]
+    [products, publishedOnly, query, targetProductId]
   );
   const publicReadyCount = products.filter(
     (product) =>
@@ -293,6 +304,15 @@ export default function AdminAffiliateLinkQueue({
       !getCustomerPublishReadiness(product).ready
   ).length;
   const visibleProducts = missingProducts.slice(0, 24);
+
+  useEffect(() => {
+    if (!targetProductId || handledTargetRef.current === targetProductId) return;
+    if (!visibleProducts.some((product) => product.id === targetProductId)) return;
+
+    handledTargetRef.current = targetProductId;
+    const timer = window.setTimeout(() => scrollToAdminAnchor(`admin-affiliate-product-${targetProductId}`), 80);
+    return () => window.clearTimeout(timer);
+  }, [targetProductId, visibleProducts]);
 
   async function copyTitle(product: ProductWithScore) {
     await navigator.clipboard.writeText(product.title);
@@ -701,7 +721,11 @@ export default function AdminAffiliateLinkQueue({
           const searchUrl = buildCoupangSearchUrl(product);
           const naverPrice = getNaverPriceTrust(product);
           return (
-            <article key={product.id} className="rounded-lg border border-line p-4">
+            <article
+              id={`admin-affiliate-product-${product.id}`}
+              key={product.id}
+              className="scroll-mt-4 rounded-lg border border-line p-4"
+            >
               <div className="grid gap-3 lg:grid-cols-[1fr_360px]">
                 <div>
                   <div className="flex flex-wrap items-center gap-2 text-xs font-black">

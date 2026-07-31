@@ -83,7 +83,10 @@ export default function AdminManualProductForm({ password, onCreated }: { passwo
       {createdProductId ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-pine/30 bg-pine/10 px-3 py-3 text-sm font-bold text-pine">
           <p>상품 ID <code className="break-all">{createdProductId}</code>가 생성됐습니다. 다음은 상품별 파트너스 링크 확인입니다.</p>
-          <a className="focus-ring shrink-0 rounded-lg bg-pine px-3 py-2 text-xs font-black text-white hover:bg-ink" href="#admin-affiliate-links">
+          <a
+            className="focus-ring shrink-0 rounded-lg bg-pine px-3 py-2 text-xs font-black text-white hover:bg-ink"
+            href={`?candidate=${encodeURIComponent(createdProductId)}#admin-affiliate-links`}
+          >
             링크 보강 큐로 이동
           </a>
         </div>

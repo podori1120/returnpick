@@ -10,6 +10,7 @@ import AdminKeywordManager from "@/components/AdminKeywordManager";
 import AdminLaunchRunner from "@/components/AdminLaunchRunner";
 import AdminLaunchStatusBar from "@/components/AdminLaunchStatusBar";
 import AdminManualProductForm from "@/components/AdminManualProductForm";
+import AdminManualProductBulkForm from "@/components/AdminManualProductBulkForm";
 import AdminLogin from "@/components/AdminLogin";
 import AdminOpsDashboard from "@/components/AdminOpsDashboard";
 import AdminPriceBackfillPanel from "@/components/AdminPriceBackfillPanel";
@@ -105,6 +106,7 @@ export default function AdminPage() {
       <AdminPriceBackfillPanel password={password} onCompleted={() => setRefreshToken((value) => value + 1)} />
       <AdminAffiliateLinkQueue password={password} refreshToken={refreshToken} onCompleted={() => setRefreshToken((value) => value + 1)} />
       <AdminManualProductForm password={password} onCreated={() => setRefreshToken((value) => value + 1)} />
+      <AdminManualProductBulkForm password={password} onCreated={() => setRefreshToken((value) => value + 1)} />
       <AdminBootstrapCatalogPanel />
       <AdminKeywordManager password={password} />
       <AdminSourcingRunner password={password} onCompleted={() => setRefreshToken((value) => value + 1)} />
