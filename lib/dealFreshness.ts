@@ -59,6 +59,10 @@ export function getDealFreshnessFromTimestamps(values: Array<string | null | und
 }
 
 export function getDealFreshness(product: ProductWithScore, nowMs = Date.now()) {
+  if (product.source === "manual_admin") {
+    return getDealFreshnessFromTimestamps([], nowMs);
+  }
+
   if (product.last_observed_at && Number.isFinite(new Date(product.last_observed_at).getTime())) {
     return getDealFreshnessFromTimestamps([product.last_observed_at], nowMs);
   }

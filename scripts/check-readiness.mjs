@@ -4061,6 +4061,9 @@ if (fileExists("lib/schedulerInsights.ts")) {
 if (fileExists("app/api/admin/sourcing/run/route.ts") && fileExists("lib/dataStore.ts")) {
   const sourcingRunRoute = readText("app/api/admin/sourcing/run/route.ts");
   const dataStore = readText("lib/dataStore.ts");
+  const manualProductRoute = readText("app/api/admin/products/route.ts");
+  const manualProductImportRoute = readText("app/api/admin/products/import/route.ts");
+  const dealFreshness = readText("lib/dealFreshness.ts");
   const updateProductBody = dataStore.slice(
     dataStore.indexOf("export async function updateProduct"),
     dataStore.indexOf("export async function createDealScore")
@@ -4111,7 +4114,11 @@ if (fileExists("app/api/admin/sourcing/run/route.ts") && fileExists("lib/dataSto
   );
   check(
     "data store: source observation is automatic-only",
-    dataStore.includes("last_observed_at: input.last_observed_at ?? stamp") &&
+    dataStore.includes("last_observed_at: input.last_observed_at === undefined ? stamp : input.last_observed_at") &&
+      dataStore.includes("last_observed_at: payload.last_observed_at ?? existing.last_observed_at") &&
+      manualProductRoute.includes("last_observed_at: null") &&
+      manualProductImportRoute.includes("last_observed_at: null") &&
+      dealFreshness.includes('product.source === "manual_admin"') &&
       dataStore.includes("export async function upsertSourcedProduct") &&
       !updateProductBody.includes("last_observed_at"),
     "automatic sourcing refreshes last_observed_at while ordinary admin edits do not impersonate a source observation",

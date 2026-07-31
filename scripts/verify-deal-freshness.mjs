@@ -35,6 +35,14 @@ assert.equal(
 );
 assert.equal(getDealFreshness({ last_observed_at: null, latest_snapshot: freshSnapshot }, now).status, "fresh");
 assert.equal(getDealFreshness({ last_observed_at: "2026-07-31T11:00:00.000Z" }, now).status, "fresh");
+assert.equal(
+  getDealFreshness({
+    source: "manual_admin",
+    last_observed_at: "2026-07-31T11:00:00.000Z",
+    latest_snapshot: freshSnapshot
+  }, now).status,
+  "unknown"
+);
 
 console.log(
   "Deal freshness checks passed: 24-hour boundary, unknown state, source observation precedence, and legacy snapshot fallback."

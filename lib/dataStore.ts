@@ -135,7 +135,7 @@ function makeProduct(input: ProductInput): SourcedProduct {
     rejection_reason: input.rejection_reason ?? null,
     admin_memo: input.admin_memo ?? null,
     public_note: input.public_note ?? null,
-    last_observed_at: input.last_observed_at ?? stamp,
+    last_observed_at: input.last_observed_at === undefined ? stamp : input.last_observed_at,
     created_at: input.created_at ?? stamp,
     updated_at: input.updated_at ?? stamp
   };
@@ -160,6 +160,7 @@ function preserveExistingReviewFields(existing: SourcedProduct, payload: Sourced
         : payload.condition_grade,
     admin_memo: existing.admin_memo,
     public_note: existing.public_note,
+    last_observed_at: payload.last_observed_at ?? existing.last_observed_at,
     image_url: isUsableProductImageUrl(existing.image_url) ? existing.image_url : payload.image_url,
     affiliate_url: isUsableAffiliateUrl(existing.affiliate_url) ? existing.affiliate_url : payload.affiliate_url,
     raw_json: {

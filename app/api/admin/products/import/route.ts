@@ -137,6 +137,7 @@ export async function POST(request: Request) {
               affiliate_link_provided: Boolean(affiliateUrl)
             }
           },
+          last_observed_at: null,
           sourcing_status: "needs_review",
           is_published: false,
           is_rejected: false

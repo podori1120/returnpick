@@ -122,6 +122,7 @@ export async function POST(request: Request) {
           source: "admin_manual"
         }
       },
+      last_observed_at: null,
       sourcing_status: "needs_review",
       is_published: false,
       is_rejected: false,
