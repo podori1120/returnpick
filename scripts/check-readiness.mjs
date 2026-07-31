@@ -1553,6 +1553,31 @@ if (fileExists("components/AffiliateButton.tsx") && fileExists("components/DealD
   );
 }
 
+if (fileExists("lib/dealFreshness.ts") && fileExists("components/PurchaseVerificationStrip.tsx") && fileExists("components/PurchaseDecisionPanel.tsx")) {
+  const freshness = readText("lib/dealFreshness.ts");
+  const verificationStrip = readText("components/PurchaseVerificationStrip.tsx");
+  const purchaseDecisionPanel = readText("components/PurchaseDecisionPanel.tsx");
+  const purchaseDecision = readText("lib/purchaseDecision.ts");
+  check(
+    "public detail: observed data freshness beside purchase CTA",
+    freshness.includes('export type DealFreshnessStatus = "fresh" | "stale" | "unknown"') &&
+      freshness.includes("product.latest_snapshot?.observed_at") &&
+      freshness.includes("FRESH_WINDOW_MS = 24 * 60 * 60 * 1000") &&
+      !freshness.includes("product.updated_at") &&
+      verificationStrip.includes('data-freshness-status={freshness.status}') &&
+      verificationStrip.includes("마지막 가격·재고 관찰") &&
+      verificationStrip.includes("동일 모델·용량·색상") &&
+      verificationStrip.includes("현재 가격·재고·배송") &&
+      verificationStrip.includes("반품등급·구성품·교환 조건") &&
+      purchaseDecisionPanel.includes("<PurchaseVerificationStrip freshness={decision.freshness} />") &&
+      purchaseDecisionPanel.includes('placement="detail_decision"') &&
+      purchaseDecision.includes('freshness.status === "stale"') &&
+      purchaseDecision.includes('freshness.status === "unknown"'),
+    "purchase CTA shows the latest real observation, flags data older than 24 hours, and keeps a one-click explicit outbound action",
+    "required"
+  );
+}
+
 if (
   fileExists("app/disclosure/page.tsx") &&
   fileExists("components/AffiliateButton.tsx") &&

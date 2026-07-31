@@ -1,6 +1,7 @@
 import { getDealPrice, getDiscountRate, getPrimaryUseCase, getReferencePrice } from "@/lib/dealIntelligence";
 import { formatPercent, formatPrice } from "@/lib/format";
 import { isUsableAffiliateUrl } from "@/lib/coupangLink";
+import { getDealFreshness } from "@/lib/dealFreshness";
 import { getPriceReferenceInfo } from "@/lib/priceReference";
 import { getDealQuality } from "@/lib/quality";
 import { getLatestScore } from "@/lib/scoring";
@@ -41,6 +42,7 @@ export function getPurchaseDecision(product: ProductWithScore) {
   const riskFlags = score?.risk_flags ?? [];
   const hasVerifiedReturn = Boolean(product.return_price && !["확인필요", "알수없음"].includes(product.condition_grade));
   const hasAffiliate = isUsableAffiliateUrl(product.affiliate_url);
+  const freshness = getDealFreshness(product);
 
   let confidence = Math.round(((score?.total_score ?? 55) * 0.62) + (quality.confidence * 0.38));
   if (discountRate != null && discountRate >= 0.2) confidence += 6;
@@ -49,6 +51,8 @@ export function getPurchaseDecision(product: ProductWithScore) {
   if (!hasAffiliate) confidence -= 12;
   if (!product.return_price) confidence -= 12;
   if (product.stock_count === 1) confidence -= 3;
+  if (freshness.status === "stale") confidence -= 8;
+  if (freshness.status === "unknown") confidence -= 5;
   confidence = clamp(confidence);
 
   const verdict =
@@ -77,6 +81,8 @@ export function getPurchaseDecision(product: ProductWithScore) {
     !product.naver_lowest_price ? "네이버 최저가 기준이 없어 가격 비교를 보수적으로 봐야 합니다." : "",
     product.stock_count === 1 ? "재고 1개 상품은 가격과 재고가 빠르게 바뀔 수 있습니다." : "",
     !hasAffiliate ? "구매 링크가 준비되지 않아 관리자 확인이 필요합니다." : "",
+    freshness.status === "stale" ? `마지막 관찰 후 ${freshness.ageHours ?? 0}시간이 지나 최신 조건을 재확인해야 합니다.` : "",
+    freshness.status === "unknown" ? "가격·재고 관찰 시각이 없어 쿠팡에서 최신 조건을 먼저 확인해야 합니다." : "",
     ...riskFlags.map((flag) => riskLabels[flag])
   ]).slice(0, 5);
 
@@ -97,6 +103,7 @@ export function getPurchaseDecision(product: ProductWithScore) {
     referencePrice,
     discountRate,
     primaryUseCase: useCase,
-    hasAffiliate
+    hasAffiliate,
+    freshness
   };
 }

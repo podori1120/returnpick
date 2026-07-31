@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, Clock3, ShieldCheck } from "lucide-react";
 import AffiliateButton from "@/components/AffiliateButton";
+import PurchaseVerificationStrip from "@/components/PurchaseVerificationStrip";
 import { getCoupangOutboundLink } from "@/lib/coupangLink";
 import { getPurchaseDecision } from "@/lib/purchaseDecision";
 import { formatPercent, formatPrice } from "@/lib/format";
@@ -46,13 +47,21 @@ export default function PurchaseDecisionPanel({ product }: { product: ProductWit
                 리턴픽 점수와 가격 비교, 반품 리스크를 합쳐 구매 직전 확인 순서로 정리했습니다.
               </p>
             </div>
+          </div>
+
+          <PurchaseVerificationStrip freshness={decision.freshness} />
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs font-bold leading-5 text-steel">
+              위 항목을 쿠팡 화면에서 맞춰본 뒤 구매를 결정하세요. 버튼은 사용자가 직접 누를 때만 새 탭으로 열립니다.
+            </p>
             <AffiliateButton
               productId={product.id}
               href={outboundLink.href}
               label={outboundLink.isAffiliate ? "쿠팡에서 실시간 가격 확인" : outboundLink.label}
               placement="detail_decision"
               sponsored={outboundLink.isAffiliate}
-              className="focus-ring inline-flex min-w-[220px] items-center justify-center gap-2 rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink"
+              className="focus-ring inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink sm:w-auto sm:min-w-[220px]"
             />
           </div>
 
