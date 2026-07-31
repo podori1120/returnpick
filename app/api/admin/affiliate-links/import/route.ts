@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getProductById, updateProduct } from "@/lib/dataStore";
 import { getCoupangPartnersLinkIssue, isApprovalSampleAffiliateUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { getCustomerPublishReadiness } from "@/lib/quality";
+import { getAffiliateIdentityReadiness } from "@/lib/affiliateIdentity";
 import { requireAdmin } from "@/lib/validators";
 
 type ImportItem = {
@@ -87,6 +88,13 @@ export async function POST(request: Request) {
       if (!product) {
         skippedCount += 1;
         items.push({ product_id: productId, title: null, status: "skipped", reason: "PRODUCT_NOT_FOUND", affiliate_url: affiliateUrl });
+        continue;
+      }
+
+      const affiliateIdentity = getAffiliateIdentityReadiness({ affiliate_url: affiliateUrl, raw_json: product.raw_json });
+      if (affiliateIdentity.status === "MISMATCH") {
+        skippedCount += 1;
+        items.push({ product_id: productId, title: product.title, status: "skipped", reason: "AFFILIATE_TARGET_MISMATCH", affiliate_url: affiliateUrl });
         continue;
       }
 

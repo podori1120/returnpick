@@ -1,4 +1,5 @@
 import { calculateDiscountRate } from "@/lib/format";
+import { getAffiliateIdentityReadiness } from "@/lib/affiliateIdentity";
 import { isApprovalSampleAffiliateUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { isUsableProductImageUrl } from "@/lib/productImageUrl";
 import { getLatestScore } from "@/lib/scoring";
@@ -82,6 +83,9 @@ export function getCustomerPublishReadiness(product: ProductWithScore): Customer
 
   if (!isUsableAffiliateUrl(product.affiliate_url)) {
     blockers.add(isApprovalSampleAffiliateUrl(product.affiliate_url) ? "승인용 샘플 링크 사용 중" : "상품별 파트너스 링크 필요");
+  } else {
+    const affiliateIdentity = getAffiliateIdentityReadiness(product);
+    if (!affiliateIdentity.ready && affiliateIdentity.blocker) blockers.add(affiliateIdentity.blocker);
   }
   for (const blocker of quality.blockers) blockers.add(blocker);
   if (!isUsableProductImageUrl(product.image_url)) {

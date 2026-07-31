@@ -4,6 +4,7 @@ import { createDealScore, getProductById, updateProduct } from "@/lib/dataStore"
 import { parseSpecsFromTitle } from "@/lib/specParser";
 import { toNumberOrNull } from "@/lib/format";
 import { getCustomerPublishReadiness } from "@/lib/quality";
+import { getAffiliateIdentityReadiness } from "@/lib/affiliateIdentity";
 import { getCoupangPartnersLinkIssue, isApprovalSampleAffiliateUrl, isGenericCoupangLandingUrl, isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
 import { getProductImageUrlIssue } from "@/lib/productImageUrl";
 import { isConditionGrade, isSourcingStatus, requireAdmin, sanitizeText } from "@/lib/validators";
@@ -142,6 +143,18 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       },
       { status: 400 }
     );
+  }
+  if (hasAffiliateUrlPatch && patch.affiliate_url) {
+    const affiliateIdentity = getAffiliateIdentityReadiness({ affiliate_url: patch.affiliate_url, raw_json: current.raw_json });
+    if (affiliateIdentity.status === "MISMATCH") {
+      return NextResponse.json(
+        {
+          error: "AFFILIATE_TARGET_MISMATCH",
+          message: "자동 확인에서 후보와 다른 쿠팡 상품번호가 확인되었습니다. 올바른 상품별 파트너스 링크로 교체하세요."
+        },
+        { status: 400 }
+      );
+    }
   }
   if (hasImageUrlPatch && patch.image_url && getProductImageUrlIssue(patch.image_url)) {
     return NextResponse.json(

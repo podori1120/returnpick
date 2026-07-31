@@ -197,6 +197,7 @@ const requiredFiles = [
   "components/GuideEditorialLink.tsx",
   "components/TelegramPreview.tsx",
   "lib/affiliateLinkBackfill.ts",
+  "lib/affiliateIdentity.ts",
   "lib/coupangAffiliateLinkVerifier.ts",
   "lib/editorialCampaign.ts",
   "lib/approvalSample.ts",
@@ -228,6 +229,7 @@ const requiredFiles = [
   "scripts/run-production-launch.mjs",
   "scripts/verify-git-deploy-readiness.mjs",
   "scripts/verify-github-hourly-scheduler.mjs",
+  "scripts/verify-affiliate-identity.mjs",
   "scripts/verify-provider-product-merge.mjs",
   "scripts/verify-scoring-rules.mjs",
   "scripts/verify-public-web-config.mjs",
@@ -327,6 +329,31 @@ if (fileExists("package.json") && fileExists("lib/providerProductMerge.ts") && f
       providerMergeCheck.includes("supplemental retention") &&
       providerMergeCheck.includes("source-id deduplication"),
     "official and allowed public-web candidates retain distinct products, deduplicate conservative identities, and prefer explicit return evidence",
+    "required"
+  );
+}
+
+if (fileExists("package.json") && fileExists("lib/affiliateIdentity.ts") && fileExists("scripts/verify-affiliate-identity.mjs")) {
+  const packageJson = readText("package.json");
+  const identity = readText("lib/affiliateIdentity.ts");
+  const identityCheck = readText("scripts/verify-affiliate-identity.mjs");
+  check(
+    "scripts: affiliate identity check command",
+    packageJson.includes('"affiliate-identity:check": "node scripts/verify-affiliate-identity.mjs"'),
+    "package.json exposes a deterministic affiliate destination identity check",
+    "required"
+  );
+  check(
+    "affiliate identity: product match contract",
+    identity.includes('"MATCH"') &&
+      identity.includes('"MISMATCH"') &&
+      identity.includes('"UNRESOLVED"') &&
+      identity.includes('"EXPECTED_ID_UNAVAILABLE"') &&
+      identity.includes('"MANUAL_CONFIRMED"') &&
+      identity.includes("getAffiliateIdentityReadiness") &&
+      identityCheck.includes("URL-change invalidation") &&
+      identityCheck.includes("access-limited resolution"),
+    "affiliate identity tests cover resolved matches, hard mismatches, access limits, explicit manual confirmation, and changed-link invalidation",
     "required"
   );
 }
@@ -1248,12 +1275,20 @@ if (fileExists("lib/coupangLink.ts")) {
 
 if (
   fileExists("lib/coupangAffiliateLinkVerifier.ts") &&
+  fileExists("lib/affiliateIdentity.ts") &&
   fileExists("app/api/admin/affiliate-links/verify/route.ts") &&
-  fileExists("components/AdminAffiliateLinkQueue.tsx")
+  fileExists("components/AdminAffiliateLinkQueue.tsx") &&
+  fileExists("lib/quality.ts") &&
+  fileExists("app/api/admin/products/[id]/route.ts") &&
+  fileExists("app/api/admin/affiliate-links/import/route.ts")
 ) {
   const verifier = readText("lib/coupangAffiliateLinkVerifier.ts");
+  const identity = readText("lib/affiliateIdentity.ts");
   const verifyRoute = readText("app/api/admin/affiliate-links/verify/route.ts");
   const linkQueue = readText("components/AdminAffiliateLinkQueue.tsx");
+  const quality = readText("lib/quality.ts");
+  const productRoute = readText("app/api/admin/products/[id]/route.ts");
+  const affiliateImportRoute = readText("app/api/admin/affiliate-links/import/route.ts");
   check(
     "affiliate link verification: bounded Coupang-only resolution",
     verifier.includes('import "server-only"') &&
@@ -1274,19 +1309,41 @@ if (
     "required"
   );
   check(
-    "affiliate link verification: protected endpoint and advisory UI",
+    "affiliate link verification: protected product-aware endpoint",
     verifyRoute.includes("requireAdmin(request)") &&
       verifyRoute.includes("MAX_PAYLOAD_BYTES") &&
       verifyRoute.includes("new TextEncoder().encode(rawBody).byteLength") &&
       verifyRoute.includes("verifyCoupangAffiliateLinkResolution") &&
+      verifyRoute.includes("getProductById(productId)") &&
+      verifyRoute.includes("assessAffiliateIdentity") &&
+      verifyRoute.includes("mergeAffiliateIdentityRecord") &&
+      verifyRoute.includes("AUTOMATIC_CHECK_REQUIRED") &&
+      verifyRoute.includes("AFFILIATE_TARGET_MISMATCH") &&
+      verifyRoute.includes("manual_confirm") &&
       verifyRoute.includes('"Cache-Control": "no-store"') &&
       linkQueue.includes('/api/admin/affiliate-links/verify') &&
       linkQueue.includes("자동 목적지 확인") &&
       linkQueue.includes("브라우저로 직접 열기") &&
+      linkQueue.includes("브라우저 확인 완료") &&
+      linkQueue.includes("후보 상품번호") &&
+      linkQueue.includes("getAffiliateIdentityReadiness(product).ready") &&
+      linkQueue.includes("getCustomerPublishReadiness(product).ready") &&
       linkQueue.includes('rel="nofollow sponsored noopener noreferrer"') &&
-      linkQueue.includes("linkVerifications") &&
-      linkQueue.includes("강제 차단 조건은 아닙니다"),
-    "authenticated admins can inspect one pasted link without turning transient Coupang failures into a publish blocker",
+      linkQueue.includes("linkVerifications"),
+    "authenticated admins compare one pasted link with the server-loaded candidate, retain unverified links in the queue, and can explicitly confirm only unresolved destinations",
+    "required"
+  );
+  check(
+    "affiliate link verification: central publish identity gate",
+    identity.includes("getExpectedCoupangProductIdentity") &&
+      identity.includes("readAffiliateIdentityRecord") &&
+      identity.includes("record.affiliate_url !== affiliateUrl") &&
+      quality.includes("getAffiliateIdentityReadiness") &&
+      quality.includes("affiliateIdentity.blocker") &&
+      productRoute.includes("AFFILIATE_TARGET_MISMATCH") &&
+      affiliateImportRoute.includes("AFFILIATE_TARGET_MISMATCH") &&
+      affiliateImportRoute.includes("getCustomerPublishReadiness"),
+    "single and bulk publish paths reject changed or mismatched affiliate destinations through the shared customer-ready gate",
     "required"
   );
 }

@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Copy, ExternalLink, Link2, RefreshCw, Search, Upload, Wand2 } from "lucide-react";
+import { getAffiliateIdentityReadiness } from "@/lib/affiliateIdentity";
 import { getCategoryLabel } from "@/lib/category";
 import { buildCoupangSearchUrl, isApprovalSampleAffiliateUrl, isCoupangPartnersLink, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { formatPrice } from "@/lib/format";
+import { getCustomerPublishReadiness } from "@/lib/quality";
 import type { ProductWithScore } from "@/lib/types";
 
 function headers(password: string) {
@@ -75,9 +77,11 @@ type BulkImportResponse = BulkImportResult & {
 type AffiliateLinkVerification = {
   ok: boolean;
   code: string;
+  identity_status?: "MATCH" | "MISMATCH" | "UNRESOLVED" | "EXPECTED_ID_UNAVAILABLE" | "MANUAL_CONFIRMED";
   message: string;
   final_url?: string;
   product_id?: string;
+  expected_product_id?: string;
   http_status?: number;
   redirect_count: number;
   checked_at: string;
@@ -140,6 +144,7 @@ function linkResultReasonLabel(reason?: string | null) {
   if (reason === "PRODUCT_NOT_FOUND") return "해당 상품 ID를 찾지 못했습니다.";
   if (reason === "PUBLISHED") return "저장 후 게시까지 완료했습니다.";
   if (reason === "INVALID_AFFILIATE_URL") return "상품별 쿠팡 파트너스 단축 링크 형식이 아닙니다.";
+  if (reason === "AFFILIATE_TARGET_MISMATCH") return "후보와 다른 쿠팡 상품번호로 연결되어 저장·게시하지 않았습니다.";
   if (reason.startsWith("PUBLISH_BLOCKED_PUBLIC_QUALITY")) return `링크는 저장했지만 게시 전 품질 확인이 필요합니다. ${reason.split(":").slice(1).join(":").trim()}`;
   if (reason.startsWith("DIRECT_DEEPLINK_FAILED")) return "기존 쿠팡 URL을 파트너스 링크로 변환하지 못했습니다.";
   if (reason.includes("COUPANG_MATCH_RELEVANCE_TOO_LOW") || reason.includes("MATCH_RELEVANCE_TOO_LOW")) return "쿠팡 검색 결과의 상품명/스펙 관련도가 낮아 자동 저장하지 않았습니다.";
@@ -247,7 +252,11 @@ export default function AdminAffiliateLinkQueue({
   const missingProducts = useMemo(
     () =>
       products
-        .filter((product) => !isUsableAffiliateUrl(product.affiliate_url))
+        .filter(
+          (product) =>
+            !isUsableAffiliateUrl(product.affiliate_url) ||
+            !getAffiliateIdentityReadiness(product).ready
+        )
         .filter((product) => (publishedOnly ? product.is_published || product.sourcing_status === "published" : true))
         .filter((product) => (query ? product.title.toLowerCase().includes(query.toLowerCase()) : true))
         .sort((a, b) => {
@@ -257,8 +266,17 @@ export default function AdminAffiliateLinkQueue({
         }),
     [products, publishedOnly, query]
   );
-  const publicReadyCount = products.filter((product) => product.is_published && product.sourcing_status === "published" && isUsableAffiliateUrl(product.affiliate_url)).length;
-  const hiddenPublishedCount = products.filter((product) => (product.is_published || product.sourcing_status === "published") && !isUsableAffiliateUrl(product.affiliate_url)).length;
+  const publicReadyCount = products.filter(
+    (product) =>
+      product.is_published &&
+      product.sourcing_status === "published" &&
+      getCustomerPublishReadiness(product).ready
+  ).length;
+  const hiddenPublishedCount = products.filter(
+    (product) =>
+      (product.is_published || product.sourcing_status === "published") &&
+      !getCustomerPublishReadiness(product).ready
+  ).length;
   const visibleProducts = missingProducts.slice(0, 24);
 
   async function copyTitle(product: ProductWithScore) {
@@ -267,7 +285,7 @@ export default function AdminAffiliateLinkQueue({
     window.setTimeout(() => setCopiedId((current) => (current === product.id ? null : current)), 1500);
   }
 
-  async function verifyAffiliateUrl(product: ProductWithScore) {
+  async function verifyAffiliateUrl(product: ProductWithScore, mode: "verify" | "manual_confirm" = "verify") {
     const affiliateUrl = inputs[product.id]?.trim() ?? "";
     if (!isCoupangPartnersLink(affiliateUrl)) {
       setLinkVerifications((current) => ({
@@ -294,7 +312,7 @@ export default function AdminAffiliateLinkQueue({
       const response = await fetch("/api/admin/affiliate-links/verify", {
         method: "POST",
         headers: headers(password),
-        body: JSON.stringify({ affiliate_url: affiliateUrl })
+        body: JSON.stringify({ product_id: product.id, affiliate_url: affiliateUrl, mode })
       });
       const data = (await response.json().catch(() => ({}))) as AffiliateLinkVerificationResponse;
       if (!response.ok || !data.verification) {
@@ -468,7 +486,7 @@ export default function AdminAffiliateLinkQueue({
           <p className="text-sm font-black text-pine">Affiliate Link Queue</p>
           <h2 className="text-xl font-black">상품별 파트너스 링크 보강</h2>
           <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-steel">
-            승인 대기 중에는 쿠팡 파트너스 웹에서 상품별 링크를 직접 만들고 여기에 붙여넣습니다. 링크가 준비된 상품만 공개 딜과 구매 CTA에 노출됩니다.
+            승인 대기 중에는 쿠팡 파트너스 웹에서 상품별 링크를 직접 만들고 여기에 붙여넣습니다. 링크를 저장하고 후보 상품과의 일치 확인을 마친 상품만 공개 딜과 구매 CTA에 노출됩니다.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -622,7 +640,7 @@ export default function AdminAffiliateLinkQueue({
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <div className="rounded-lg border border-line bg-mist p-4">
-          <p className="text-xs font-black text-steel">보강 필요</p>
+          <p className="text-xs font-black text-steel">보강·일치 확인 필요</p>
           <p className="mt-1 text-2xl font-black">{missingProducts.length.toLocaleString("ko-KR")}개</p>
         </div>
         <div className="rounded-lg border border-line bg-mist p-4">
@@ -657,6 +675,9 @@ export default function AdminAffiliateLinkQueue({
           const approvalSampleAffiliate = isApprovalSampleAffiliateUrl(inputValue);
           const linkReady = isUsableAffiliateUrl(inputValue) && !approvalSampleAffiliate;
           const verification = linkVerifications[product.id]?.checked_url === inputValue.trim() ? linkVerifications[product.id] : null;
+          const identityReady = verification?.identity_status === "MATCH" || verification?.identity_status === "MANUAL_CONFIRMED";
+          const identityMismatch = verification?.identity_status === "MISMATCH";
+          const manualConfirmationAvailable = verification?.identity_status === "UNRESOLVED" || verification?.identity_status === "EXPECTED_ID_UNAVAILABLE";
           const searchUrl = buildCoupangSearchUrl(product);
           return (
             <article key={product.id} className="rounded-lg border border-line p-4">
@@ -705,7 +726,7 @@ export default function AdminAffiliateLinkQueue({
                   </label>
                   <p className={linkReady ? "mt-2 text-xs font-bold text-pine" : "mt-2 text-xs font-bold text-coral"}>
                     {linkReady
-                      ? "저장하면 구매 CTA 공개 준비가 됩니다. 실제 상품 확인 후 저장하는 것을 권장합니다."
+                      ? "링크 저장은 가능하며, 게시 전 자동 상품번호 확인 또는 명시적 수동 확인이 필요합니다."
                       : approvalSampleAffiliate
                         ? "승인용 샘플 링크는 이 상품에 저장하거나 게시할 수 없습니다."
                         : "쿠팡 파트너스에서 만든 상품별 링크를 붙여넣어 주세요."}
@@ -744,7 +765,7 @@ export default function AdminAffiliateLinkQueue({
                       className={
                         verification.ok
                           ? "mt-2 rounded-lg bg-pine/10 p-3 text-xs font-bold text-pine"
-                          : verification.code === "INVALID_AFFILIATE_URL" || verification.code === "REDIRECT_BLOCKED"
+                          : verification.code === "INVALID_AFFILIATE_URL" || verification.code === "REDIRECT_BLOCKED" || identityMismatch
                             ? "mt-2 rounded-lg bg-red-50 p-3 text-xs font-bold text-red-700"
                             : "mt-2 rounded-lg bg-lemon/30 p-3 text-xs font-bold text-ink"
                       }
@@ -752,17 +773,36 @@ export default function AdminAffiliateLinkQueue({
                       aria-live="polite"
                     >
                       <p>{verification.message}</p>
-                      {verification.product_id ? (
-                        <p className="mt-1">상품번호 {verification.product_id} · HTTP {verification.http_status ?? "확인필요"} · 이동 {verification.redirect_count}회</p>
+                      {verification.product_id || verification.expected_product_id ? (
+                        <p className="mt-1">
+                          후보 상품번호 {verification.expected_product_id ?? "확인필요"} · 링크 상품번호 {verification.product_id ?? "확인필요"} · HTTP{" "}
+                          {verification.http_status ?? "확인필요"} · 이동 {verification.redirect_count}회
+                        </p>
                       ) : null}
-                      <p className="mt-1 font-semibold">자동 확인 결과는 참고 신호이며 저장·게시의 강제 차단 조건은 아닙니다.</p>
+                      <p className="mt-1 font-semibold">
+                        {identityReady
+                          ? "현재 링크는 게시 품질 게이트를 통과했습니다."
+                          : identityMismatch
+                            ? "다른 상품으로 연결되어 현재 링크의 저장·게시를 차단합니다."
+                            : "자동 해석이 부족합니다. 브라우저에서 상품명과 옵션을 확인한 뒤 수동 확인을 완료하세요."}
+                      </p>
+                      {manualConfirmationAvailable ? (
+                        <button
+                          className="focus-ring mt-2 inline-flex items-center justify-center rounded-lg border border-current px-3 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-50"
+                          onClick={() => verifyAffiliateUrl(product, "manual_confirm")}
+                          disabled={checkingLinkId !== null}
+                          type="button"
+                        >
+                          브라우저 확인 완료
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     <button
                       className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-black hover:bg-mist disabled:cursor-not-allowed disabled:opacity-50"
                       onClick={() => saveAffiliateUrl(product, "save")}
-                      disabled={!linkReady || savingId === product.id}
+                      disabled={!linkReady || identityMismatch || savingId === product.id}
                       type="button"
                     >
                       <Link2 size={14} aria-hidden /> 링크 저장
@@ -770,7 +810,8 @@ export default function AdminAffiliateLinkQueue({
                     <button
                       className="focus-ring rounded-lg bg-pine px-3 py-2 text-xs font-black text-white hover:bg-ink disabled:cursor-not-allowed disabled:opacity-50"
                       onClick={() => saveAffiliateUrl(product, "publish")}
-                      disabled={!linkReady || savingId === product.id}
+                      disabled={!linkReady || !identityReady || savingId === product.id}
+                      title={identityReady ? "검수된 현재 링크를 저장하고 게시합니다." : "게시 전 상품번호 일치 확인이 필요합니다."}
                       type="button"
                     >
                       저장 후 게시
