@@ -193,6 +193,7 @@ const requiredFiles = [
   "components/AdminProductEditor.tsx",
   "components/AffiliateEventTracker.tsx",
   "components/EditorialShareBar.tsx",
+  "components/GuideEditorialLink.tsx",
   "components/TelegramPreview.tsx",
   "lib/affiliateLinkBackfill.ts",
   "lib/coupangAffiliateLinkVerifier.ts",
@@ -1408,6 +1409,29 @@ if (
       approvalPage.includes("sku: approvalSampleProduct.coupangProductNumber") &&
       !approvalPage.includes("https://schema.org/InStock"),
     "the manual approval product uses a disclosed editorial image and does not invent price, stock, or availability",
+    "required"
+  );
+}
+
+if (
+  fileExists("components/GuideEditorialLink.tsx") &&
+  fileExists("app/guide/return-checklist/page.tsx") &&
+  fileExists("app/guide/safe-categories/page.tsx")
+) {
+  const guideEditorialLink = readText("components/GuideEditorialLink.tsx");
+  const returnChecklistGuide = readText("app/guide/return-checklist/page.tsx");
+  const safeCategoriesGuide = readText("app/guide/safe-categories/page.tsx");
+  check(
+    "public guides: disclosed editorial handoff",
+    returnChecklistGuide.includes("GuideEditorialLink") &&
+      safeCategoriesGuide.includes("GuideEditorialLink") &&
+      guideEditorialLink.includes("approvalSampleProduct.detailPath") &&
+      guideEditorialLink.includes("approvalSampleProduct.imageSrc") &&
+      guideEditorialLink.includes("실전 구매 전 사례") &&
+      guideEditorialLink.includes("Novatech S1 구매 전 체크 보기") &&
+      guideEditorialLink.includes("쿠팡 파트너스 제휴 링크가 포함되어 있습니다") &&
+      !guideEditorialLink.includes("link.coupang.com"),
+    "search guides send readers to the disclosed ReturnPick editorial review before any explicit affiliate destination",
     "required"
   );
 }

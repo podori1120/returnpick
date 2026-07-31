@@ -1,5 +1,6 @@
 import AffiliateNotice from "@/components/AffiliateNotice";
 import Checklist from "@/components/Checklist";
+import GuideEditorialLink from "@/components/GuideEditorialLink";
 import { categoryOptions, getCategoryLabel } from "@/lib/category";
 import type { Category } from "@/lib/types";
 
@@ -22,6 +23,7 @@ export default function ReturnChecklistPage() {
         </section>
       ))}
 
+      <GuideEditorialLink />
       <AffiliateNotice />
     </main>
   );

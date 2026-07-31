@@ -57,6 +57,11 @@ const editorialPickRequirements = {
   socialImage: "/picks/novatech-s1-window-cleaner/opengraph-image"
 };
 const editorialSocialImagePath = "/picks/novatech-s1-window-cleaner/opengraph-image";
+const guideEditorialRequirements = {
+  path: "/picks/novatech-s1-window-cleaner",
+  title: "Novatech S1 구매 전 체크 보기",
+  disclosure: "쿠팡 파트너스 제휴 링크가 포함되어 있습니다"
+};
 
 const sitemapRequiredPaths = [
   "/",
@@ -221,6 +226,25 @@ function checkEditorialSocialImage(response, byteLength) {
   }
 
   pass("editorial social image", `product-specific preview is ${contentType} and ${byteLength} bytes`);
+}
+
+function checkGuideEditorialHandoff(name, path, html, status) {
+  if (status !== 200) {
+    fail(name, `${path} returned ${status}`);
+    return;
+  }
+
+  const missing = Object.entries(guideEditorialRequirements)
+    .filter(([, value]) => !html.includes(value))
+    .map(([key]) => key);
+
+  if (containsLikelyMojibake(html)) missing.push("readable_korean");
+
+  if (missing.length) {
+    fail(name, `missing disclosed editorial handoff: ${missing.join(", ")}`);
+  } else {
+    pass(name, "guide links to the disclosed editorial review before the affiliate destination");
+  }
 }
 
 function checkRobotsTxt(text, status) {
@@ -519,6 +543,20 @@ async function main() {
     checkEditorialSocialImage(editorialSocialImage.response, editorialSocialImage.byteLength);
   } catch (error) {
     fail("editorial social image", error instanceof Error ? error.message : "fetch failed");
+  }
+
+  try {
+    const returnChecklistGuide = await readText("/guide/return-checklist");
+    checkGuideEditorialHandoff("return checklist handoff", "/guide/return-checklist", returnChecklistGuide.text, returnChecklistGuide.response.status);
+  } catch (error) {
+    fail("return checklist handoff", error instanceof Error ? error.message : "fetch failed");
+  }
+
+  try {
+    const safeCategoriesGuide = await readText("/guide/safe-categories");
+    checkGuideEditorialHandoff("safe categories handoff", "/guide/safe-categories", safeCategoriesGuide.text, safeCategoriesGuide.response.status);
+  } catch (error) {
+    fail("safe categories handoff", error instanceof Error ? error.message : "fetch failed");
   }
 
   try {

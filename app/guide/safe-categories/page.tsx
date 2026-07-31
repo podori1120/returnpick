@@ -1,4 +1,5 @@
 import AffiliateNotice from "@/components/AffiliateNotice";
+import GuideEditorialLink from "@/components/GuideEditorialLink";
 
 export default function SafeCategoriesPage() {
   return (
@@ -28,6 +29,7 @@ export default function SafeCategoriesPage() {
         ))}
       </section>
 
+      <GuideEditorialLink />
       <AffiliateNotice />
     </main>
   );
