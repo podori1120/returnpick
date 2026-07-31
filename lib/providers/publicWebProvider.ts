@@ -12,6 +12,7 @@ const DEFAULT_PUBLIC_WEB_REQUEST_DELAY_MS = 1200;
 const MAX_SUPPORTED_CRAWL_DELAY_SECONDS = 10;
 export const MAX_PUBLIC_WEB_ALLOWED_HOSTS = 5;
 export const MAX_PUBLIC_WEB_SEARCH_TEMPLATES = 5;
+export const MAX_PUBLIC_WEB_DETAIL_PAGES = 3;
 
 type RobotsFetchResult =
   | { status: "ok"; text: string }
@@ -23,6 +24,7 @@ type LimitedTextResult =
 
 type PublicWebDiagnostic = {
   status: string;
+  stage?: "search" | "detail";
   url?: string;
   error?: string;
   robots_status?: string;
@@ -56,9 +58,12 @@ function searchTemplates() {
 }
 
 function buildPublicWebMeta(diagnostics: PublicWebDiagnostic[], hosts: Set<string>, templates: string[]) {
+  const detailDiagnostics = diagnostics.filter((item) => item.stage === "detail");
   return {
     public_web_diagnostics: diagnostics.slice(0, 12),
     public_web_diagnostic_count: diagnostics.length,
+    detail_page_limit: MAX_PUBLIC_WEB_DETAIL_PAGES,
+    detail_page_fetched_count: detailDiagnostics.filter((item) => item.status === "FETCHED_DETAIL").length,
     allowed_host_count: hosts.size,
     template_count: templates.length,
     user_agent: crawlUserAgent(),
@@ -317,6 +322,137 @@ function extractCards(html: string, category: Category, keyword: string, pageUrl
   return products;
 }
 
+function readMetaContent(html: string, names: string[]) {
+  const wanted = new Set(names.map((name) => name.toLowerCase()));
+  for (const match of html.matchAll(/<meta\b[^>]*>/gi)) {
+    const tag = match[0];
+    const nameMatch = tag.match(/\b(?:property|name)\s*=\s*["']([^"']+)["']/i);
+    const contentMatch = tag.match(/\bcontent\s*=\s*["']([^"']*)["']/i);
+    if (nameMatch && contentMatch && wanted.has(nameMatch[1].toLowerCase())) {
+      return contentMatch[1].trim().slice(0, 2_000) || null;
+    }
+  }
+  return null;
+}
+
+function readHtmlTitle(html: string) {
+  const match = html.match(/<title\b[^>]*>([\s\S]{0,500}?)<\/title>/i);
+  return match?.[1]?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300) || null;
+}
+
+function enrichProductFromDetail(product: ProviderProduct, html: string, detailUrl: URL, allowedHosts: ReadonlySet<string>) {
+  const readableHtml = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<noscript[\s\S]*?<\/noscript>/gi, " ");
+  const detailInfo = extractReturnInfoFromText(readableHtml, detailUrl.toString());
+  const imageValue = readMetaContent(html, ["og:image", "twitter:image"]);
+  const detailImage = imageValue ? safeAllowlistedPublicUrl(imageValue, detailUrl, allowedHosts)?.toString() ?? null : null;
+  const existingWebInfo = product.raw_json?.web_return_info;
+  const detailEvidence = toReturnInfoJson(detailInfo);
+  const detailTitle = readMetaContent(html, ["og:title", "twitter:title"]) ?? readHtmlTitle(html);
+
+  return {
+    ...product,
+    image_url: product.image_url ?? detailImage,
+    return_price: detailInfo.return_price ?? product.return_price ?? null,
+    condition_grade: detailInfo.condition_grade ?? product.condition_grade ?? "확인필요",
+    stock_count: detailInfo.stock_count ?? product.stock_count ?? null,
+    raw_json: {
+      ...(product.raw_json ?? {}),
+      web_return_info: {
+        ...(typeof existingWebInfo === "object" && existingWebInfo !== null && !Array.isArray(existingWebInfo) ? existingWebInfo : {}),
+        detail_page: detailEvidence,
+        detail_page_title: detailTitle,
+        detail_page_url: detailUrl.toString()
+      }
+    }
+  };
+}
+
+async function enrichProductDetails(
+  products: ProviderProduct[],
+  allowedHosts: ReadonlySet<string>,
+  diagnostics: PublicWebDiagnostic[]
+) {
+  const enriched = [...products];
+  const seenUrls = new Set<string>();
+  let requestCount = 0;
+
+  for (const [index, product] of enriched.entries()) {
+    if (requestCount >= MAX_PUBLIC_WEB_DETAIL_PAGES) break;
+    if (!product.source_url) continue;
+
+    let detailUrl: URL;
+    try {
+      const safeDetailUrl = safeAllowlistedPublicUrl(product.source_url, new URL(product.source_url), allowedHosts);
+      if (!safeDetailUrl) continue;
+      detailUrl = safeDetailUrl;
+    } catch {
+      continue;
+    }
+    if (!detailUrl || detailUrl.pathname === "/") continue;
+    const normalizedUrl = detailUrl.toString();
+    if (seenUrls.has(normalizedUrl)) continue;
+    seenUrls.add(normalizedUrl);
+
+    const searchPageUrl = typeof product.raw_json?.page_url === "string" ? product.raw_json.page_url : null;
+    if (searchPageUrl && normalizedUrl === searchPageUrl) continue;
+
+    const robots = await getRobots(detailUrl.origin);
+    if (robots.status !== "ok") {
+      diagnostics.push({ stage: "detail", status: "ROBOTS_UNAVAILABLE", url: normalizedUrl, robots_status: robots.status, error: robots.error });
+      continue;
+    }
+    if (!isPathAllowedByRobots(robots.text, detailUrl.pathname, crawlUserAgent())) {
+      diagnostics.push({ stage: "detail", status: "ROBOTS_DISALLOWED", url: normalizedUrl, robots_status: robots.status });
+      continue;
+    }
+
+    const crawlDelaySeconds = crawlDelaySecondsForRobots(robots.text, crawlUserAgent());
+    if (crawlDelaySeconds != null && crawlDelaySeconds > MAX_SUPPORTED_CRAWL_DELAY_SECONDS) {
+      diagnostics.push({ stage: "detail", status: "CRAWL_DELAY_TOO_HIGH", url: normalizedUrl, error: `CRAWL_DELAY_${crawlDelaySeconds}` });
+      continue;
+    }
+
+    requestCount += 1;
+    await waitForOriginRateLimit(detailUrl.origin, Math.max(DEFAULT_PUBLIC_WEB_REQUEST_DELAY_MS, Math.ceil((crawlDelaySeconds ?? 0) * 1000)));
+    const response = await fetchWithTimeout(normalizedUrl, {
+      headers: { "User-Agent": crawlUserAgent(), Accept: "text/html,application/xhtml+xml" },
+      redirect: "manual",
+      cache: "no-store"
+    });
+    if (response.status >= 300 && response.status < 400) {
+      diagnostics.push({ stage: "detail", status: "REDIRECT_BLOCKED", url: normalizedUrl, error: safeRedirectTarget(response.headers.get("location"), detailUrl, response.status) });
+      continue;
+    }
+    if (!response.ok) {
+      diagnostics.push({ stage: "detail", status: "HTTP_ERROR", url: normalizedUrl, error: `HTTP_${response.status}` });
+      continue;
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (!isHtmlContentType(contentType)) {
+      diagnostics.push({ stage: "detail", status: "UNSUPPORTED_CONTENT_TYPE", url: normalizedUrl, content_type: contentType, error: contentType ?? "MISSING_CONTENT_TYPE" });
+      continue;
+    }
+    const htmlResult = await readTextWithLimit(response, MAX_PUBLIC_WEB_HTML_BYTES);
+    if (htmlResult.status !== "ok") {
+      diagnostics.push({ stage: "detail", status: "CONTENT_TOO_LARGE", url: normalizedUrl, error: htmlResult.error });
+      continue;
+    }
+
+    enriched[index] = enrichProductFromDetail(product, htmlResult.text, detailUrl, allowedHosts);
+    diagnostics.push({
+      stage: "detail",
+      status: "FETCHED_DETAIL",
+      url: normalizedUrl,
+      robots_status: robots.status,
+      crawl_delay_seconds: crawlDelaySeconds,
+      content_type: contentType
+    });
+  }
+
+  return enriched;
+}
+
 export async function searchPublicWebProducts(keyword: string, category: Category): Promise<ProviderSearchResult> {
   if (!isEnabled()) return { status: "DISABLED", products: [] };
 
@@ -353,17 +489,17 @@ export async function searchPublicWebProducts(keyword: string, category: Categor
 
     const robots = await getRobots(parsed.origin);
     if (robots.status !== "ok") {
-      diagnostics.push({ status: "ROBOTS_UNAVAILABLE", url, robots_status: robots.status, error: robots.error });
+      diagnostics.push({ stage: "search", status: "ROBOTS_UNAVAILABLE", url, robots_status: robots.status, error: robots.error });
       continue;
     }
     if (!isPathAllowedByRobots(robots.text, parsed.pathname, crawlUserAgent())) {
-      diagnostics.push({ status: "ROBOTS_DISALLOWED", url, robots_status: robots.status });
+      diagnostics.push({ stage: "search", status: "ROBOTS_DISALLOWED", url, robots_status: robots.status });
       continue;
     }
 
     const crawlDelaySeconds = crawlDelaySecondsForRobots(robots.text, crawlUserAgent());
     if (crawlDelaySeconds != null && crawlDelaySeconds > MAX_SUPPORTED_CRAWL_DELAY_SECONDS) {
-      diagnostics.push({ status: "CRAWL_DELAY_TOO_HIGH", url, error: `CRAWL_DELAY_${crawlDelaySeconds}` });
+      diagnostics.push({ stage: "search", status: "CRAWL_DELAY_TOO_HIGH", url, error: `CRAWL_DELAY_${crawlDelaySeconds}` });
       continue;
     }
     const requestDelayMs = Math.max(DEFAULT_PUBLIC_WEB_REQUEST_DELAY_MS, Math.ceil((crawlDelaySeconds ?? 0) * 1000));
@@ -380,6 +516,7 @@ export async function searchPublicWebProducts(keyword: string, category: Categor
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get("location");
       diagnostics.push({
+        stage: "search",
         status: "REDIRECT_BLOCKED",
         url,
         error: safeRedirectTarget(location, parsed, response.status)
@@ -387,25 +524,26 @@ export async function searchPublicWebProducts(keyword: string, category: Categor
       continue;
     }
     if (!response.ok) {
-      diagnostics.push({ status: "HTTP_ERROR", url, error: `HTTP_${response.status}` });
+      diagnostics.push({ stage: "search", status: "HTTP_ERROR", url, error: `HTTP_${response.status}` });
       continue;
     }
 
     const contentType = response.headers.get("content-type");
     if (!isHtmlContentType(contentType)) {
-      diagnostics.push({ status: "UNSUPPORTED_CONTENT_TYPE", url, content_type: contentType, error: contentType ?? "MISSING_CONTENT_TYPE" });
+      diagnostics.push({ stage: "search", status: "UNSUPPORTED_CONTENT_TYPE", url, content_type: contentType, error: contentType ?? "MISSING_CONTENT_TYPE" });
       continue;
     }
 
     const htmlResult = await readTextWithLimit(response, MAX_PUBLIC_WEB_HTML_BYTES);
     if (htmlResult.status !== "ok") {
-      diagnostics.push({ status: "CONTENT_TOO_LARGE", url, error: htmlResult.error });
+      diagnostics.push({ stage: "search", status: "CONTENT_TOO_LARGE", url, error: htmlResult.error });
       continue;
     }
 
     const html = htmlResult.text;
     const extracted = extractCards(html, category, keyword, url, hosts);
     diagnostics.push({
+      stage: "search",
       status: "FETCHED_HTML",
       url,
       robots_status: robots.status,
@@ -416,8 +554,9 @@ export async function searchPublicWebProducts(keyword: string, category: Categor
     products.push(...extracted);
   }
 
+  const enrichedProducts = products.length ? await enrichProductDetails(products, hosts, diagnostics) : products;
   const meta = buildPublicWebMeta(diagnostics, hosts, templates);
-  if (products.length) return { status: "ok", products, meta };
+  if (enrichedProducts.length) return { status: "ok", products: enrichedProducts, meta };
   const firstBlocking = diagnostics.find((item) => item.status === "ROBOTS_DISALLOWED" || item.status === "ROBOTS_UNAVAILABLE");
   if (firstBlocking?.status === "ROBOTS_DISALLOWED") return { status: "ROBOTS_DISALLOWED", products: [], error: firstBlocking.url, meta };
   if (firstBlocking?.status === "ROBOTS_UNAVAILABLE") {

@@ -251,6 +251,7 @@ const requiredFiles = [
   "scripts/verify-scoring-rules.mjs",
   "scripts/verify-public-web-config.mjs",
   "scripts/verify-public-web-url-safety.mjs",
+  "scripts/verify-public-web-detail-enrichment.mjs",
   "scripts/print-supabase-setup-runbook.mjs",
   "scripts/verify-production-readiness.mjs",
   "scripts/verify-supabase-schema.mjs",
@@ -1634,6 +1635,31 @@ if (fileExists("lib/providers/publicWebProvider.ts")) {
       publicWebProvider.includes("crawl_delay_seconds") &&
       publicWebProvider.includes("content_type"),
     "public web collection records bounded safe diagnostics for allowlist, robots, content, redirect, and extraction outcomes",
+    "required"
+  );
+  check(
+    "provider: public web bounded detail enrichment",
+    publicWebProvider.includes("MAX_PUBLIC_WEB_DETAIL_PAGES = 3") &&
+      publicWebProvider.includes("enrichProductDetails") &&
+      publicWebProvider.includes('stage: "detail"') &&
+      publicWebProvider.includes('status: "FETCHED_DETAIL"') &&
+      publicWebProvider.includes("readMetaContent") &&
+      publicWebProvider.includes("readHtmlTitle") &&
+      publicWebProvider.includes("detail_page_fetched_count") &&
+      publicWebProvider.includes("safeAllowlistedPublicUrl") &&
+      publicWebProvider.includes("isPathAllowedByRobots") &&
+      publicWebProvider.includes("waitForOriginRateLimit") &&
+      publicWebProvider.includes("readTextWithLimit"),
+    "public web collection may enrich at most three discovered product pages while reapplying allowlist, robots, redirect, delay, and byte limits",
+    "required"
+  );
+  check(
+    "scripts: public web detail enrichment contract",
+    packageJson.includes('"public-web-detail:check": "node scripts/verify-public-web-detail-enrichment.mjs"') &&
+      publicWebProvider.includes("detail_page") &&
+      publicWebProvider.includes("web_return_info") &&
+      fileExists("scripts/verify-public-web-detail-enrichment.mjs"),
+    "detail-page return evidence and bounded enrichment are covered by a deterministic source contract check",
     "required"
   );
   check(
