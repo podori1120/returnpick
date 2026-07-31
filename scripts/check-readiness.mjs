@@ -1720,6 +1720,8 @@ if (
   fileExists("lib/approvalSample.ts") &&
   fileExists("app/products/approval-sample/page.tsx") &&
   fileExists("app/api/events/route.ts") &&
+  fileExists("components/PurposeDealExplorer.tsx") &&
+  fileExists("lib/homeDiscovery.ts") &&
   fileExists("app/page.tsx") &&
   fileExists("app/deals/page.tsx")
 ) {
@@ -1728,6 +1730,8 @@ if (
   const approvalData = readText("lib/approvalSample.ts");
   const approvalPage = readText("app/products/approval-sample/page.tsx");
   const eventRoute = readText("app/api/events/route.ts");
+  const purposeExplorer = readText("components/PurposeDealExplorer.tsx");
+  const homeDiscovery = readText("lib/homeDiscovery.ts");
   const homePage = readText("app/page.tsx");
   const dealsPage = readText("app/deals/page.tsx");
   check(
@@ -1771,11 +1775,28 @@ if (
       homePage.includes('name="search"') &&
       homePage.includes('placeholder="상품명·브랜드·모델명 검색"') &&
       homePage.includes("matchesUseCase") &&
-      homePage.includes("useCaseOptions") &&
-      homePage.includes('/deals?useCase=${item.id}&sort=fit') &&
-      homePage.includes("자동 수집 딜은 검수 후 공개됩니다") &&
-      homePage.includes('/picks/novatech-s1-window-cleaner'),
-    "the homepage supports product search, purpose-first discovery, and an honest editorial fallback when no public deals exist",
+      homePage.includes("homePurposeOptions") &&
+      homePage.includes("<PurposeDealExplorer") &&
+      purposeExplorer.includes('role="tablist"') &&
+      purposeExplorer.includes('role="tabpanel"') &&
+      purposeExplorer.includes("aria-selected={selectedTab}") &&
+      purposeExplorer.includes('/deals?useCase=${selected.primaryUseCaseId}&sort=fit') &&
+      purposeExplorer.includes("자동 수집 후보가 관리자 검수와 상품별 파트너스 링크 확인을 통과하면") &&
+      homePage.includes("approvalSampleProduct.detailPath"),
+    "the homepage supports product search, keyboard-accessible purpose tabs, matched-deal comparison, and an honest editorial fallback before inventory exists",
+    "required"
+  );
+  check(
+    "home discovery: useful category and purpose guidance before inventory",
+    ["laptop", "monitor", "robot_vacuum", "cordless_vacuum", "air_purifier", "dehumidifier"].every((category) => homeDiscovery.includes(`${category}: {`)) &&
+      ["study_work", "gaming_creator", "cleaning", "air_season", "value"].every((purpose) => homeDiscovery.includes(`id: "${purpose}"`)) &&
+      homePage.includes("카테고리부터 골라보세요") &&
+      homePage.includes("상품이 없어도 카테고리별 반품 구매 기준을 먼저 확인할 수 있습니다") &&
+      homePage.includes('grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6') &&
+      purposeExplorer.includes("상품 수를 채우기 위해 미확인 딜을 먼저 보여주지 않습니다") &&
+      !purposeExplorer.includes("/redirect?") &&
+      !purposeExplorer.includes("window.location"),
+    "zero inventory still provides category-specific checks and purpose guidance without invented products or automatic affiliate redirects",
     "required"
   );
   check(

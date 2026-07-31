@@ -34,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ko">
       <body>
         <header className="border-b border-line bg-white/90 backdrop-blur">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
+          <div className="mx-auto flex max-w-7xl flex-col items-stretch gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
             <Link href="/" className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-pine text-lg font-black text-white">
                 R
@@ -44,7 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <span className="block text-xs font-semibold text-steel">리턴픽</span>
               </span>
             </Link>
-            <nav className="flex flex-wrap items-center gap-2 text-sm font-semibold text-steel">
+            <nav className="hide-scrollbar -mx-4 flex items-center gap-1 overflow-x-auto whitespace-nowrap px-4 pb-1 text-sm font-semibold text-steel sm:mx-0 sm:flex-wrap sm:gap-2 sm:overflow-visible sm:px-0 sm:pb-0">
               <Link className="rounded-md px-3 py-2 hover:bg-mist hover:text-ink" href="/deals">
                 딜 보기
               </Link>

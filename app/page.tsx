@@ -1,13 +1,12 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
-  BadgePercent,
+  BatteryCharging,
   Bot,
-  BriefcaseBusiness,
   CloudRain,
-  Feather,
-  Gamepad2,
-  MonitorUp,
+  Laptop2,
+  Monitor,
   Search,
   ShieldCheck,
   Sparkles,
@@ -18,26 +17,27 @@ import {
 import AffiliateNotice from "@/components/AffiliateNotice";
 import ApprovalSampleCard from "@/components/ApprovalSampleCard";
 import DealCard from "@/components/DealCard";
+import PurposeDealExplorer, { type PurposeExplorerItem } from "@/components/PurposeDealExplorer";
 import RecentDealsRail from "@/components/RecentDealsRail";
-import { categoryOptions } from "@/lib/category";
+import { categoryOptions, getCategoryLabel } from "@/lib/category";
 import { listProducts } from "@/lib/dataStore";
-import { matchesUseCase, useCaseOptions, type UseCaseId } from "@/lib/dealIntelligence";
+import { matchesUseCase } from "@/lib/dealIntelligence";
 import { approvalSampleProduct } from "@/lib/approvalSample";
+import { homeCategoryDetails, homePurposeOptions } from "@/lib/homeDiscovery";
 import { isPublicDealReady } from "@/lib/publicDeal";
+import type { Category } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 const popularSearches = ["갤럭시북", "LG 그램", "QHD 모니터", "로봇청소기"];
 
-const useCaseIcons: Record<UseCaseId, LucideIcon> = {
-  office_student: BriefcaseBusiness,
-  gaming: Gamepad2,
-  creator: MonitorUp,
-  portable: Feather,
-  budget: BadgePercent,
-  floor_care: Bot,
-  air_care: Wind,
-  rainy_season: CloudRain
+const categoryIcons: Record<Category, LucideIcon> = {
+  laptop: Laptop2,
+  monitor: Monitor,
+  robot_vacuum: Bot,
+  cordless_vacuum: BatteryCharging,
+  air_purifier: Wind,
+  dehumidifier: CloudRain
 };
 
 export default async function HomePage() {
@@ -48,17 +48,33 @@ export default async function HomePage() {
   const hasPublishedDeals = products.length > 0;
   const counts = categoryOptions.map((category) => ({
     ...category,
-    count: products.filter((product) => product.category === category.value).length
+    count: products.filter((product) => product.category === category.value).length,
+    description: homeCategoryDetails[category.value].description
   }));
-  const useCases = useCaseOptions.map((option) => ({
-    ...option,
-    count: products.filter((product) => matchesUseCase(product, option.id)).length
-  }));
+  const purposeItems: PurposeExplorerItem[] = homePurposeOptions.map((purpose) => {
+    const matchingProducts = products.filter((product) => purpose.useCaseIds.some((useCaseId) => matchesUseCase(product, useCaseId)));
+    const topDeal = matchingProducts[0];
+    return {
+      id: purpose.id,
+      count: matchingProducts.length,
+      topDeal: topDeal
+        ? {
+            href: `/deals/${topDeal.id}`,
+            title: topDeal.title,
+            categoryLabel: getCategoryLabel(topDeal.category),
+            score: topDeal.latest_score?.total_score ?? null,
+            verdict: topDeal.latest_score?.verdict ?? null,
+            conditionGrade: topDeal.condition_grade
+          }
+        : null
+    };
+  });
+  const initialPurposeId = purposeItems.find((item) => item.count > 0)?.id ?? homePurposeOptions[0].id;
 
   return (
     <main>
       <section className="border-b border-line bg-white">
-        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_420px] lg:py-14">
+        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-4 sm:px-6 sm:py-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:py-4">
           <div className="flex flex-col justify-center">
             <p className="text-sm font-black text-pine">
               {hasPublishedDeals ? "반품 노트북·디지털·소형가전 비교" : "쿠팡 이동 경로 확인 완료 추천"}
@@ -101,16 +117,35 @@ export default async function HomePage() {
                 </div>
               </>
             ) : (
-              <div className="mt-6 max-w-2xl border-y border-line py-4">
+              <div className="mt-4 max-w-2xl border-y border-line py-3 sm:mt-6 sm:py-4">
                 <p className="text-xs font-black text-pine">현재 공개된 직접 검수 추천 1건</p>
                 <p className="mt-1 text-sm font-semibold leading-6 text-steel">
                   빈 검색 결과를 보여주기보다 확인된 추천을 먼저 제공합니다. 자동 수집 딜은 관리자 검수와 상품별 파트너스 링크 확인을 마친 뒤 추가됩니다.
                 </p>
               </div>
             )}
-            <div className="mt-6 flex flex-wrap gap-2">
+            {!hasPublishedDeals ? (
               <Link
-                className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink"
+                className="focus-ring mt-4 grid max-w-2xl grid-cols-[72px_minmax(0,1fr)] items-center gap-3 rounded-lg border border-line bg-mist p-2 lg:hidden"
+                href={approvalSampleProduct.detailPath}
+              >
+                <span className="relative h-[72px] overflow-hidden rounded-md bg-white">
+                  <Image alt={approvalSampleProduct.imageAlt} className="object-cover" fill sizes="72px" src={approvalSampleProduct.imageSrc} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-xs font-black text-pine">직접 검수 추천</span>
+                  <strong className="mt-1 line-clamp-1 block text-sm font-black text-ink">{approvalSampleProduct.name}</strong>
+                  <span className="mt-1 inline-flex items-center gap-1 text-xs font-black text-steel">
+                    검수 내용 보기 <ArrowRight size={13} aria-hidden />
+                  </span>
+                </span>
+              </Link>
+            ) : null}
+            <div className={hasPublishedDeals ? "mt-6 flex flex-wrap gap-2" : "mt-3 flex flex-wrap gap-2 sm:mt-6"}>
+              <Link
+                className={hasPublishedDeals
+                  ? "focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink"
+                  : "focus-ring hidden items-center gap-2 rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink sm:inline-flex"}
                 href={hasPublishedDeals ? "/deals" : approvalSampleProduct.detailPath}
               >
                 {hasPublishedDeals ? "검수 완료 딜" : "첫 추천 구매 전 체크"} <ArrowRight size={16} aria-hidden />
@@ -125,7 +160,7 @@ export default async function HomePage() {
               </Link>
             </div>
           </div>
-          <div className="lg:self-start">
+          <div className={hasPublishedDeals ? "lg:self-start" : "hidden lg:block lg:self-start"}>
             {featured[0] ? (
               <DealCard product={featured[0]} />
             ) : (
@@ -135,92 +170,64 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {hasPublishedDeals ? <section className="border-b border-ink bg-ink text-white">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <section className="border-b border-line bg-mist" aria-labelledby="category-heading">
+        <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-sm font-black text-lemon">FOR YOUR USE</p>
-              <h2 className="mt-1 text-2xl font-black">어떤 용도로 찾으세요?</h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-white/70">용도에 맞는 스펙과 반품 위험을 함께 추려서 보여드립니다.</p>
+              <p className="text-sm font-black text-pine">CATEGORY</p>
+              <h2 className="mt-1 text-2xl font-black" id="category-heading">카테고리부터 골라보세요</h2>
+              <p className="mt-1 text-sm font-semibold text-steel">상품이 없어도 카테고리별 반품 구매 기준을 먼저 확인할 수 있습니다.</p>
             </div>
-            <Link className="focus-ring inline-flex items-center gap-2 text-sm font-black text-white hover:text-lemon" href="/deals">
-              전체 조건에서 찾기 <ArrowRight size={16} aria-hidden />
+            <Link className="focus-ring inline-flex items-center gap-2 text-sm font-black text-pine hover:text-ink" href="/guide/safe-categories">
+              카테고리 안전성 보기 <ArrowRight size={16} aria-hidden />
             </Link>
           </div>
-          <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {useCases.map((item) => {
-              const Icon = useCaseIcons[item.id];
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {counts.map((category) => {
+              const Icon = categoryIcons[category.value];
               return (
                 <Link
-                  key={item.id}
-                  className="focus-ring group flex min-h-28 items-start gap-3 rounded-lg border border-white/15 bg-white/5 p-4 hover:border-lemon hover:bg-white/10"
-                  href={`/deals?useCase=${item.id}&sort=fit`}
+                  key={category.value}
+                  className="focus-ring group flex min-h-36 flex-col rounded-lg border border-line bg-white p-4 hover:border-pine hover:bg-mist"
+                  href={`/deals/category/${category.value}`}
                 >
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-white text-ink group-hover:bg-lemon">
-                    <Icon size={19} aria-hidden />
+                  <span className="flex size-10 items-center justify-center rounded-md bg-mist text-pine group-hover:bg-pine group-hover:text-white">
+                    <Icon size={20} aria-hidden />
                   </span>
-                  <span className="min-w-0">
-                    <span className="flex items-center justify-between gap-2">
-                      <strong className="text-sm font-black">{item.label}</strong>
-                      <span className="shrink-0 text-xs font-black text-lemon">{item.count ? `${item.count}개` : "필터 열기"}</span>
-                    </span>
-                    <span className="mt-1.5 block text-xs font-semibold leading-5 text-white/65">{item.description}</span>
+                  <strong className="mt-3 text-sm font-black text-ink">{category.label}</strong>
+                  <span className="mt-1 text-xs font-semibold leading-5 text-steel">{category.description}</span>
+                  <span className="mt-auto inline-flex items-center gap-1 pt-3 text-xs font-black text-pine">
+                    {category.count ? `${category.count}개 검수 완료` : "구매 기준 보기"} <ArrowRight size={13} aria-hidden />
                   </span>
                 </Link>
               );
             })}
           </div>
         </div>
-      </section> : null}
+      </section>
 
-      <section className="mx-auto max-w-7xl space-y-5 px-4 py-8 sm:px-6">
-        <RecentDealsRail />
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-sm font-black text-pine">Today</p>
-            <h2 className="text-2xl font-black">오늘 볼 만한 딜</h2>
-            <p className="mt-1 text-sm font-semibold text-steel">현재 공개 상품 {products.length.toLocaleString("ko-KR")}개</p>
+      <PurposeDealExplorer items={purposeItems} initialPurposeId={initialPurposeId} />
+
+      {hasPublishedDeals ? (
+        <section className="mx-auto max-w-7xl space-y-5 px-4 py-8 sm:px-6">
+          <RecentDealsRail />
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-sm font-black text-pine">Today</p>
+              <h2 className="text-2xl font-black">오늘 볼 만한 딜</h2>
+              <p className="mt-1 text-sm font-semibold text-steel">현재 공개 상품 {products.length.toLocaleString("ko-KR")}개</p>
+            </div>
+            <Link className="text-sm font-black text-pine hover:text-ink" href="/deals">
+              더 보기
+            </Link>
           </div>
-          <Link className="text-sm font-black text-pine hover:text-ink" href="/deals">
-            더 보기
-          </Link>
-        </div>
-        {featured.length ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {featured.map((product) => (
               <DealCard key={product.id} product={product} />
             ))}
           </div>
-        ) : (
-          <div className="flex flex-col justify-between gap-4 border-y border-line py-6 sm:flex-row sm:items-center">
-            <div>
-              <h3 className="text-lg font-black">자동 수집 딜은 검수 후 공개됩니다</h3>
-              <p className="mt-1 text-sm font-semibold leading-6 text-steel">지금은 상품 정보와 쿠팡 이동 경로를 직접 확인한 추천 상품부터 살펴보세요.</p>
-            </div>
-            <Link className="focus-ring inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink" href="/picks/novatech-s1-window-cleaner">
-              직접 검수 추천 보기 <ArrowRight size={16} aria-hidden />
-            </Link>
-          </div>
-        )}
-      </section>
-
-      <section className="border-y border-line bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-          <h2 className="text-2xl font-black">카테고리별 추천</h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {counts.map((category) => (
-              <Link
-                key={category.value}
-                className="rounded-lg border border-line p-4 font-black hover:border-pine hover:bg-mist"
-                href={`/deals/category/${category.value}`}
-              >
-                <span className="block text-sm text-steel">{category.label}</span>
-                <span className="mt-1 block text-lg text-ink">{category.count ? `${category.count}개 공개` : "검수 등록 대기"}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       <section className="mx-auto grid max-w-7xl gap-4 px-4 py-8 sm:px-6 lg:grid-cols-3">
         {[
