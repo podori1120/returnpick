@@ -2061,7 +2061,10 @@ if (
       homePage.includes("현재 공개된 직접 검수 추천 1건") &&
       homePage.includes('href={hasPublishedDeals ? "/deals" : approvalSampleProduct.detailPath}') &&
       dealsPage.includes("function EmptyDealsCatalog()") &&
-      dealsPage.includes("빈 목록 대신, 확인된 한 건을 먼저 보여드립니다") &&
+      dealsPage.includes("검수 기준을 통과한 상품만 공개합니다") &&
+      dealsPage.includes("찾는 품목의 반품 구매 기준부터 확인하세요") &&
+      dealsPage.includes("homeCategoryDetails[category.value].description") &&
+      dealsPage.includes('href={`/deals/category/${category.value}`}') &&
       dealsPage.includes('if (!allPublished.length) return <EmptyDealsCatalog />;') &&
       dealsPage.indexOf('if (!allPublished.length) return <EmptyDealsCatalog />;') < dealsPage.indexOf("const filteredProducts = sortProducts") &&
       dealsPage.includes('<ApprovalSampleCard placement="deals" />') &&

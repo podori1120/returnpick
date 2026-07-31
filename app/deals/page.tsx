@@ -23,6 +23,7 @@ import {
 import { formatPercent, formatPrice } from "@/lib/format";
 import { listProducts } from "@/lib/dataStore";
 import { approvalSampleProduct } from "@/lib/approvalSample";
+import { homeCategoryDetails } from "@/lib/homeDiscovery";
 import { isPublicDealReady } from "@/lib/publicDeal";
 import { getDealQuality, type DealQualityStatus } from "@/lib/quality";
 import { getSiteUrl } from "@/lib/siteUrl";
@@ -144,16 +145,16 @@ function EmptyDealsCatalog() {
     <main className="mx-auto max-w-7xl space-y-7 px-4 py-8 sm:px-6">
       <header className="border-b border-line pb-6">
         <p className="text-sm font-black text-pine">ReturnPick Direct Review</p>
-        <h1 className="mt-1 text-3xl font-black tracking-tight">지금 확인할 수 있는 직접 검수 추천</h1>
+        <h1 className="mt-1 text-3xl font-black tracking-tight">검수 기준을 통과한 상품만 공개합니다</h1>
         <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-steel">
-          상품별 근거와 파트너스 링크 검수를 마친 자동 딜은 아직 공개 전입니다. 빈 통계와 검색 결과 대신 실제 구매 경로가 확인된 추천부터 보여드립니다.
+          자동 수집 후보는 상품별 가격·반품 근거·파트너스 링크를 확인한 뒤 순차적으로 공개합니다. 지금은 실제 구매 경로가 확인된 추천과 카테고리별 구매 기준을 먼저 확인할 수 있습니다.
         </p>
       </header>
 
       <section className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center" aria-labelledby="direct-review-title">
         <div>
-          <p className="text-xs font-black text-pine">현재 공개 추천 1건</p>
-          <h2 id="direct-review-title" className="mt-2 text-2xl font-black leading-tight">빈 목록 대신, 확인된 한 건을 먼저 보여드립니다</h2>
+          <p className="text-xs font-black text-pine">직접 검수 콘텐츠 1건</p>
+          <h2 id="direct-review-title" className="mt-2 text-2xl font-black leading-tight">첫 구매 전 확인할 근거부터 보세요</h2>
           <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-steel">
             {approvalSampleProduct.name}의 핵심 사양과 구매 전 확인할 점을 정리했습니다. 확인되지 않은 가격이나 재고를 만들어 넣지 않고 마지막 거래 조건은 쿠팡에서 직접 확인합니다.
           </p>
@@ -176,6 +177,36 @@ function EmptyDealsCatalog() {
           </div>
         </div>
         <ApprovalSampleCard placement="deals" />
+      </section>
+
+      <section className="border-t border-line pt-7" aria-labelledby="category-guide-title">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-sm font-black text-pine">CATEGORY GUIDE</p>
+            <h2 id="category-guide-title" className="mt-1 text-2xl font-black">찾는 품목의 반품 구매 기준부터 확인하세요</h2>
+            <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-steel">
+              상품 수를 채우기 위해 확인되지 않은 딜을 노출하지 않습니다. 카테고리 페이지에서는 실제 딜이 들어온 뒤에도 같은 기준으로 비교합니다.
+            </p>
+          </div>
+          <Link className="focus-ring inline-flex items-center gap-2 text-sm font-black text-pine hover:text-ink" href="/guide/safe-categories">
+            안전 카테고리 안내 <ArrowRight size={16} aria-hidden />
+          </Link>
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {categoryOptions.map((category) => (
+            <Link
+              key={category.value}
+              className="focus-ring group flex min-h-32 flex-col rounded-lg border border-line bg-white p-4 hover:border-pine hover:bg-mist"
+              href={`/deals/category/${category.value}`}
+            >
+              <strong className="text-sm font-black text-ink">{category.label}</strong>
+              <span className="mt-1 text-xs font-bold leading-5 text-steel">{homeCategoryDetails[category.value].description}</span>
+              <span className="mt-auto inline-flex items-center gap-1 pt-4 text-xs font-black text-pine group-hover:text-ink">
+                구매 기준 보기 <ArrowRight size={13} aria-hidden />
+              </span>
+            </Link>
+          ))}
+        </div>
       </section>
 
       <AffiliateNotice />
