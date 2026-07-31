@@ -19,6 +19,8 @@ type ExportResult = {
   message?: string;
 };
 
+const BOOTSTRAP_CATALOG_ENV_LABEL = "RETURNPICK_BOOTSTRAP_CATALOG_JSON";
+
 const reasonLabels: Record<string, string> = {
   synthetic_source: "목업·데모 소스",
   not_published: "게시 상태 아님",
@@ -77,6 +79,9 @@ export default function AdminBootstrapCatalogPanel() {
           <p className="mt-2 text-sm font-semibold leading-6 text-steel">
             Supabase 연결 전에도 검수 완료 상품을 Vercel 재배포 뒤 그대로 공개하기 위한 임시 보존 수단입니다. 목업 상품, 승인용 샘플 링크,
             상품번호 불일치, 공개 품질 미달 상품은 자동으로 제외합니다.
+          </p>
+          <p className="mt-2 text-xs font-bold text-steel">
+            Vercel Production Key: <code className="break-all text-ink">{BOOTSTRAP_CATALOG_ENV_LABEL}</code>
           </p>
         </div>
         <button
