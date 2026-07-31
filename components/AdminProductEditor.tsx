@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Save } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Save, Upload } from "lucide-react";
 import { isApprovalSampleAffiliateUrl, isGenericCoupangLandingUrl, isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
+import { toNumberOrNull } from "@/lib/format";
 import { isUsableProductImageUrl } from "@/lib/productImageUrl";
-import type { ProductWithScore } from "@/lib/types";
+import { getCustomerPublishReadiness } from "@/lib/quality";
+import type { ConditionGrade, ProductWithScore } from "@/lib/types";
 
 function headers(password: string) {
   return { "Content-Type": "application/json", "x-admin-password": password };
@@ -30,13 +32,30 @@ export default function AdminProductEditor({
     public_note: "",
     admin_memo: ""
   });
-  const [saving, setSaving] = useState(false);
+  const [savingAction, setSavingAction] = useState<"save" | "publish" | null>(null);
   const [saveNotice, setSaveNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const affiliateReady = isUsableAffiliateUrl(form.affiliate_url);
   const genericAffiliate = isGenericCoupangLandingUrl(form.affiliate_url);
   const approvalSampleAffiliate = isApprovalSampleAffiliateUrl(form.affiliate_url);
   const regularProductUrl = !affiliateReady && isUsableCoupangProductUrl(form.affiliate_url);
   const imageUrlReady = isUsableProductImageUrl(form.image_url);
+  const projectedProduct: ProductWithScore | null = product
+    ? {
+        ...product,
+        condition_grade: form.condition_grade as ConditionGrade,
+        return_price: toNumberOrNull(form.return_price),
+        new_price: toNumberOrNull(form.new_price),
+        naver_lowest_price: toNumberOrNull(form.naver_lowest_price),
+        stock_count: toNumberOrNull(form.stock_count),
+        affiliate_url: form.affiliate_url.trim() || null,
+        image_url: form.image_url.trim() || null,
+        public_note: form.public_note.trim() || null,
+        admin_memo: form.admin_memo.trim() || null
+      }
+    : null;
+  const publishReadiness = projectedProduct ? getCustomerPublishReadiness(projectedProduct) : null;
+  const publishReady = publishReadiness?.ready === true;
+  const saving = savingAction !== null;
 
   useEffect(() => {
     if (!product) return;
@@ -63,27 +82,30 @@ export default function AdminProductEditor({
     );
   }
 
-  async function save() {
+  async function save(action: "save" | "publish" = "save") {
     if (!product) return;
-    setSaving(true);
+    setSavingAction(action);
     setSaveNotice(null);
     try {
       const response = await fetch(`/api/admin/products/${product.id}`, {
         method: "PATCH",
         headers: headers(password),
-        body: JSON.stringify(form)
+        body: JSON.stringify(action === "publish" ? { ...form, action: "publish" } : form)
       });
       const data = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
       if (!response.ok) {
         setSaveNotice({ type: "error", message: data.message ?? data.error ?? "저장에 실패했습니다. 입력값을 확인해 주세요." });
         return;
       }
-      setSaveNotice({ type: "success", message: "저장했고 점수를 다시 계산했습니다." });
+      setSaveNotice({
+        type: "success",
+        message: action === "publish" ? "저장하고 고객 화면에 게시했습니다." : "저장했고 점수를 다시 계산했습니다."
+      });
       onSaved();
     } catch {
       setSaveNotice({ type: "error", message: "네트워크 문제로 저장하지 못했습니다. 잠시 후 다시 시도해 주세요." });
     } finally {
-      setSaving(false);
+      setSavingAction(null);
     }
   }
 
@@ -212,14 +234,47 @@ export default function AdminProductEditor({
           onChange={(event) => setForm((current) => ({ ...current, admin_memo: event.target.value }))}
         />
       </label>
-      <button
-        className="focus-ring mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-ink px-4 py-3 text-sm font-black text-white hover:bg-pine disabled:opacity-60"
-        onClick={save}
-        disabled={saving}
-        type="button"
+      <div
+        className={
+          publishReady
+            ? "mt-4 border-y border-pine/30 bg-pine/5 py-3 text-sm text-pine"
+            : "mt-4 border-y border-amber-300 bg-amber-50 py-3 text-sm text-ink"
+        }
+        id="publish-readiness"
       >
-        <Save size={16} aria-hidden /> {saving ? "저장 중" : "저장 후 재점수화"}
-      </button>
+        <div className="flex items-start gap-2">
+          {publishReady ? <CheckCircle2 className="mt-0.5 shrink-0" size={17} aria-hidden /> : <AlertTriangle className="mt-0.5 shrink-0" size={17} aria-hidden />}
+          <div className="min-w-0">
+            <p className="font-black">{publishReady ? "고객 공개 준비 완료" : "게시 전 보강이 필요합니다."}</p>
+            {publishReadiness && publishReadiness.blockers.length > 0 ? (
+              <p className="mt-1 break-words text-xs font-semibold">{publishReadiness.blockers.slice(0, 4).join(" · ")}</p>
+            ) : (
+              <p className="mt-1 text-xs font-semibold">저장과 게시를 한 번에 처리할 수 있습니다.</p>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        <button
+          className="focus-ring inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 py-3 text-sm font-black text-ink hover:border-ink disabled:opacity-60"
+          onClick={() => save("save")}
+          disabled={saving}
+          type="button"
+        >
+          <Save size={16} aria-hidden /> {savingAction === "save" ? "저장 중" : "저장 후 재점수화"}
+        </button>
+        <button
+          aria-describedby="publish-readiness"
+          className="focus-ring inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-ink px-4 py-3 text-sm font-black text-white hover:bg-pine disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={() => save("publish")}
+          disabled={saving || !publishReady}
+          title={publishReady ? "현재 입력값을 저장하고 즉시 게시합니다." : publishReadiness?.blockers.join(", ")}
+          type="button"
+        >
+          <Upload size={16} aria-hidden />
+          {savingAction === "publish" ? "게시 중" : product.is_published ? "저장 후 공개 반영" : "저장 후 게시"}
+        </button>
+      </div>
       {saveNotice ? (
         <div
           className={

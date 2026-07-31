@@ -2906,6 +2906,19 @@ if (fileExists("components/AdminProductEditor.tsx")) {
     "admin can safely repair a missing product image and unsafe image URLs cannot pass the public quality gate",
     "required"
   );
+  check(
+    "admin: atomic save and publish",
+    productEditor.includes("getCustomerPublishReadiness") &&
+      productEditor.includes('action === "publish" ? { ...form, action: "publish" } : form') &&
+      productEditor.includes("저장 후 게시") &&
+      productEditor.includes("게시 전 보강이 필요합니다") &&
+      productEditor.includes("disabled={saving || !publishReady}") &&
+      productRoute.includes('if (action === "publish")') &&
+      productRoute.includes("projectProductForPublishCheck") &&
+      productRoute.includes("PUBLIC_QUALITY_BLOCKERS_FOR_PUBLISH"),
+    "product editor can atomically save and publish only when the same customer quality gate is ready",
+    "required"
+  );
 }
 
 if (fileExists("lib/publicDeal.ts")) {
