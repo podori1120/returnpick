@@ -1,6 +1,6 @@
 import { calculateDealScore } from "@/lib/scoring";
 import { createDealScore, listProducts, updateProduct } from "@/lib/dataStore";
-import { searchNaverShopping, type NaverShoppingItem } from "@/lib/providers/naverShoppingProvider";
+import { getLowestPriceFromQueries, type NaverLowestPriceResult } from "@/lib/providers/naverShoppingProvider";
 import type { ProductWithScore } from "@/lib/types";
 
 type NaverPriceBackfillDetail = {
@@ -11,6 +11,8 @@ type NaverPriceBackfillDetail = {
   query?: string;
   queries?: string[];
   reason?: string;
+  matched_title?: string;
+  match?: NaverLowestPriceResult["match"];
 };
 
 function cleanTitle(value: string) {
@@ -57,49 +59,39 @@ export function buildNaverPriceQueries(product: ProductWithScore) {
   return Array.from(new Set(queries));
 }
 
-function relevance(product: ProductWithScore, item: NaverShoppingItem) {
-  const haystack = `${item.title} ${item.brand ?? ""} ${item.maker ?? ""}`.toLowerCase();
-  const tokens = specTokens(product)
-    .concat(cleanTitle(product.title).split(/\s+/))
-    .map((token) => token.toLowerCase())
-    .filter((token) => token.length >= 2)
-    .slice(0, 14);
-  if (!tokens.length) return 0;
-  return tokens.reduce((score, token) => score + (haystack.includes(token) ? 1 : 0), 0);
+function relevanceTokens(product: ProductWithScore) {
+  return Array.from(
+    new Set(
+      specTokens(product)
+        .concat(cleanTitle(product.title).split(/\s+/))
+        .map((token) => token.toLowerCase())
+        .filter((token) => token.length >= 2)
+    )
+  ).slice(0, 18);
 }
 
 async function findNaverLowestPrice(product: ProductWithScore) {
   const queries = buildNaverPriceQueries(product);
-  let apiStatus: "ok" | "API_NOT_CONFIGURED" | "error" | "no_match" = "no_match";
-  let best: { price: number; query: string; item: NaverShoppingItem; relevance: number } | null = null;
-  const errors: string[] = [];
-
-  for (const query of queries) {
-    const result = await searchNaverShopping(query);
-    if (result.status === "API_NOT_CONFIGURED") return { status: "API_NOT_CONFIGURED" as const, queries, best: null, errors };
-    if (result.status === "error") {
-      apiStatus = "error";
-      errors.push(result.error ?? "NAVER_ERROR");
-      continue;
+  const lookup = await getLowestPriceFromQueries(queries, {
+    relevanceTokens: relevanceTokens(product),
+    product: {
+      category: product.category,
+      title: product.title,
+      brand: product.brand,
+      model_name: product.model_name,
+      spec_json: product.spec_json
     }
-
-    apiStatus = "ok";
-    const ranked = result.items
-      .filter((item) => typeof item.lprice === "number" && item.lprice > 0)
-      .map((item) => ({ item, relevance: relevance(product, item) }))
-      .filter((item) => item.relevance > 0)
-      .sort((a, b) => b.relevance - a.relevance || (a.item.lprice ?? 0) - (b.item.lprice ?? 0));
-
-    for (const candidate of ranked.slice(0, 5)) {
-      const price = candidate.item.lprice;
-      if (!price) continue;
-      if (!best || price < best.price) {
-        best = { price, query, item: candidate.item, relevance: candidate.relevance };
+  });
+  const best = lookup.price && lookup.query && lookup.item
+    ? {
+        price: lookup.price,
+        query: lookup.query,
+        item: lookup.item,
+        relevance: lookup.match?.relevance_score ?? 0,
+        match: lookup.match
       }
-    }
-  }
-
-  return { status: best ? ("ok" as const) : apiStatus, queries, best, errors };
+    : null;
+  return { status: lookup.status, queries, best, errors: lookup.errors, match: lookup.match };
 }
 
 function backfillErrorMessage(error: unknown) {
@@ -113,6 +105,7 @@ function firstQuery(queries: string[]) {
 function noMatchReason(result: Awaited<ReturnType<typeof findNaverLowestPrice>>) {
   if (result.status === "error") return result.errors.slice(0, 2).join(" | ") || "NAVER_SEARCH_ERROR";
   if (!result.queries.length) return "NO_NAVER_PRICE_QUERY";
+  if ((result.match?.sku_rejected_count ?? 0) > 0) return "NAVER_SKU_UNVERIFIED";
   return "NO_RELEVANT_PRICED_MATCH";
 }
 
@@ -165,8 +158,13 @@ export async function backfillNaverLowestPrices(options?: { publishedOnly?: bool
               query: result.best.query,
               price: result.best.price,
               matched_title: result.best.item.title,
+              matched_url: result.best.item.link,
               mall_name: result.best.item.mallName,
+              brand: result.best.item.brand,
+              maker: result.best.item.maker,
+              categories: [result.best.item.category1, result.best.item.category2, result.best.item.category3, result.best.item.category4].filter(Boolean),
               relevance: result.best.relevance,
+              match: result.best.match ?? null,
               updated_at: new Date().toISOString()
             }
           }
@@ -201,7 +199,15 @@ export async function backfillNaverLowestPrices(options?: { publishedOnly?: bool
       }
 
       updated_count += 1;
-      details.push({ product_id: product.id, title: product.title, status: "updated", price: result.best.price, query: result.best.query });
+      details.push({
+        product_id: product.id,
+        title: product.title,
+        status: "updated",
+        price: result.best.price,
+        query: result.best.query,
+        matched_title: result.best.item.title,
+        match: result.best.match
+      });
       continue;
     }
 
@@ -216,6 +222,7 @@ export async function backfillNaverLowestPrices(options?: { publishedOnly?: bool
             status: result.status,
             queries: result.queries,
             errors: result.errors,
+            match: result.match ?? null,
             updated_at: new Date().toISOString()
           }
         }
@@ -237,7 +244,8 @@ export async function backfillNaverLowestPrices(options?: { publishedOnly?: bool
       status: result.status,
       reason: noMatchReason(result),
       query: firstQuery(result.queries),
-      queries: result.queries
+      queries: result.queries,
+      match: result.match
     });
   }
 

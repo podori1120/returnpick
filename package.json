@@ -25,6 +25,7 @@
     "scoring:check": "node scripts/verify-scoring-rules.mjs",
     "freshness:check": "node scripts/verify-deal-freshness.mjs",
     "affiliate-identity:check": "node scripts/verify-affiliate-identity.mjs",
+    "naver-match:check": "node scripts/verify-naver-product-match.mjs",
     "provider-merge:check": "node scripts/verify-provider-product-merge.mjs",
     "public-web:check": "node scripts/verify-public-web-config.mjs",
     "schema:setup": "node scripts/print-supabase-setup-runbook.mjs",

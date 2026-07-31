@@ -1,4 +1,10 @@
 import { stripHtml, toNumberOrNull } from "@/lib/format";
+import {
+  matchNaverProductSku,
+  shouldPreferNaverSkuCandidate,
+  type NaverMatchProduct,
+  type NaverSkuMatchEvidence
+} from "@/lib/naverProductMatch";
 
 export interface NaverShoppingItem {
   title: string;
@@ -44,12 +50,21 @@ export type NaverLowestPriceResult = {
     priced_item_count: number;
     relevance_candidate_count: number;
     rejected_by_relevance_count: number;
+    sku_confidence: NaverSkuMatchEvidence["confidence"] | null;
+    sku_score: number;
+    sku_reason_code: string | null;
+    sku_matched_signals: string[];
+    sku_conflict_signals: string[];
+    sku_missing_signals: string[];
+    sku_rejected_count: number;
+    sku_rejection_reasons: Record<string, number>;
   };
 };
 
 type NaverLowestPriceOptions = {
   relevanceTokens?: Array<string | number | null | undefined>;
   minRelevance?: number;
+  product?: NaverMatchProduct;
 };
 
 function envText(name: string) {
@@ -216,7 +231,16 @@ export async function getLowestPriceFromQueries(queries: string[], options: Nave
   let pricedItemCount = 0;
   let relevanceCandidateCount = 0;
   let rejectedByRelevanceCount = 0;
-  let best: { price: number; query: string; item: NaverShoppingItem; relevanceScore: number; matchedTokens: string[] } | null = null;
+  let skuRejectedCount = 0;
+  const skuRejectionReasons: Record<string, number> = {};
+  let best: {
+    price: number;
+    query: string;
+    item: NaverShoppingItem;
+    relevanceScore: number;
+    matchedTokens: string[];
+    sku: NaverSkuMatchEvidence | null;
+  } | null = null;
 
   for (const query of normalizedQueries) {
     const result = await searchNaverShopping(query);
@@ -234,13 +258,26 @@ export async function getLowestPriceFromQueries(queries: string[], options: Nave
       if (!price || price <= 0) continue;
       pricedItemCount += 1;
       const relevance = itemRelevance(item, relevanceTokens);
-      if (relevance.score < minRelevance) {
+      const sku = options.product ? matchNaverProductSku(options.product, item) : null;
+      if (sku && !sku.accepted) {
+        skuRejectedCount += 1;
+        skuRejectionReasons[sku.reason_code] = (skuRejectionReasons[sku.reason_code] ?? 0) + 1;
+        continue;
+      }
+      if (!sku && relevance.score < minRelevance) {
         rejectedByRelevanceCount += 1;
         continue;
       }
       relevanceCandidateCount += 1;
-      if (!best || price < best.price) {
-        best = { price, query, item, relevanceScore: relevance.score, matchedTokens: relevance.matchedTokens };
+      const candidate = { price, query, item, relevanceScore: relevance.score, matchedTokens: relevance.matchedTokens, sku };
+      const shouldReplace = options.product
+        ? shouldPreferNaverSkuCandidate(
+            { price, relevanceScore: relevance.score, sku: sku as NaverSkuMatchEvidence },
+            best?.sku ? { price: best.price, relevanceScore: best.relevanceScore, sku: best.sku } : null
+          )
+        : !best || price < best.price;
+      if (shouldReplace) {
+        best = candidate;
       }
     }
   }
@@ -250,7 +287,15 @@ export async function getLowestPriceFromQueries(queries: string[], options: Nave
     matched_tokens: best?.matchedTokens.slice(0, 10) ?? [],
     priced_item_count: pricedItemCount,
     relevance_candidate_count: relevanceCandidateCount,
-    rejected_by_relevance_count: rejectedByRelevanceCount
+    rejected_by_relevance_count: rejectedByRelevanceCount,
+    sku_confidence: best?.sku?.confidence ?? null,
+    sku_score: best?.sku?.score ?? 0,
+    sku_reason_code: best?.sku?.reason_code ?? null,
+    sku_matched_signals: best?.sku?.matched_signals.slice(0, 12) ?? [],
+    sku_conflict_signals: best?.sku?.conflict_signals.slice(0, 8) ?? [],
+    sku_missing_signals: best?.sku?.missing_signals.slice(0, 8) ?? [],
+    sku_rejected_count: skuRejectedCount,
+    sku_rejection_reasons: skuRejectionReasons
   };
 
   if (best) {

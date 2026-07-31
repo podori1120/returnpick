@@ -89,7 +89,7 @@ function cleanNaverTitle(value: string) {
 }
 
 function specTokens(specJson: Record<string, JsonValue>) {
-  return ["ram", "ssd", "cpu", "gpu", "size", "resolution", "refresh_rate", "capacity"]
+  return ["ram", "ssd", "cpu", "gpu", "size", "resolution", "refresh_rate", "capacity", "coverage"]
     .map((key) => specJson[key])
     .filter((value): value is string | number => typeof value === "string" || typeof value === "number")
     .map(String)
@@ -182,7 +182,16 @@ async function enrichAffiliateUrl(product: ProviderProduct): Promise<AffiliateEn
 async function enrichNaverLowestPrice(product: ProviderProduct, specJson: Record<string, JsonValue>): Promise<NaverPriceEnrichment> {
   const queries = buildNaverQueries(product, specJson);
   const relevanceTokens = buildNaverRelevanceTokens(product, specJson);
-  const result = await getLowestPriceFromQueries(queries, { relevanceTokens });
+  const result = await getLowestPriceFromQueries(queries, {
+    relevanceTokens,
+    product: {
+      category: product.category,
+      title: product.title,
+      brand: product.brand,
+      model_name: product.model_name,
+      spec_json: specJson
+    }
+  });
 
   return {
     price: result.price,
@@ -193,7 +202,13 @@ async function enrichNaverLowestPrice(product: ProviderProduct, specJson: Record
       selected_query: result.query,
       price: result.price,
       matched_title: result.item?.title ?? null,
+      matched_url: result.item?.link ?? null,
       mall_name: result.item?.mallName ?? null,
+      brand: result.item?.brand ?? null,
+      maker: result.item?.maker ?? null,
+      categories: result.item
+        ? [result.item.category1, result.item.category2, result.item.category3, result.item.category4].filter(Boolean)
+        : [],
       match: result.match ?? null,
       errors: result.errors
     }

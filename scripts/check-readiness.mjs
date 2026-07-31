@@ -206,6 +206,7 @@ const requiredFiles = [
   "lib/categoryLanding.ts",
   "lib/clientTracking.ts",
   "lib/launchState.ts",
+  "lib/naverProductMatch.ts",
   "lib/naverPriceBackfill.ts",
   "lib/productImageUrl.ts",
   "lib/providerProductMerge.ts",
@@ -230,6 +231,7 @@ const requiredFiles = [
   "scripts/verify-git-deploy-readiness.mjs",
   "scripts/verify-github-hourly-scheduler.mjs",
   "scripts/verify-affiliate-identity.mjs",
+  "scripts/verify-naver-product-match.mjs",
   "scripts/verify-provider-product-merge.mjs",
   "scripts/verify-scoring-rules.mjs",
   "scripts/verify-public-web-config.mjs",
@@ -354,6 +356,34 @@ if (fileExists("package.json") && fileExists("lib/affiliateIdentity.ts") && file
       identityCheck.includes("URL-change invalidation") &&
       identityCheck.includes("access-limited resolution"),
     "affiliate identity tests cover resolved matches, hard mismatches, access limits, explicit manual confirmation, and changed-link invalidation",
+    "required"
+  );
+}
+
+if (fileExists("package.json") && fileExists("lib/naverProductMatch.ts") && fileExists("scripts/verify-naver-product-match.mjs")) {
+  const packageJson = readText("package.json");
+  const matcher = readText("lib/naverProductMatch.ts");
+  const matcherCheck = readText("scripts/verify-naver-product-match.mjs");
+  check(
+    "scripts: Naver SKU match check command",
+    packageJson.includes('"naver-match:check": "node scripts/verify-naver-product-match.mjs"'),
+    "package.json exposes a deterministic Naver Shopping SKU identity check",
+    "required"
+  );
+  check(
+    "Naver SKU match: conservative product identity contract",
+    matcher.includes("matchNaverProductSku") &&
+      matcher.includes("ACCESSORY_ONLY") &&
+      matcher.includes("MODEL_MISMATCH") &&
+      matcher.includes("SPEC_CONFLICT") &&
+      matcher.includes("CANDIDATE_VARIANT_AMBIGUOUS") &&
+      matcher.includes("INSUFFICIENT_IDENTITY") &&
+      matcher.includes("shouldPreferNaverSkuCandidate") &&
+      matcherCheck.includes("exact model") &&
+      matcherCheck.includes("option ambiguity") &&
+      matcherCheck.includes("accessory rejection") &&
+      matcherCheck.includes("confidence-first price ranking"),
+    "Naver price matching rejects accessories, model/spec conflicts, ambiguous variants, and weak identities before comparing prices",
     "required"
   );
 }
@@ -1131,14 +1161,17 @@ if (fileExists("lib/providers/naverShoppingProvider.ts")) {
     "required"
   );
   check(
-    "provider: naver lowest price relevance guard",
+    "provider: naver lowest price SKU guard",
     naverProvider.includes("NaverLowestPriceOptions") &&
       naverProvider.includes("relevanceTokens") &&
       naverProvider.includes("itemRelevance") &&
       naverProvider.includes("minRelevance") &&
+      naverProvider.includes("matchNaverProductSku") &&
+      naverProvider.includes("shouldPreferNaverSkuCandidate") &&
+      naverProvider.includes("sku_rejection_reasons") &&
       naverProvider.includes("rejected_by_relevance_count") &&
       naverProvider.includes("matched_tokens"),
-    "Naver lowest-price selection can reject irrelevant cheap accessories and records match evidence",
+    "Naver lowest-price selection ranks verified same-SKU results before price and records rejection evidence",
     "required"
   );
 }
@@ -2401,6 +2434,16 @@ if (fileExists("components/AdminPriceBackfillPanel.tsx")) {
     "admin price backfill details expose attempted Naver queries as safe manual retry links",
     "required"
   );
+  check(
+    "admin: price backfill SKU evidence",
+    pricePanel.includes("동일 SKU만 채택") &&
+      pricePanel.includes("matchSummary") &&
+      pricePanel.includes("sku_rejection_reasons") &&
+      pricePanel.includes("네이버 결과:") &&
+      pricePanel.includes("동일 SKU 강한 일치"),
+    "admin price repair results show the selected Naver title, SKU confidence, match signals, and rejection reasons",
+    "required"
+  );
 }
 
 if (fileExists("lib/naverPriceBackfill.ts")) {
@@ -2434,6 +2477,17 @@ if (fileExists("lib/naverPriceBackfill.ts")) {
       naverPriceBackfill.includes("NAVER_API_NOT_CONFIGURED") &&
       naverPriceBackfill.includes("queries: result.queries"),
     "Naver price backfill returns attempted query details when API is missing or no priced match is found",
+    "required"
+  );
+  check(
+    "naver price backfill: shared SKU matcher and evidence",
+    naverPriceBackfill.includes("getLowestPriceFromQueries") &&
+      naverPriceBackfill.includes("spec_json: product.spec_json") &&
+      naverPriceBackfill.includes("NAVER_SKU_UNVERIFIED") &&
+      naverPriceBackfill.includes("matched_url") &&
+      naverPriceBackfill.includes("match: result.best.match ?? null") &&
+      !naverPriceBackfill.includes("function relevance(product"),
+    "manual price backfill uses the same conservative SKU matcher as automatic sourcing and persists review evidence",
     "required"
   );
 }

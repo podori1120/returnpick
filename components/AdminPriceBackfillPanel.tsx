@@ -29,6 +29,22 @@ type BackfillDetail = {
   query?: string;
   queries?: string[];
   reason?: string;
+  matched_title?: string;
+  match?: {
+    relevance_score: number;
+    matched_tokens: string[];
+    priced_item_count: number;
+    relevance_candidate_count: number;
+    rejected_by_relevance_count: number;
+    sku_confidence: "strong" | "moderate" | "rejected" | null;
+    sku_score: number;
+    sku_reason_code: string | null;
+    sku_matched_signals: string[];
+    sku_conflict_signals: string[];
+    sku_missing_signals: string[];
+    sku_rejected_count: number;
+    sku_rejection_reasons: Record<string, number>;
+  };
 };
 
 type BackfillResponse = {
@@ -87,6 +103,60 @@ function naverShoppingSearchUrl(query: string) {
 
 function detailQueries(detail: BackfillDetail) {
   return Array.from(new Set([detail.query, ...(detail.queries ?? [])].filter((query): query is string => Boolean(query?.trim())))).slice(0, 3);
+}
+
+function reasonLabel(reason: string) {
+  const labels: Record<string, string> = {
+    NAVER_SKU_UNVERIFIED: "동일 SKU로 확인할 수 있는 결과가 없어 가격을 비워 두었습니다.",
+    NO_RELEVANT_PRICED_MATCH: "관련성이 충분한 가격 결과를 찾지 못했습니다.",
+    NO_NAVER_PRICE_QUERY: "검색에 사용할 상품명이나 모델명이 부족합니다.",
+    ACCESSORY_ONLY: "액세서리·소모품",
+    CATEGORY_MISMATCH: "카테고리 불일치",
+    BRAND_MISMATCH: "브랜드 불일치",
+    MODEL_MISMATCH: "모델 불일치",
+    SPEC_CONFLICT: "핵심 스펙 불일치",
+    SPEC_MISSING: "핵심 스펙 누락",
+    SOURCE_VARIANT_AMBIGUOUS: "원상품 옵션 불명확",
+    CANDIDATE_VARIANT_AMBIGUOUS: "네이버 다중 옵션",
+    INSUFFICIENT_IDENTITY: "식별 근거 부족"
+  };
+  return labels[reason] ?? reason;
+}
+
+function signalLabel(signal: string) {
+  const [kind, value] = signal.split(":", 2);
+  const labels: Record<string, string> = {
+    model_code: "모델코드",
+    model: "모델",
+    brand: "브랜드",
+    ram: "RAM",
+    ssd: "저장용량",
+    cpu: "CPU",
+    gpu: "GPU",
+    size: "화면",
+    resolution: "해상도",
+    refresh_rate: "주사율",
+    capacity: "용량",
+    coverage: "사용면적"
+  };
+  return labels[kind] ? `${labels[kind]} ${value}` : signal;
+}
+
+function matchSummary(detail: BackfillDetail) {
+  const match = detail.match;
+  if (!match) return null;
+  const parts: string[] = [];
+  if (match.sku_confidence === "strong") parts.push("동일 SKU 강한 일치");
+  if (match.sku_confidence === "moderate") parts.push("동일 SKU 조건 일치");
+  const signals = match.sku_matched_signals.filter((signal) => !signal.startsWith("category:") && !signal.startsWith("title:")).slice(0, 4);
+  if (signals.length) parts.push(signals.map(signalLabel).join(", "));
+  const rejected = Object.entries(match.sku_rejection_reasons)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([reason, count]) => `${reasonLabel(reason)} ${count}개`);
+  if (rejected.length) parts.push(`제외: ${rejected.join(", ")}`);
+  if (match.sku_rejected_count > 0 && !rejected.length) parts.push(`SKU 부적합 ${match.sku_rejected_count}개 제외`);
+  return parts.length ? parts.join(" · ") : null;
 }
 
 export default function AdminPriceBackfillPanel({ password, onCompleted }: { password: string; onCompleted: () => void }) {
@@ -151,7 +221,7 @@ export default function AdminPriceBackfillPanel({ password, onCompleted }: { pas
           <p className="text-xs font-black text-pine">Naver Price Backfill</p>
           <h2 className="text-lg font-black">네이버 최저가 보강</h2>
           <p className="mt-1 text-sm font-semibold leading-6 text-steel">
-            비어 있는 네이버 최저가를 공식 네이버 쇼핑 API로 다시 검색합니다. API 키가 없으면 값을 임의로 채우지 않습니다.
+            비어 있는 네이버 최저가를 공식 네이버 쇼핑 API로 다시 검색합니다. 모델코드와 핵심 스펙이 확인되는 동일 SKU만 채택하며, API 키가 없거나 식별 근거가 부족하면 값을 비워 둡니다.
           </p>
           <p className="mt-1 text-xs font-bold text-steel">
             게시 상품만 또는 검토 후보까지 포함해 최대 40개씩 처리하고, 매칭 검색어와 실패 사유를 남깁니다.
@@ -232,6 +302,7 @@ export default function AdminPriceBackfillPanel({ password, onCompleted }: { pas
             {lastResult.details.slice(0, 6).map((detail) => {
               const queries = detailQueries(detail);
               const primaryQuery = queries[0];
+              const skuSummary = matchSummary(detail);
               return (
                 <div key={`${detail.product_id}-${detail.status}`} className="grid gap-2 px-3 py-2 text-xs sm:grid-cols-[1fr_auto]">
                   <div>
@@ -240,7 +311,9 @@ export default function AdminPriceBackfillPanel({ password, onCompleted }: { pas
                       <span className={detailStatusClassName(detail.status)}>{detailStatusLabel(detail.status)}</span>
                       {primaryQuery ? ` · ${primaryQuery}` : ""}
                     </p>
-                    {detail.reason ? <p className="mt-1 font-bold text-coral">{detail.reason}</p> : null}
+                    {detail.matched_title ? <p className="mt-1 font-semibold text-steel">네이버 결과: {detail.matched_title}</p> : null}
+                    {skuSummary ? <p className="mt-1 font-semibold text-pine">{skuSummary}</p> : null}
+                    {detail.reason ? <p className="mt-1 font-bold text-coral">{reasonLabel(detail.reason)}</p> : null}
                     {queries.length ? (
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         <span className="font-black text-steel">재검색어</span>
