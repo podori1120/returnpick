@@ -178,6 +178,7 @@ const requiredFiles = [
   "app/api/cron/sourcing/route.ts",
   "app/api/cron/telegram-digest/route.ts",
   "app/api/events/route.ts",
+  "app/deals/category/[category]/page.tsx",
   "app/picks/novatech-s1-window-cleaner/page.tsx",
   "app/picks/novatech-s1-window-cleaner/opengraph-image.tsx",
   "app/picks/novatech-s1-window-cleaner/twitter-image.tsx",
@@ -201,6 +202,7 @@ const requiredFiles = [
   "lib/approvalSample.ts",
   "lib/adminNavigation.ts",
   "lib/apiReadiness.ts",
+  "lib/categoryLanding.ts",
   "lib/clientTracking.ts",
   "lib/launchState.ts",
   "lib/naverPriceBackfill.ts",
@@ -390,6 +392,43 @@ if (fileExists("app/robots.ts") && fileExists("app/sitemap.ts")) {
       sitemap.includes('/picks/novatech-s1-window-cleaner') &&
       !sitemap.includes('/products/approval-sample'),
     "robots protects admin/API while sitemap exposes core public, guide, disclosure, and indexable editorial routes",
+    "required"
+  );
+}
+
+if (
+  fileExists("app/deals/category/[category]/page.tsx") &&
+  fileExists("lib/category.ts") &&
+  fileExists("lib/categoryLanding.ts") &&
+  fileExists("app/page.tsx") &&
+  fileExists("app/sitemap.ts")
+) {
+  const categoryLandingPage = readText("app/deals/category/[category]/page.tsx");
+  const categorySource = readText("lib/category.ts");
+  const categoryLanding = readText("lib/categoryLanding.ts");
+  const homePage = readText("app/page.tsx");
+  const sitemap = readText("app/sitemap.ts");
+  const categoryIds = ["laptop", "monitor", "robot_vacuum", "cordless_vacuum", "air_purifier", "dehumidifier"];
+  check(
+    "public SEO: canonical category landing pages",
+    categoryIds.every((category) => categoryLanding.includes(`${category}: {`)) &&
+      categoryLanding.includes("Record<Category, CategoryLandingContent>") &&
+      categorySource.includes("Object.prototype.hasOwnProperty.call(categories, value)") &&
+      categoryLandingPage.includes("generateStaticParams") &&
+      categoryLandingPage.includes("dynamicParams = false") &&
+      categoryLandingPage.includes("generateMetadata") &&
+      categoryLandingPage.includes("alternates: { canonical: canonicalUrl }") &&
+      categoryLandingPage.includes("isPublicDealReady") &&
+      categoryLandingPage.includes("product.category === category") &&
+      categoryLandingPage.includes('"@type": "FAQPage"') &&
+      categoryLandingPage.includes("AffiliateNotice") &&
+      categoryLandingPage.includes("가격과 반품 근거가 확인되기 전에는 상품 수를 채우기 위해 임의 게시하지 않습니다") &&
+      !categoryLandingPage.includes('"@type": "Offer"') &&
+      homePage.includes('/deals/category/${category.value}') &&
+      sitemap.includes('/deals/category/${category.value}') &&
+      sitemap.includes("categoryOptions.map") &&
+      !sitemap.includes('/products/approval-sample'),
+    "six category pages use self-canonical metadata, public-ready products, unique buying guidance, FAQ schema, honest empty states, and sitemap/home discovery",
     "required"
   );
 }

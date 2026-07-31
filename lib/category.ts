@@ -14,7 +14,11 @@ export const categoryOptions = Object.entries(categories).map(([value, meta]) =>
   label: meta.label
 }));
 
+export function isKnownCategory(value: string | null | undefined): value is Category {
+  return Boolean(value && Object.prototype.hasOwnProperty.call(categories, value));
+}
+
 export function getCategoryLabel(category: string | null | undefined) {
-  if (!category || !(category in categories)) return "기타";
-  return categories[category as Category].label;
+  if (!isKnownCategory(category)) return "기타";
+  return categories[category].label;
 }

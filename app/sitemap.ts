@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { categoryOptions } from "@/lib/category";
 import { getSiteUrl } from "@/lib/siteUrl";
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -12,8 +13,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/disclosure", changeFrequency: "yearly", priority: 0.2 },
     { path: "/picks/novatech-s1-window-cleaner", changeFrequency: "weekly", priority: 0.8 }
   ];
+  const categoryEntries = categoryOptions.map((category) => ({
+    path: `/deals/category/${category.value}`,
+    changeFrequency: "daily" as const,
+    priority: 0.75
+  }));
 
-  return entries.map((entry) => ({
+  return [...entries, ...categoryEntries].map((entry) => ({
     url: `${siteUrl}${entry.path}`,
     lastModified: now,
     changeFrequency: entry.changeFrequency,

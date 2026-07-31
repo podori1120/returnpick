@@ -63,13 +63,23 @@ const guideEditorialRequirements = {
   disclosure: "쿠팡 파트너스 제휴 링크가 포함되어 있습니다"
 };
 
+const categoryLandingRequirements = [
+  { path: "/deals/category/laptop", label: "노트북" },
+  { path: "/deals/category/monitor", label: "모니터" },
+  { path: "/deals/category/robot_vacuum", label: "로봇청소기" },
+  { path: "/deals/category/cordless_vacuum", label: "무선청소기" },
+  { path: "/deals/category/air_purifier", label: "공기청정기" },
+  { path: "/deals/category/dehumidifier", label: "제습기" }
+];
+
 const sitemapRequiredPaths = [
   "/",
   "/deals",
   "/disclosure",
   "/picks/novatech-s1-window-cleaner",
   "/guide/return-checklist",
-  "/guide/safe-categories"
+  "/guide/safe-categories",
+  ...categoryLandingRequirements.map((item) => item.path)
 ];
 
 const adminUiRequiredText = [
@@ -284,7 +294,36 @@ function checkSitemapXml(xml, status) {
   if (missing.length) {
     fail("sitemap.xml", `missing public routes: ${missing.join(", ")}`);
   } else {
-    pass("sitemap.xml", "core public, editorial, disclosure, and guide routes are listed");
+    pass("sitemap.xml", "core public, category, editorial, disclosure, and guide routes are listed");
+  }
+}
+
+function checkCategoryLandingPages(pages) {
+  const failures = [];
+  for (const page of pages) {
+    if (page.status !== 200) {
+      failures.push(`${page.path}:status_${page.status}`);
+      continue;
+    }
+
+    const expected = [
+      `${siteUrl}${page.path}`,
+      `반품 ${page.label}`,
+      "구매 전 비교 기준",
+      "수령 직후 확인",
+      "FAQPage",
+      "쿠팡 파트너스 활동의 일환"
+    ];
+    const missing = expected.filter((value) => !page.html.includes(value));
+    if (page.html.includes('"@type":"Offer"') || page.html.includes("https://schema.org/Offer")) missing.push("unexpected_offer_schema");
+    if (containsLikelyMojibake(page.html)) missing.push("readable_korean");
+    if (missing.length) failures.push(`${page.path}:${missing.join("|")}`);
+  }
+
+  if (failures.length) {
+    fail("category landing pages", failures.join(", "));
+  } else {
+    pass("category landing pages", `${pages.length} canonical pages expose unique buying checks, FAQ schema, disclosure, and no invented offer data`);
   }
 }
 
@@ -608,6 +647,18 @@ async function main() {
     checkGuideEditorialHandoff("safe categories handoff", "/guide/safe-categories", safeCategoriesGuide.text, safeCategoriesGuide.response.status);
   } catch (error) {
     fail("safe categories handoff", error instanceof Error ? error.message : "fetch failed");
+  }
+
+  try {
+    const categoryPages = await Promise.all(
+      categoryLandingRequirements.map(async (item) => {
+        const page = await readText(item.path);
+        return { ...item, html: page.text, status: page.response.status };
+      })
+    );
+    checkCategoryLandingPages(categoryPages);
+  } catch (error) {
+    fail("category landing pages", error instanceof Error ? error.message : "fetch failed");
   }
 
   try {

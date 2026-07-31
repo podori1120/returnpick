@@ -188,7 +188,7 @@ export default async function HomePage() {
               <Link
                 key={category.value}
                 className="rounded-lg border border-line p-4 font-black hover:border-pine hover:bg-mist"
-                href={`/deals?category=${category.value}`}
+                href={`/deals/category/${category.value}`}
               >
                 <span className="block text-sm text-steel">{category.label}</span>
                 <span className="mt-1 block text-lg text-ink">{category.count ? `${category.count}개 공개` : "검수 등록 대기"}</span>
