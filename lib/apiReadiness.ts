@@ -59,10 +59,6 @@ export type ApiConnectionCheck = {
   detail?: Record<string, JsonValue>;
 };
 
-function present(name: string) {
-  return Boolean(process.env[name]?.trim());
-}
-
 function normalizeUrl(value: string | undefined) {
   const raw = value?.trim();
   if (!raw) return null;

@@ -1778,6 +1778,20 @@ if (
     "the homepage supports product search, purpose-first discovery, and an honest editorial fallback when no public deals exist",
     "required"
   );
+  check(
+    "public funnel: zero inventory prioritizes the verified editorial pick",
+    homePage.includes("const hasPublishedDeals = products.length > 0;") &&
+      homePage.includes("현재 공개된 직접 검수 추천 1건") &&
+      homePage.includes('href={hasPublishedDeals ? "/deals" : approvalSampleProduct.detailPath}') &&
+      dealsPage.includes("function EmptyDealsCatalog()") &&
+      dealsPage.includes("빈 목록 대신, 확인된 한 건을 먼저 보여드립니다") &&
+      dealsPage.includes('if (!allPublished.length) return <EmptyDealsCatalog />;') &&
+      dealsPage.indexOf('if (!allPublished.length) return <EmptyDealsCatalog />;') < dealsPage.indexOf("const filteredProducts = sortProducts") &&
+      dealsPage.includes('<ApprovalSampleCard placement="deals" />') &&
+      dealsPage.includes("파트너스 링크와 쿠팡 상품번호가 연결된 추천만 보여드립니다."),
+    "when the public catalog is empty, home and /deals lead with the only verified affiliate-backed editorial pick instead of zero-count filters",
+    "required"
+  );
 }
 
 if (

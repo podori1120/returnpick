@@ -22,6 +22,7 @@ import RecentDealsRail from "@/components/RecentDealsRail";
 import { categoryOptions } from "@/lib/category";
 import { listProducts } from "@/lib/dataStore";
 import { matchesUseCase, useCaseOptions, type UseCaseId } from "@/lib/dealIntelligence";
+import { approvalSampleProduct } from "@/lib/approvalSample";
 import { isPublicDealReady } from "@/lib/publicDeal";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +45,7 @@ export default async function HomePage() {
     .filter(isPublicDealReady)
     .sort((a, b) => (b.latest_score?.total_score ?? 0) - (a.latest_score?.total_score ?? 0));
   const featured = products.slice(0, 6);
+  const hasPublishedDeals = products.length > 0;
   const counts = categoryOptions.map((category) => ({
     ...category,
     count: products.filter((product) => product.category === category.value).length
@@ -58,44 +60,66 @@ export default async function HomePage() {
       <section className="border-b border-line bg-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_420px] lg:py-14">
           <div className="flex flex-col justify-center">
-            <p className="text-sm font-black text-pine">반품 노트북·디지털·소형가전 비교</p>
-            <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">가격보다 먼저, 살 만한 근거를 확인합니다</h1>
-            <p className="mt-4 max-w-2xl text-base font-semibold leading-7 text-steel">
-              상품명과 모델을 검색하면 가격 차이, 반품등급, 핵심 스펙과 주의점을 한 번에 비교합니다. 확인되지 않은 반품 정보는 추측하지 않고 확인필요로 표시합니다.
+            <p className="text-sm font-black text-pine">
+              {hasPublishedDeals ? "반품 노트북·디지털·소형가전 비교" : "쿠팡 이동 경로 확인 완료 추천"}
             </p>
-            <form action="/deals" className="mt-6 flex max-w-2xl gap-2" role="search">
-              <label className="relative min-w-0 flex-1">
-                <span className="sr-only">상품 검색</span>
-                <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-steel" size={20} aria-hidden />
-                <input
-                  className="focus-ring h-12 w-full rounded-lg border border-line bg-white pl-12 pr-4 text-sm font-bold text-ink placeholder:text-steel"
-                  name="search"
-                  placeholder="상품명·브랜드·모델명 검색"
-                />
-              </label>
-              <button className="focus-ring inline-flex h-12 shrink-0 items-center gap-2 rounded-lg bg-ink px-5 text-sm font-black text-white hover:bg-pine" type="submit">
-                딜 찾기 <ArrowRight size={17} aria-hidden />
-              </button>
-            </form>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-steel">
-              <span>많이 찾는 검색</span>
-              {popularSearches.map((keyword) => (
-                <Link
-                  key={keyword}
-                  className="focus-ring rounded-md border border-line bg-white px-2.5 py-1.5 text-ink hover:border-pine hover:text-pine"
-                  href={`/deals?search=${encodeURIComponent(keyword)}`}
-                >
-                  {keyword}
-                </Link>
-              ))}
-            </div>
+            <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
+              {hasPublishedDeals ? "가격보다 먼저, 살 만한 근거를 확인합니다" : "직접 검수한 첫 추천부터 확인하세요"}
+            </h1>
+            <p className="mt-4 max-w-2xl text-base font-semibold leading-7 text-steel">
+              {hasPublishedDeals
+                ? "상품명과 모델을 검색하면 가격 차이, 반품등급, 핵심 스펙과 주의점을 한 번에 비교합니다. 확인되지 않은 반품 정보는 추측하지 않고 확인필요로 표시합니다."
+                : `${approvalSampleProduct.name}의 확인된 사양과 구매 전 주의점을 먼저 정리했습니다. 가격과 재고는 고정해서 보여주지 않고 쿠팡의 현재 조건을 직접 확인합니다.`}
+            </p>
+            {hasPublishedDeals ? (
+              <>
+                <form action="/deals" className="mt-6 flex max-w-2xl gap-2" role="search">
+                  <label className="relative min-w-0 flex-1">
+                    <span className="sr-only">상품 검색</span>
+                    <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-steel" size={20} aria-hidden />
+                    <input
+                      className="focus-ring h-12 w-full rounded-lg border border-line bg-white pl-12 pr-4 text-sm font-bold text-ink placeholder:text-steel"
+                      name="search"
+                      placeholder="상품명·브랜드·모델명 검색"
+                    />
+                  </label>
+                  <button className="focus-ring inline-flex h-12 shrink-0 items-center gap-2 rounded-lg bg-ink px-5 text-sm font-black text-white hover:bg-pine" type="submit">
+                    딜 찾기 <ArrowRight size={17} aria-hidden />
+                  </button>
+                </form>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-steel">
+                  <span>많이 찾는 검색</span>
+                  {popularSearches.map((keyword) => (
+                    <Link
+                      key={keyword}
+                      className="focus-ring rounded-md border border-line bg-white px-2.5 py-1.5 text-ink hover:border-pine hover:text-pine"
+                      href={`/deals?search=${encodeURIComponent(keyword)}`}
+                    >
+                      {keyword}
+                    </Link>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="mt-6 max-w-2xl border-y border-line py-4">
+                <p className="text-xs font-black text-pine">현재 공개된 직접 검수 추천 1건</p>
+                <p className="mt-1 text-sm font-semibold leading-6 text-steel">
+                  빈 검색 결과를 보여주기보다 확인된 추천을 먼저 제공합니다. 자동 수집 딜은 관리자 검수와 상품별 파트너스 링크 확인을 마친 뒤 추가됩니다.
+                </p>
+              </div>
+            )}
             <div className="mt-6 flex flex-wrap gap-2">
-              <Link className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink" href="/deals">
-                검수 완료 딜 <ArrowRight size={16} aria-hidden />
+              <Link
+                className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink"
+                href={hasPublishedDeals ? "/deals" : approvalSampleProduct.detailPath}
+              >
+                {hasPublishedDeals ? "검수 완료 딜" : "첫 추천 구매 전 체크"} <ArrowRight size={16} aria-hidden />
               </Link>
-              <Link className="focus-ring rounded-lg border border-pine bg-white px-5 py-3 text-sm font-black text-pine hover:bg-pine hover:text-white" href="/picks/novatech-s1-window-cleaner">
-                직접 검수 추천 상품
-              </Link>
+              {hasPublishedDeals ? (
+                <Link className="focus-ring rounded-lg border border-pine bg-white px-5 py-3 text-sm font-black text-pine hover:bg-pine hover:text-white" href={approvalSampleProduct.detailPath}>
+                  직접 검수 추천 상품
+                </Link>
+              ) : null}
               <Link className="focus-ring rounded-lg border border-line px-5 py-3 text-sm font-black hover:bg-mist" href="/guide/return-checklist">
                 수령 체크리스트
               </Link>
@@ -111,7 +135,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="border-b border-ink bg-ink text-white">
+      {hasPublishedDeals ? <section className="border-b border-ink bg-ink text-white">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -147,7 +171,7 @@ export default async function HomePage() {
             })}
           </div>
         </div>
-      </section>
+      </section> : null}
 
       <section className="mx-auto max-w-7xl space-y-5 px-4 py-8 sm:px-6">
         <RecentDealsRail />
