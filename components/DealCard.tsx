@@ -5,6 +5,7 @@ import { getDealPrice, getDiscountRate, getPrimaryUseCase, getReferencePrice } f
 import { formatPercent, formatPrice } from "@/lib/format";
 import { getDealQuality } from "@/lib/quality";
 import { getPurchaseDecision } from "@/lib/purchaseDecision";
+import { getDealFreshness } from "@/lib/dealFreshness";
 import { getLatestScore } from "@/lib/scoring";
 import type { ProductWithScore } from "@/lib/types";
 import CompareButton from "@/components/CompareButton";
@@ -20,6 +21,7 @@ export default function DealCard({ product }: { product: ProductWithScore }) {
   const quality = getDealQuality(product);
   const primaryUseCase = getPrimaryUseCase(product);
   const decision = getPurchaseDecision(product);
+  const freshness = getDealFreshness(product);
   const isVerifiedReturn = Boolean(product.return_price && !["확인필요", "알수없음"].includes(product.condition_grade));
   const firstReason = score?.reasons?.[0] ?? product.public_note;
   const primaryCheck = quality.blockers[0] ?? quality.warnings[0];
@@ -58,6 +60,13 @@ export default function DealCard({ product }: { product: ProductWithScore }) {
           {riskCount ? <span className="rounded-md bg-coral/10 px-2.5 py-1 text-xs font-bold text-coral">주의 {riskCount}</span> : null}
           {primaryUseCase ? <span className="rounded-md bg-pine/10 px-2.5 py-1 text-xs font-bold text-pine">{primaryUseCase.label}</span> : null}
           {product.stock_count ? <span className="rounded-md bg-mist px-2.5 py-1 text-xs font-bold text-steel">재고 {product.stock_count}</span> : null}
+          <span
+            className={`rounded-md px-2.5 py-1 text-xs font-bold ${freshness.status === "fresh" ? "bg-pine/10 text-pine" : freshness.status === "stale" ? "bg-coral/10 text-coral" : "bg-lemon/25 text-ink"}`}
+            data-freshness-status={freshness.status}
+            title={freshness.description}
+          >
+            {freshness.label}
+          </span>
         </div>
         {firstReason || primaryCheck ? (
           <div className="space-y-2 rounded-lg bg-mist p-3 text-xs font-bold leading-5 text-steel">

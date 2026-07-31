@@ -767,6 +767,16 @@ if (
     "visitors can save public deals locally, return to a noindex saved-deals page, and continue through disclosed detail or affiliate CTAs without adding login or personal-data storage",
     "required"
   );
+  check(
+    "public UX: freshness on deal cards",
+    dealCard.includes('import { getDealFreshness } from "@/lib/dealFreshness"') &&
+      dealCard.includes("const freshness = getDealFreshness(product)") &&
+      dealCard.includes("data-freshness-status={freshness.status}") &&
+      dealCard.includes("freshness.description") &&
+      dealCard.includes("freshness.label"),
+    "public deal cards expose the latest observation state before a visitor opens a deal, while the detail page keeps the full verification strip",
+    "required"
+  );
 }
 
 if (
