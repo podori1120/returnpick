@@ -2,6 +2,7 @@ import Link from "next/link";
 import DealRadar from "@/components/DealRadar";
 import DealCard from "@/components/DealCard";
 import AffiliateNotice from "@/components/AffiliateNotice";
+import ApprovalSampleCard from "@/components/ApprovalSampleCard";
 import { ProductImpressionTracker } from "@/components/AffiliateEventTracker";
 import RecentDealsRail from "@/components/RecentDealsRail";
 import SavedFilterBar from "@/components/SavedFilterBar";
@@ -353,16 +354,17 @@ export default async function DealsPage({
         ))}
       </div>
       {!products.length ? (
-        <div className="rounded-lg border border-line bg-white p-8 text-center shadow-soft">
-          <p className="text-sm font-black text-pine">구매 CTA 검수 중</p>
-          <h2 className="mt-2 text-2xl font-black">파트너스 링크가 준비된 상품만 공개합니다</h2>
-          <p className="mx-auto mt-3 max-w-2xl text-sm font-semibold leading-6 text-steel">
-            현재 게시 후보는 관리자에서 제휴 링크 보강을 기다리고 있습니다. 가격 확인 버튼이 실제 쿠팡 파트너스 링크로 연결되는 상품만 공개 목록에 표시됩니다.
-          </p>
-          <Link className="focus-ring mt-5 inline-flex rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink" href="/products/approval-sample">
-            승인용 추천 상품 보기
-          </Link>
-        </div>
+        <section className="grid gap-6 border-y border-line py-6 lg:grid-cols-[1fr_420px] lg:items-center">
+          <div className="px-1 py-3 lg:pr-8">
+            <p className="text-sm font-black text-pine">직접 검수 추천</p>
+            <h2 className="mt-2 text-2xl font-black">구매 페이지가 확인된 상품을 먼저 보세요</h2>
+            <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-steel">
+              자동 수집 딜은 가격과 반품 근거를 검수 중입니다. 지금은 상품 정보와 쿠팡 이동 경로를 직접 확인한 추천 상품을 먼저 볼 수 있습니다.
+            </p>
+            <p className="mt-3 text-xs font-semibold leading-5 text-steel">가격과 재고는 표시 시점에 따라 달라질 수 있어 쿠팡 상품 페이지에서 최종 확인하도록 안내합니다.</p>
+          </div>
+          <ApprovalSampleCard />
+        </section>
       ) : null}
 
       {totalPages > 1 ? (

@@ -108,10 +108,11 @@ function sendEventWithFetch(payload: string) {
 }
 
 export function trackAffiliateEvent(input: {
-  productId: string;
+  productId?: string | null;
   eventType: AffiliateEventType;
   channel?: string;
   utmSource?: string | null;
+  context?: "approval_sample";
 }) {
   if (typeof window === "undefined") return;
   try {
@@ -121,7 +122,8 @@ export function trackAffiliateEvent(input: {
       channel: input.channel ?? "web",
       anon_session_id: getAnonSessionId(),
       referrer: document.referrer || null,
-      utm_source: input.utmSource ?? getUtmSource()
+      utm_source: input.utmSource ?? getUtmSource(),
+      context: input.context ?? null
     });
 
     if (navigator.sendBeacon) {

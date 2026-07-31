@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { createAffiliateEvent, getProductById } from "@/lib/dataStore";
+import { isCoupangPartnersLink } from "@/lib/coupangLink";
 import { isPublicDealReady } from "@/lib/publicDeal";
 import type { AffiliateEventType } from "@/lib/types";
 
 const eventTypes = new Set<AffiliateEventType>(["impression", "detail_view", "affiliate_click", "telegram_detail_click", "share_copy"]);
+const approvalSampleEventContext = "approval_sample";
+const approvalSampleEventChannel = "web_approval_sample";
 
 function isEventType(value: unknown): value is AffiliateEventType {
   return typeof value === "string" && eventTypes.has(value as AffiliateEventType);
@@ -44,6 +47,26 @@ function cleanAnonSessionId(value: unknown) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(next) ? next : null;
 }
 
+function isApprovalSampleTrackingRequest(request: Request, body: Record<string, unknown>, channel: string | null) {
+  if (body.event_type !== "affiliate_click" || body.context !== approvalSampleEventContext || channel !== approvalSampleEventChannel) {
+    return false;
+  }
+
+  if (!isCoupangPartnersLink(process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL)) return false;
+
+  const requestReferrer = request.headers.get("referer");
+  if (!requestReferrer) return false;
+
+  try {
+    const referrerUrl = new URL(requestReferrer);
+    const fetchSite = request.headers.get("sec-fetch-site");
+    if (fetchSite && fetchSite !== "same-origin") return false;
+    return referrerUrl.pathname === "/products/approval-sample";
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
   const contentLength = Number(request.headers.get("content-length") ?? 0);
   if (Number.isFinite(contentLength) && contentLength > 4096) {
@@ -56,12 +79,31 @@ export async function POST(request: Request) {
   }
 
   const productId = cleanProductId(body.product_id);
-  if (!productId) {
+  const channel = cleanTrackingLabel(body.channel, "web");
+  const approvalSampleClick = !productId && isApprovalSampleTrackingRequest(request, body, channel);
+  if (!productId && !approvalSampleClick) {
     return NextResponse.json({ ok: false, skipped: "PRODUCT_ID_REQUIRED" }, { status: 202 });
   }
 
   const referrer = cleanReferrer(body.referrer) ?? cleanReferrer(request.headers.get("referer"));
   try {
+    if (approvalSampleClick) {
+      const event = await createAffiliateEvent({
+        product_id: null,
+        event_type: "affiliate_click",
+        channel,
+        anon_session_id: cleanAnonSessionId(body.anon_session_id),
+        referrer,
+        utm_source: cleanTrackingLabel(body.utm_source)
+      });
+
+      return NextResponse.json({ ok: true, id: event.id });
+    }
+
+    if (!productId) {
+      return NextResponse.json({ ok: false, skipped: "PRODUCT_ID_REQUIRED" }, { status: 202 });
+    }
+
     const product = await getProductById(productId);
     if (!product || !isPublicDealReady(product)) {
       return NextResponse.json({ ok: false, skipped: "PRODUCT_NOT_PUBLIC_READY" }, { status: 202 });
@@ -70,7 +112,7 @@ export async function POST(request: Request) {
     const event = await createAffiliateEvent({
       product_id: productId,
       event_type: body.event_type,
-      channel: cleanTrackingLabel(body.channel, "web"),
+      channel,
       anon_session_id: cleanAnonSessionId(body.anon_session_id),
       referrer,
       utm_source: cleanTrackingLabel(body.utm_source)

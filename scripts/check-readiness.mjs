@@ -176,6 +176,7 @@ const requiredFiles = [
   "app/api/cron/telegram-digest/route.ts",
   "app/api/events/route.ts",
   "components/AdminLaunchStatusBar.tsx",
+  "components/ApprovalSampleCard.tsx",
   "components/AdminApiReadinessPanel.tsx",
   "components/AdminAffiliateLinkQueue.tsx",
   "components/AdminLaunchRunner.tsx",
@@ -186,6 +187,7 @@ const requiredFiles = [
   "components/AffiliateEventTracker.tsx",
   "components/TelegramPreview.tsx",
   "lib/affiliateLinkBackfill.ts",
+  "lib/approvalSample.ts",
   "lib/adminNavigation.ts",
   "lib/apiReadiness.ts",
   "lib/clientTracking.ts",
@@ -200,6 +202,7 @@ const requiredFiles = [
   "lib/providers/mockProvider.ts",
   "lib/validators.ts",
   "scripts/print-production-env-template.mjs",
+  "scripts/patch-brace-expansion-compat.mjs",
   "scripts/print-vercel-env-repair-plan.mjs",
   "scripts/load-env-files.mjs",
   "scripts/verify-production-env.mjs",
@@ -250,6 +253,19 @@ if (fileExists("package.json") && fileExists("eslint.config.mjs")) {
     "ESLint uses the Next flat config, ignores generated folders, and keeps current broad refactor rules as warnings",
     "required"
   );
+  if (fileExists("scripts/patch-brace-expansion-compat.mjs")) {
+    const compatibilityPatch = readText("scripts/patch-brace-expansion-compat.mjs");
+    check(
+      "dependencies: guarded secure brace compatibility",
+      packageJson.includes('"postinstall": "node scripts/patch-brace-expansion-compat.mjs"') &&
+        packageJson.includes('"brace-expansion": "5.0.9"') &&
+        compatibilityPatch.includes('packageJson.version !== "3.1.5"') &&
+        compatibilityPatch.includes("typeof braceExpansion === 'function'") &&
+        compatibilityPatch.includes("source.split(original).length !== 2"),
+      "secure brace-expansion remains compatible with legacy lint glob consumers and fails closed on dependency drift",
+      "required"
+    );
+  }
 }
 
 if (fileExists("package.json") && fileExists("scripts/verify-scoring-rules.mjs")) {
@@ -1186,6 +1202,54 @@ if (fileExists("lib/clientTracking.ts")) {
       clientTracking.includes("if (queued) return") &&
       clientTracking.includes(".catch(() => undefined)"),
     "client-side analytics failures cannot interrupt Coupang outbound clicks or page views",
+    "required"
+  );
+}
+
+if (
+  fileExists("components/ApprovalCoupangButton.tsx") &&
+  fileExists("app/api/events/route.ts") &&
+  fileExists("components/AdminOpsDashboard.tsx")
+) {
+  const approvalButton = readText("components/ApprovalCoupangButton.tsx");
+  const eventRoute = readText("app/api/events/route.ts");
+  const opsDashboard = readText("components/AdminOpsDashboard.tsx");
+  check(
+    "approval sample: measured explicit affiliate click",
+    approvalButton.includes("trackAffiliateEvent") &&
+      approvalButton.includes('channel: "web_approval_sample"') &&
+      approvalButton.includes('context: "approval_sample"') &&
+      eventRoute.includes("isApprovalSampleTrackingRequest") &&
+      eventRoute.includes("NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL") &&
+      eventRoute.includes('fetchSite !== "same-origin"') &&
+      eventRoute.includes('referrerUrl.pathname === "/products/approval-sample"') &&
+      opsDashboard.includes('web_approval_sample: "직접 검수 추천 CTA"'),
+    "the manual approval product records only explicit same-page affiliate clicks and exposes the channel in admin metrics",
+    "required"
+  );
+}
+
+if (
+  fileExists("components/ApprovalSampleCard.tsx") &&
+  fileExists("lib/approvalSample.ts") &&
+  fileExists("app/products/approval-sample/page.tsx")
+) {
+  const approvalCard = readText("components/ApprovalSampleCard.tsx");
+  const approvalData = readText("lib/approvalSample.ts");
+  const approvalPage = readText("app/products/approval-sample/page.tsx");
+  check(
+    "approval sample: customer-ready visual without invented commerce data",
+    approvalCard.includes("next/image") &&
+      approvalCard.includes("연출 이미지") &&
+      approvalCard.includes("쿠팡 파트너스 제휴 링크") &&
+      approvalData.includes("window-cleaning-robot-editorial.webp") &&
+      approvalData.includes("9204971165 - 27182792409") &&
+      approvalPage.includes("approvalSampleProduct.imageNotice") &&
+      approvalPage.includes("공개 페이지: {captureUrl}") &&
+      approvalPage.includes("<h1 className=\"mt-1 text-2xl font-black tracking-tight\">{productName}</h1>") &&
+      approvalPage.includes("sku: approvalSampleProduct.coupangProductNumber") &&
+      !approvalPage.includes("https://schema.org/InStock"),
+    "the manual approval product uses a disclosed editorial image and does not invent price, stock, or availability",
     "required"
   );
 }

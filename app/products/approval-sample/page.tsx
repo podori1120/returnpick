@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -13,16 +14,18 @@ import {
   Truck
 } from "lucide-react";
 import ApprovalCoupangButton from "@/components/ApprovalCoupangButton";
+import { approvalSampleProduct } from "@/lib/approvalSample";
 import { getSiteUrl } from "@/lib/siteUrl";
 
 const affiliateNotice = "이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.";
-const productName = "Novatech S1 창문 로봇청소기";
-const productSubtitle = "5800Pa 초강흡입력 · 자동 분수 · 초슬림 유리창 청소기";
+const productName = approvalSampleProduct.name;
+const productSubtitle = approvalSampleProduct.subtitle;
 const canonicalUrl = `${getSiteUrl()}/products/approval-sample`;
+const editorialImageUrl = `${getSiteUrl()}${approvalSampleProduct.imageSrc}`;
 
 const specCards = [
   { icon: Gauge, label: "흡입 고정", value: "5800Pa", body: "창문에 붙어 이동하는 제품 특성상 흡입 고정력을 우선 확인합니다." },
-  { icon: Droplets, label: "물 분사", value: "자동 분수", body: "유리면을 닦을 때 물 분사 방식과 사용 환경의 궁합을 확인해야 합니다." },
+  { icon: Droplets, label: "물 분사", value: "자동 물 분사", body: "유리면을 닦을 때 물 분사 방식과 사용 환경의 궁합을 확인해야 합니다." },
   { icon: Sparkles, label: "사용처", value: "유리창 청소", body: "높은 창문이나 넓은 유리면을 자주 관리해야 하는 경우에 적합합니다." }
 ];
 
@@ -61,7 +64,8 @@ export const metadata: Metadata = {
     description: "쿠팡 파트너스 최종승인 심사용 ReturnPick 추천 상품 상세 페이지",
     url: canonicalUrl,
     siteName: "ReturnPick",
-    type: "website"
+    type: "website",
+    images: [{ url: editorialImageUrl, width: 1400, height: 933, alt: approvalSampleProduct.imageAlt }]
   }
 };
 
@@ -72,17 +76,12 @@ export default function ApprovalSampleProductPage() {
     "@context": "https://schema.org",
     "@type": "Product",
     name: productName,
-    brand: "Novatech",
-    category: "Window Cleaning Robot",
+    brand: approvalSampleProduct.brand,
+    category: approvalSampleProduct.category,
     description: `${productName} ${productSubtitle}`,
     url: captureUrl,
-    offers: approvalUrl
-      ? {
-          "@type": "Offer",
-          url: approvalUrl,
-          availability: "https://schema.org/InStock"
-        }
-      : undefined
+    image: editorialImageUrl,
+    sku: approvalSampleProduct.coupangProductNumber
   };
 
   return (
@@ -92,11 +91,10 @@ export default function ApprovalSampleProductPage() {
       <section className="mb-5 rounded-lg border border-line bg-white p-4 shadow-soft">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-black text-pine">Coupang Partners Review Page</p>
-            <h1 className="mt-1 text-2xl font-black tracking-tight">ReturnPick 승인용 추천 상품</h1>
-            <p className="mt-1 text-sm font-semibold leading-6 text-steel">
-              심사용 캡처에 필요한 사이트 주소, 상품 정보, 가격 확인 버튼, 제휴 고지를 한 화면에서 확인할 수 있게 구성했습니다.
-            </p>
+            <p className="text-xs font-black text-pine">ReturnPick 승인용 추천 상품 · Coupang Partners Review Page</p>
+            <h1 className="mt-1 text-2xl font-black tracking-tight">{productName}</h1>
+            <p className="mt-1 text-sm font-black leading-6 text-steel">{productSubtitle}</p>
+            <p className="mt-1 break-all text-xs font-semibold leading-5 text-steel">공개 페이지: {captureUrl}</p>
           </div>
           <Link className="focus-ring rounded-lg border border-line px-4 py-2 text-sm font-black hover:bg-mist" href="/disclosure">
             제휴 안내
@@ -106,26 +104,25 @@ export default function ApprovalSampleProductPage() {
 
       <section className="grid gap-6 lg:grid-cols-[1fr_390px]">
         <div className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">
-          <div className="aspect-[16/9] bg-mist p-5 sm:p-8">
-            <div className="flex h-full flex-col justify-between rounded-lg border border-line bg-white p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <span className="rounded-md bg-pine/10 px-3 py-1 text-xs font-black text-pine">상품 이미지 영역</span>
-                <span className="rounded-md bg-mist px-3 py-1 text-xs font-bold text-steel">쿠팡 페이지 기준 최종 확인</span>
-              </div>
-              <div>
-                <p className="text-sm font-black text-pine">Window Cleaning Robot</p>
-                <p className="mt-2 text-3xl font-black tracking-tight text-ink sm:text-4xl">{productName}</p>
-                <p className="mt-2 text-sm font-semibold text-steel">{productSubtitle}</p>
-              </div>
-              <div className="grid gap-2 text-xs font-black text-ink sm:grid-cols-3">
-                {specCards.map((item) => (
-                  <span key={item.label} className="inline-flex items-center gap-2 rounded-md bg-mist px-3 py-2">
-                    <item.icon size={15} aria-hidden /> {item.value}
-                  </span>
-                ))}
+          <figure>
+            <div className="relative aspect-[3/2] overflow-hidden bg-mist">
+              <Image
+                alt={approvalSampleProduct.imageAlt}
+                className="object-cover"
+                fill
+                priority
+                sizes="(min-width: 1024px) 730px, 100vw"
+                src={approvalSampleProduct.imageSrc}
+              />
+              <div className="absolute inset-x-3 top-3 flex flex-wrap items-center justify-between gap-2">
+                <span className="rounded-md bg-white/95 px-3 py-1 text-xs font-black text-ink shadow-soft">제품 사용 연출 이미지</span>
+                <span className="rounded-md bg-white/95 px-3 py-1 text-xs font-bold text-steel shadow-soft">실제 외관·구성은 쿠팡에서 확인</span>
               </div>
             </div>
-          </div>
+            <figcaption className="border-b border-line bg-mist px-5 py-3 text-xs font-semibold leading-5 text-steel">
+              {approvalSampleProduct.imageNotice}
+            </figcaption>
+          </figure>
 
           <div className="space-y-5 p-5 sm:p-6">
             <div className="flex flex-wrap gap-2">

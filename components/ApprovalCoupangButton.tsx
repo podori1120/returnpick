@@ -1,6 +1,7 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
+import { getUtmSource, trackAffiliateEvent } from "@/lib/clientTracking";
 
 export default function ApprovalCoupangButton({
   href,
@@ -18,6 +19,13 @@ export default function ApprovalCoupangButton({
       target="_blank"
       rel="nofollow sponsored noopener noreferrer"
       onClick={(event) => {
+        trackAffiliateEvent({
+          eventType: "affiliate_click",
+          channel: "web_approval_sample",
+          utmSource: getUtmSource(),
+          context: "approval_sample"
+        });
+
         if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 
         event.preventDefault();

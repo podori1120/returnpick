@@ -75,7 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 제휴 안내
               </Link>
               <Link className="text-pine hover:text-ink" href="/products/approval-sample">
-                승인용 추천 상품
+                직접 검수 추천 상품
               </Link>
             </div>
           </div>

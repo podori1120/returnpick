@@ -122,6 +122,7 @@ function noticeClassName(type: "info" | "error") {
 function channelLabel(channel: string) {
   const labels: Record<string, string> = {
     web: "웹 기본",
+    web_approval_sample: "직접 검수 추천 CTA",
     telegram: "텔레그램 기본",
     web_detail_hero: "상세 상단 CTA",
     telegram_detail_hero: "텔레그램 상단 CTA",
