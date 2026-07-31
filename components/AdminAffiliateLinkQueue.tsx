@@ -97,6 +97,10 @@ type AffiliateLinkVerificationResponse = {
   message?: string;
 };
 
+type CheckedAffiliateLinkVerification = AffiliateLinkVerification & {
+  checked_url: string;
+};
+
 function noticeClassName(type: "info" | "success" | "error") {
   if (type === "error") return "border-coral/30 bg-coral/10 text-coral";
   if (type === "success") return "border-pine/30 bg-pine/10 text-pine";
@@ -235,7 +239,7 @@ export default function AdminAffiliateLinkQueue({
   const [bulkImportRunning, setBulkImportRunning] = useState(false);
   const [bulkImportResult, setBulkImportResult] = useState<BulkImportResult | null>(null);
   const [checkingLinkId, setCheckingLinkId] = useState<string | null>(null);
-  const [linkVerifications, setLinkVerifications] = useState<Record<string, AffiliateLinkVerification & { checked_url: string }>>({});
+  const [linkVerifications, setLinkVerifications] = useState<Record<string, CheckedAffiliateLinkVerification>>({});
   const [notice, setNotice] = useState<{ type: "info" | "success" | "error"; message: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [targetProductId] = useState<string | null>(() => {
@@ -320,21 +324,23 @@ export default function AdminAffiliateLinkQueue({
     window.setTimeout(() => setCopiedId((current) => (current === product.id ? null : current)), 1500);
   }
 
-  async function verifyAffiliateUrl(product: ProductWithScore, mode: "verify" | "manual_confirm" = "verify") {
-    const affiliateUrl = inputs[product.id]?.trim() ?? "";
+  async function verifyAffiliateUrl(
+    product: ProductWithScore,
+    mode: "verify" | "manual_confirm" = "verify",
+    affiliateUrlOverride?: string
+  ): Promise<CheckedAffiliateLinkVerification> {
+    const affiliateUrl = affiliateUrlOverride?.trim() ?? inputs[product.id]?.trim() ?? "";
     if (!isCoupangPartnersLink(affiliateUrl)) {
-      setLinkVerifications((current) => ({
-        ...current,
-        [product.id]: {
-          ok: false,
-          code: "INVALID_AFFILIATE_URL",
-          message: "https://link.coupang.com/a/... 형식의 파트너스 링크를 먼저 입력하세요.",
-          redirect_count: 0,
-          checked_at: new Date().toISOString(),
-          checked_url: affiliateUrl
-        }
-      }));
-      return;
+      const verification: CheckedAffiliateLinkVerification = {
+        ok: false,
+        code: "INVALID_AFFILIATE_URL",
+        message: "https://link.coupang.com/a/... 형식의 파트너스 링크를 먼저 입력하세요.",
+        redirect_count: 0,
+        checked_at: new Date().toISOString(),
+        checked_url: affiliateUrl
+      };
+      setLinkVerifications((current) => ({ ...current, [product.id]: verification }));
+      return verification;
     }
 
     setCheckingLinkId(product.id);
@@ -351,32 +357,31 @@ export default function AdminAffiliateLinkQueue({
       });
       const data = (await response.json().catch(() => ({}))) as AffiliateLinkVerificationResponse;
       if (!response.ok || !data.verification) {
-        setLinkVerifications((current) => ({
-          ...current,
-          [product.id]: {
-            ok: false,
-            code: data.error ?? "LINK_VERIFICATION_FAILED",
-            message: data.message ?? "링크 목적지를 확인하지 못했습니다.",
-            redirect_count: 0,
-            checked_at: new Date().toISOString(),
-            checked_url: affiliateUrl
-          }
-        }));
-        return;
-      }
-      setLinkVerifications((current) => ({ ...current, [product.id]: { ...data.verification!, checked_url: affiliateUrl } }));
-    } catch {
-      setLinkVerifications((current) => ({
-        ...current,
-        [product.id]: {
+        const verification: CheckedAffiliateLinkVerification = {
           ok: false,
-          code: "LINK_VERIFICATION_NETWORK_ERROR",
-          message: "네트워크 문제로 링크 목적지를 확인하지 못했습니다.",
+          code: data.error ?? "LINK_VERIFICATION_FAILED",
+          message: data.message ?? "링크 목적지를 확인하지 못했습니다.",
           redirect_count: 0,
           checked_at: new Date().toISOString(),
           checked_url: affiliateUrl
-        }
-      }));
+        };
+        setLinkVerifications((current) => ({ ...current, [product.id]: verification }));
+        return verification;
+      }
+      const verification: CheckedAffiliateLinkVerification = { ...data.verification, checked_url: affiliateUrl };
+      setLinkVerifications((current) => ({ ...current, [product.id]: verification }));
+      return verification;
+    } catch {
+      const verification: CheckedAffiliateLinkVerification = {
+        ok: false,
+        code: "LINK_VERIFICATION_NETWORK_ERROR",
+        message: "네트워크 문제로 링크 목적지를 확인하지 못했습니다.",
+        redirect_count: 0,
+        checked_at: new Date().toISOString(),
+        checked_url: affiliateUrl
+      };
+      setLinkVerifications((current) => ({ ...current, [product.id]: verification }));
+      return verification;
     } finally {
       setCheckingLinkId(null);
     }
@@ -462,6 +467,10 @@ export default function AdminAffiliateLinkQueue({
       return;
     }
     setSavingId(product.id);
+    setNotice({
+      type: "info",
+      message: mode === "publish" ? "파트너스 링크를 저장하고 게시 상태를 확인하는 중입니다." : "파트너스 링크를 저장하고 목적지를 확인하는 중입니다."
+    });
     try {
       const response = await fetch(`/api/admin/products/${product.id}`, {
         method: "PATCH",
@@ -473,8 +482,15 @@ export default function AdminAffiliateLinkQueue({
         setNotice({ type: "error", message: data.message ?? data.error ?? "파트너스 링크 저장에 실패했습니다." });
         return;
       }
-      setNotice({ type: "success", message: mode === "publish" ? "파트너스 링크를 저장하고 게시했습니다." : "파트너스 링크를 저장했습니다." });
+      const verification = mode === "save" ? await verifyAffiliateUrl(product, "verify", affiliateUrl) : null;
       await loadProducts();
+      if (mode === "publish") {
+        setNotice({ type: "success", message: "파트너스 링크를 저장하고 게시했습니다." });
+      } else if (verification?.ok) {
+        setNotice({ type: "success", message: "파트너스 링크 저장과 목적지 확인을 완료했습니다." });
+      } else {
+        setNotice({ type: "info", message: "링크는 저장했지만 목적지 확인이 추가로 필요합니다. 아래 결과를 확인한 뒤 수동 확인을 진행하세요." });
+      }
       onCompleted();
     } catch {
       setNotice({ type: "error", message: "네트워크 문제로 파트너스 링크를 저장하지 못했습니다." });

@@ -1764,7 +1764,10 @@ if (
       linkQueue.includes("getAffiliateIdentityReadiness(product).ready") &&
       linkQueue.includes("getCustomerPublishReadiness(product).ready") &&
       linkQueue.includes('rel="nofollow sponsored noopener noreferrer"') &&
-      linkQueue.includes("linkVerifications"),
+      linkQueue.includes("linkVerifications") &&
+      linkQueue.includes("affiliateUrlOverride") &&
+      linkQueue.includes('await verifyAffiliateUrl(product, "verify", affiliateUrl)') &&
+      linkQueue.includes("링크는 저장했지만 목적지 확인이 추가로 필요합니다."),
     "authenticated admins compare one pasted link with the server-loaded candidate, retain unverified links in the queue, and can explicitly confirm only unresolved destinations",
     "required"
   );
