@@ -493,24 +493,31 @@ function checkConnectionCards(readiness, checks) {
     return;
   }
 
-  const failed = checks.filter((check) => check?.status === "error");
   const requiredIds = Array.isArray(readiness?.requiredConnectionCheckIds) ? readiness.requiredConnectionCheckIds : [];
-  const returnedIds = new Set(checks.map((check) => check?.id).filter(Boolean));
-  const missingRequired = requiredIds.filter((id) => !returnedIds.has(id));
+  const checkById = new Map(checks.map((check) => [check?.id, check]).filter(([id]) => Boolean(id)));
+  const missingRequired = requiredIds.filter((id) => !checkById.has(id));
+  const notReady = requiredIds.map((id) => checkById.get(id)).filter((check) => check && check.status !== "ok");
 
-  if (requireLaunchReady && missingRequired.length) {
-    fail("connection checks", `required cards missing: ${missingRequired.join(", ")}`);
-  } else if (missingRequired.length) {
+  if (requireLaunchReady && (missingRequired.length || notReady.length)) {
+    const detail = [
+      missingRequired.length ? `missing=${missingRequired.join(",")}` : null,
+      notReady.length ? `not_ready=${notReady.map((check) => `${check.id}:${check.status}`).join(",")}` : null
+    ].filter(Boolean);
+    fail("connection checks", detail.join("; "));
+    return;
+  }
+
+  if (missingRequired.length) {
     warn("connection checks", `required cards missing: ${missingRequired.join(", ")}`);
+    return;
   }
 
-  if (requireLaunchReady && failed.length) {
-    fail("connection checks", `failed cards: ${failed.map((check) => check.id || check.label).join(", ")}`);
-  } else if (failed.length) {
-    warn("connection checks", `failed cards: ${failed.map((check) => check.id || check.label).join(", ")}`);
-  } else if (!missingRequired.length) {
-    pass("connection checks", `${checks.length} cards returned, no error cards`);
+  if (notReady.length) {
+    warn("connection checks", `required cards awaiting setup: ${notReady.map((check) => `${check.id}:${check.status}`).join(", ")}`);
+    return;
   }
+
+  pass("connection checks", `${checks.length} required cards returned with ok status`);
 }
 
 function checkSchedulerHealth(json) {

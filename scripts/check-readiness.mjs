@@ -1439,6 +1439,19 @@ if (
     "the home and deals fallback cards record one session-safe impression through exact path and channel allowlists",
     "required"
   );
+  check(
+    "home discovery: search and use-case entry points",
+    homePage.includes('form action="/deals"') &&
+      homePage.includes('name="search"') &&
+      homePage.includes('placeholder="상품명·브랜드·모델명 검색"') &&
+      homePage.includes("matchesUseCase") &&
+      homePage.includes("useCaseOptions") &&
+      homePage.includes('/deals?useCase=${item.id}&sort=fit') &&
+      homePage.includes("자동 수집 딜은 검수 후 공개됩니다") &&
+      homePage.includes('/picks/novatech-s1-window-cleaner'),
+    "the homepage supports product search, purpose-first discovery, and an honest editorial fallback when no public deals exist",
+    "required"
+  );
 }
 
 if (
@@ -1590,6 +1603,7 @@ if (fileExists("components/AffiliateEventTracker.tsx")) {
 
 if (fileExists("lib/apiReadiness.ts")) {
   const readiness = readText("lib/apiReadiness.ts");
+  const productionVerifier = fileExists("scripts/verify-production-readiness.mjs") ? readText("scripts/verify-production-readiness.mjs") : "";
   check("readiness: coupang deeplink connection test", readiness.includes("createCoupangDeeplink") && readiness.includes("deeplink_status"), "admin readiness tests Coupang search and deeplink path", "required");
   check(
     "readiness: coupang response-shape diagnostics",
@@ -1766,6 +1780,18 @@ if (fileExists("lib/apiReadiness.ts")) {
       readiness.includes("anon_cannot_read_unpublished_product") &&
       readiness.includes("anon_public_rls_smoke"),
     "admin readiness verifies public RLS with the anon key, not only service role access",
+    "required"
+  );
+  check(
+    "readiness: data quality dependency card",
+    readiness.includes("dataQualityDependencyCheck") &&
+      readiness.includes('id: "data_quality"') &&
+      readiness.includes('status: "skipped"') &&
+      readiness.includes('blocked_by: "supabase"') &&
+      readiness.includes("checks.push(") &&
+      productionVerifier.includes('check.status !== "ok"') &&
+      productionVerifier.includes("required cards awaiting setup"),
+    "data quality is always reported with an explicit Supabase dependency and launch verification requires every required card to be ok",
     "required"
   );
   check(

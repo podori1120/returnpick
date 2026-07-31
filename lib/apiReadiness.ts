@@ -197,6 +197,20 @@ function connectionCheckFailure(id: string, label: string, error: unknown): ApiC
   };
 }
 
+function dataQualityDependencyCheck(message: string, supabaseStatus: string): ApiConnectionCheck {
+  return {
+    id: "data_quality",
+    label: "공개 데이터 품질",
+    status: "skipped",
+    message,
+    detail: {
+      blocked_by: "supabase",
+      supabase_status: supabaseStatus,
+      operator_next_action: "Supabase 운영 DB 설정과 스키마 검사를 먼저 통과시킨 뒤 공개 데이터 품질 검사를 다시 실행하세요."
+    }
+  };
+}
+
 function describeCoupangApiIssue(...values: Array<string | null | undefined>) {
   const raw = values.filter(Boolean).join(" | ").slice(0, 500);
   const text = raw.toLowerCase();
@@ -1556,6 +1570,7 @@ export async function runApiConnectionChecks(): Promise<ApiConnectionCheck[]> {
   const summary = getApiReadinessSummary();
   const itemById = new Map(summary.items.map((item) => [item.id, item]));
   const checks: ApiConnectionCheck[] = [];
+  let dataQualityCheck: ApiConnectionCheck | null = null;
 
   try {
   const coupang = itemById.get("coupang");
@@ -1744,6 +1759,7 @@ export async function runApiConnectionChecks(): Promise<ApiConnectionCheck[]> {
   const supabase = itemById.get("supabase");
   if (!hasSupabaseConfig()) {
     checks.push({ id: "supabase", label: "Supabase 운영 DB", status: "skipped", message: "Supabase 값이 없어 로컬 저장소 모드입니다." });
+    dataQualityCheck = dataQualityDependencyCheck("Supabase 값이 없어 공개 데이터 품질 검사를 건너뜁니다.", "not_configured");
   } else if (supabase?.state !== "ready") {
     checks.push({
       id: "supabase",
@@ -1755,6 +1771,7 @@ export async function runApiConnectionChecks(): Promise<ApiConnectionCheck[]> {
         next_action: supabase?.nextAction ?? "Supabase URL과 key를 다시 확인하세요."
       }
     });
+    dataQualityCheck = dataQualityDependencyCheck("Supabase 환경변수가 준비되지 않아 공개 데이터 품질 검사를 건너뜁니다.", "invalid_configuration");
   } else {
     const client = getSupabaseServiceClient();
     const requiredTables = [
@@ -1853,14 +1870,23 @@ export async function runApiConnectionChecks(): Promise<ApiConnectionCheck[]> {
         anon_public_rls_smoke: anonRlsSmoke
       }
     });
-    if (!failedCount && client) {
-      checks.push(await runPublicDataQualityCheck(client));
-    }
+    dataQualityCheck =
+      !failedCount && client
+        ? await runPublicDataQualityCheck(client)
+        : dataQualityDependencyCheck("Supabase 스키마 또는 쓰기 검사가 통과하지 않아 공개 데이터 품질 검사를 건너뜁니다.", "schema_check_failed");
   }
 
   } catch (error) {
-    checks.push(connectionCheckFailure("supabase", "Supabase 운영 DB", error));
+    const failure = connectionCheckFailure("supabase", "Supabase 운영 DB", error);
+    const existingSupabaseIndex = checks.findIndex((check) => check.id === "supabase");
+    if (existingSupabaseIndex >= 0) checks[existingSupabaseIndex] = failure;
+    else checks.push(failure);
+    dataQualityCheck = dataQualityDependencyCheck("Supabase 연결 테스트 중 예외가 발생해 공개 데이터 품질 검사를 건너뜁니다.", "connection_error");
   }
+
+  checks.push(
+    dataQualityCheck ?? dataQualityDependencyCheck("Supabase 검사 결과를 확인할 수 없어 공개 데이터 품질 검사를 건너뜁니다.", "unknown")
+  );
 
   try {
   const telegram = itemById.get("telegram");
