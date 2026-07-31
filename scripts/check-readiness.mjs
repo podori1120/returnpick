@@ -208,6 +208,7 @@ const requiredFiles = [
   "lib/apiReadiness.ts",
   "lib/categoryLanding.ts",
   "lib/clientTracking.ts",
+  "lib/launchCapabilityPolicy.ts",
   "lib/launchState.ts",
   "lib/naverProductMatch.ts",
   "lib/naverPriceTrust.ts",
@@ -236,6 +237,7 @@ const requiredFiles = [
   "scripts/verify-github-hourly-scheduler.mjs",
   "scripts/verify-affiliate-identity.mjs",
   "scripts/verify-bootstrap-catalog-runtime.mjs",
+  "scripts/verify-launch-capability-policy.mjs",
   "scripts/verify-naver-product-match.mjs",
   "scripts/verify-naver-price-trust.mjs",
   "scripts/verify-provider-product-merge.mjs",
@@ -411,6 +413,51 @@ if (
       panel.includes("Value 복사") &&
       panel.includes("Supabase 운영 DB 연결이 여전히 필요합니다"),
     "admin can export a bounded reviewed catalog without treating the temporary bridge as a replacement for Supabase",
+    "required"
+  );
+}
+
+if (
+  fileExists("package.json") &&
+  fileExists("lib/launchCapabilityPolicy.ts") &&
+  fileExists("scripts/verify-launch-capability-policy.mjs") &&
+  fileExists("lib/apiReadiness.ts") &&
+  fileExists("lib/scheduler.ts") &&
+  fileExists("app/api/admin/launch/route.ts")
+) {
+  const packageJson = readText("package.json");
+  const policy = readText("lib/launchCapabilityPolicy.ts");
+  const policyCheck = readText("scripts/verify-launch-capability-policy.mjs");
+  const readiness = readText("lib/apiReadiness.ts");
+  const scheduler = readText("lib/scheduler.ts");
+  const launchRoute = readText("app/api/admin/launch/route.ts");
+  check(
+    "scripts: launch capability policy check command",
+    packageJson.includes('"launch-capabilities:check": "node scripts/verify-launch-capability-policy.mjs"'),
+    "package.json exposes a deterministic core-versus-optional launch policy check",
+    "required"
+  );
+  check(
+    "launch capabilities: core readiness contract",
+    policy.includes('OPTIONAL_CAPABILITY_ITEM_IDS = ["naver", "telegram"]') &&
+      policy.includes('CORE_RUNTIME_ITEM_IDS = ["supabase", "site", "approval_link", "admin_password", "cron_secret"]') &&
+      policy.includes("getLaunchBlockingItemIds") &&
+      policy.includes("getRequiredConnectionCheckIds") &&
+      policyCheck.includes("Naver and Telegram must not block core sourcing and publishing") &&
+      policy.includes("evaluateLaunchReadiness") &&
+      readiness.includes("evaluateLaunchReadiness(items, publicWebEnabled)"),
+    "core launch requires durable storage, Coupang, public/admin/cron safety, while Naver and Telegram stay visible as optional capabilities",
+    "required"
+  );
+  check(
+    "launch capabilities: scoped optional failure gates",
+    policy.includes("hasBlockingLaunchError") &&
+      launchRoute.includes("blocking: false") &&
+      launchRoute.includes("hasBlockingLaunchError(steps)") &&
+      scheduler.includes('skipped_reason: "TELEGRAM_NOT_READY"') &&
+      scheduler.includes('isCapabilityReady(gate.readiness.items, "telegram")') &&
+      policyCheck.includes("optional jobs remain gated"),
+    "Naver failures do not suppress first-launch confirmation, while Telegram delivery waits without blocking sourcing or site publishing",
     "required"
   );
 }
@@ -810,6 +857,16 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-env.mjs"
       !envVerifier.includes("console.log(value)") &&
       !envVerifier.includes("console.error(value)"),
     "production env check validates launch env formats, blank values, and raw surrounding whitespace, then prints a safe Vercel repair checklist without secret values",
+    "required"
+  );
+  check(
+    "scripts: core launch env versus optional capabilities",
+    envVerifier.includes('{ name: "NAVER_CLIENT_ID", required: false') &&
+      envVerifier.includes('{ name: "TELEGRAM_BOT_TOKEN", required: false') &&
+      vercelEnvVerifier.indexOf('"NAVER_CLIENT_ID"') > vercelEnvVerifier.indexOf("const recommendedNames") &&
+      envRepairPlan.includes("Optional capabilities (do not block core launch)") &&
+      envRepairPlan.includes("missing values gate only the Telegram job"),
+    "launch-mode env checks require Coupang and Supabase but report Naver and Telegram as optional capability setup",
     "required"
   );
   check(
@@ -1898,6 +1955,7 @@ if (fileExists("components/AffiliateEventTracker.tsx")) {
 
 if (fileExists("lib/apiReadiness.ts")) {
   const readiness = readText("lib/apiReadiness.ts");
+  const launchCapabilityPolicy = fileExists("lib/launchCapabilityPolicy.ts") ? readText("lib/launchCapabilityPolicy.ts") : "";
   const productionVerifier = fileExists("scripts/verify-production-readiness.mjs") ? readText("scripts/verify-production-readiness.mjs") : "";
   check("readiness: coupang deeplink connection test", readiness.includes("createCoupangDeeplink") && readiness.includes("deeplink_status"), "admin readiness tests Coupang search and deeplink path", "required");
   check(
@@ -1941,7 +1999,12 @@ if (fileExists("lib/apiReadiness.ts")) {
     "admin readiness surfaces Naver response shape and price-field diagnostics before first launch",
     "required"
   );
-  check("readiness: telegram launch gate", readiness.includes('"telegram"') && readiness.includes("getChat") && readiness.includes("get_chat_ok"), "admin readiness requires Telegram token and chat access for launch", "required");
+  check(
+    "readiness: telegram optional connection check",
+    readiness.includes('"telegram"') && readiness.includes("getChat") && readiness.includes("get_chat_ok") && readiness.includes("optionalConnectionCheckIds"),
+    "admin readiness verifies Telegram token and chat access when configured without making it a core launch blocker",
+    "required"
+  );
   check(
     "readiness: telegram operator guidance",
     readiness.includes("describeTelegramApiIssue") &&
@@ -2043,7 +2106,7 @@ if (fileExists("lib/apiReadiness.ts")) {
       readiness.includes("getPublicWebHostIssue") &&
       readiness.includes("getPublicWebTemplateIssue") &&
       readiness.includes("template_host_not_allowed") &&
-      readiness.includes('...(publicWebEnabled ? ["public_web"] : [])'),
+      launchCapabilityPolicy.includes('...(publicWebEnabled ? ["public_web"] : [])'),
     "admin readiness blocks unsafe or mismatched public-web crawl allowlists and templates when crawling is enabled",
     "required"
   );
@@ -2116,7 +2179,16 @@ if (fileExists("lib/apiReadiness.ts")) {
     "admin readiness verifies deployed Cron endpoints with CRON_SECRET without starting jobs",
     "required"
   );
-  check("readiness: full launch gate", readiness.includes("launchReady") && readiness.includes("blockingEnv") && readiness.includes("NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL"), "admin readiness distinguishes API keys from full production launch readiness", "required");
+  check(
+    "readiness: capability-scoped launch gate",
+    readiness.includes("launchReady") &&
+      readiness.includes("blockingEnv") &&
+      readiness.includes("optionalMissingItemIds") &&
+      readiness.includes("optionalMissingEnv") &&
+      readiness.includes("NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL"),
+    "admin readiness distinguishes core launch blockers from optional price and delivery integrations",
+    "required"
+  );
   check(
     "readiness: isolated connection check failures",
     readiness.includes("connectionCheckFailure") &&
@@ -2218,7 +2290,15 @@ if (fileExists("components/AdminApiReadinessPanel.tsx")) {
   const panel = readText("components/AdminApiReadinessPanel.tsx");
   check("admin: launch runbook", panel.includes("승인 후 첫 운영 순서") && panel.includes("목업 끄고 첫 후보 수집"), "admin shows the post-approval first-run checklist", "required");
   check("admin: launch connection checks include data quality", panel.includes("requiredConnectionCheckIds") && panel.includes("공개 상품 데이터 품질"), "admin launch checklist requires public product data quality checks", "required");
-  check("admin: launch connection checks include telegram", panel.includes("텔레그램 chat ID") && panel.includes("공개 승인 페이지"), "admin launch checklist requires Telegram and public page checks", "required");
+  check(
+    "admin: optional capability readiness",
+    panel.includes("선택 연동 대기") &&
+      panel.includes("핵심 출시와 사이트 게시는 차단하지 않습니다") &&
+      panel.includes("사이트 게시는 텔레그램 없이도 가능") &&
+      panel.includes("optionalMissingItemIds"),
+    "admin clearly separates optional Naver and Telegram setup from core launch blockers",
+    "required"
+  );
   check("admin: launch connection checks include cron", panel.includes("Cron 인증"), "admin launch checklist requires deployed Cron auth checks", "required");
   check(
     "admin: launch connection checks include optional public web",
@@ -3096,6 +3176,15 @@ if (fileExists("app/api/admin/launch/route.ts")) {
     "required"
   );
   check(
+    "admin api: optional integration failures do not block core launch",
+    launchRoute.includes("hasBlockingLaunchError") &&
+      launchRoute.includes("blocking: false") &&
+      launchRoute.includes("optionalConnectionCheckIds") &&
+      launchRoute.includes("텔레그램 다이제스트는 텔레그램 연동이 준비된 경우에만 발송합니다"),
+    "first launch can confirm after core checks even when Naver backfill or Telegram delivery is not configured",
+    "required"
+  );
+  check(
     "admin api: launch operator actions",
     launchRoute.includes("getReadinessBlockingActions") &&
       launchRoute.includes("getConnectionFailureActions") &&
@@ -3622,6 +3711,15 @@ if (fileExists("lib/scheduler.ts")) {
       scheduler.includes("first_launch_confirmed") &&
       scheduler.includes("launch_confirmation_id"),
     "scheduled sourcing and telegram jobs wait for a successful post-approval first launch and return the first-launch operator action",
+    "required"
+  );
+  check(
+    "cron: Telegram capability-only gate",
+    scheduler.includes("TELEGRAM_NOT_READY") &&
+      scheduler.includes('getSchedulerBlockingItems(gate.readiness, ["telegram"])') &&
+      scheduler.includes('isCapabilityReady(gate.readiness.items, "telegram")') &&
+      scheduler.includes('code: "CONFIGURE_TELEGRAM"'),
+    "missing Telegram credentials pause only the Telegram job after core launch without stopping scheduled sourcing",
     "required"
   );
   check(

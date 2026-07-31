@@ -10,6 +10,7 @@ type LaunchStep = {
   status: "ok" | "skipped" | "error";
   message: string;
   detail?: unknown;
+  blocking?: boolean;
 };
 
 type LaunchResult = {
@@ -170,7 +171,7 @@ function getLaunchNextAction(result: LaunchResult): LaunchNextAction {
   if (errorStepIds.has("connection_checks")) {
     return {
       title: "다음 조치: 실제 연결 테스트 실패 카드를 먼저 고치세요.",
-      description: "쿠팡, 네이버, Supabase, 텔레그램, 공개 사이트, Cron 중 실패한 카드의 메시지를 보고 Vercel 환경변수나 SQL 적용 상태를 수정한 뒤 다시 실행하세요.",
+      description: "쿠팡, Supabase, 공개 사이트, Cron 중 실패한 핵심 카드의 메시지를 보고 Vercel 환경변수나 SQL 적용 상태를 수정한 뒤 다시 실행하세요.",
       tone: "error"
     };
   }
@@ -299,7 +300,7 @@ export default function AdminLaunchRunner({ password, onCompleted }: { password:
           <p className="text-sm font-black text-pine">Post Approval Launch</p>
           <h2 className="text-xl font-black">승인 후 첫 가동 실행</h2>
           <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-steel">
-            쿠팡·네이버·Supabase·텔레그램 환경변수가 모두 들어간 뒤 누릅니다. 목업 없이 작은 단위로 첫 소싱, 파트너스 링크 보강, 네이버 최저가 보강을 순서대로 실행합니다.
+            쿠팡 API와 Supabase 등 핵심 환경이 준비된 뒤 누릅니다. 목업 없이 작은 단위로 첫 소싱과 파트너스 링크 보강을 실행하며, 네이버 최저가는 API가 연결된 경우에만 보강합니다.
           </p>
           {notice ? <p className="mt-2 text-sm font-black text-pine" role="status">{notice}</p> : null}
         </div>
@@ -488,7 +489,10 @@ export default function AdminLaunchRunner({ password, onCompleted }: { password:
               return (
                 <div key={step.id} className={`rounded-lg border p-3 ${statusClass(step.status)}`}>
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-black">{step.label}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-black">{step.label}</p>
+                      {step.blocking === false ? <span className="rounded-md bg-white/75 px-2 py-0.5 text-[11px] font-black">선택 기능</span> : null}
+                    </div>
                     <span className="text-xs font-black uppercase">{step.status}</span>
                   </div>
                   <p className="mt-1 text-xs font-bold leading-5">{step.message}</p>

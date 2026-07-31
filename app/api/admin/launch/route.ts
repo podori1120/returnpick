@@ -4,6 +4,7 @@ import { getApiReadinessSummary, runApiConnectionChecks, type ApiConnectionCheck
 import { listProducts } from "@/lib/dataStore";
 import { getNextSourcingKeywordOffset } from "@/lib/sourcingCursor";
 import { isUsableAffiliateUrl } from "@/lib/coupangLink";
+import { hasBlockingLaunchError } from "@/lib/launchCapabilityPolicy";
 import { markFirstLaunchConfirmed } from "@/lib/launchState";
 import { backfillNaverLowestPrices } from "@/lib/naverPriceBackfill";
 import { getNaverPriceTrust } from "@/lib/naverPriceTrust";
@@ -25,6 +26,7 @@ type LaunchStep = {
   status: "ok" | "skipped" | "error";
   message: string;
   detail?: unknown;
+  blocking?: boolean;
 };
 
 type ProductSummary = {
@@ -310,8 +312,12 @@ export async function POST(request: Request) {
     id: "connection_checks",
     label: "실제 연결 테스트",
     status: "ok",
-    message: "쿠팡, 네이버, Supabase, 텔레그램, 공개 승인 페이지 연결이 모두 확인되었습니다.",
-    detail: connectionChecks
+    message: "쿠팡, Supabase, 공개 승인 페이지와 Cron 연결이 확인되었습니다. 네이버와 텔레그램은 설정된 경우 별도 기능으로 동작합니다.",
+    detail: {
+      required_check_ids: requiredConnectionCheckIds,
+      optional_check_ids: readiness.optionalConnectionCheckIds,
+      checks: connectionChecks
+    }
   });
 
   try {
@@ -368,21 +374,23 @@ export async function POST(request: Request) {
       label: "네이버 최저가 보강",
       status: naver.status === "API_NOT_CONFIGURED" ? "skipped" : naver.status === "completed_with_errors" ? "error" : "ok",
       message: `확인 ${naver.checked_count}개, 업데이트 ${naver.updated_count}개, 매칭 없음 ${naver.no_match_count}개, 오류 ${naver.error_count}개`,
-      detail: naver
+      detail: naver,
+      blocking: false
     });
   } catch (error) {
     steps.push({
       id: "naver_backfill",
       label: "네이버 최저가 보강",
       status: "error",
-      message: error instanceof Error ? error.message : "NAVER_BACKFILL_FAILED"
+      message: error instanceof Error ? error.message : "NAVER_BACKFILL_FAILED",
+      blocking: false
     });
   }
 
   const summary = await productSummary();
   const launchDelta = deltaSummary(beforeSummary, summary);
   const launchDataSignal = getLaunchDataSignal(beforeSummary, summary, progressSignal);
-  if (!steps.some((step) => step.status === "error") && !launchDataSignal.ok) {
+  if (!hasBlockingLaunchError(steps) && !launchDataSignal.ok) {
     steps.push({
       id: "launch_data_signal",
       label: "첫 가동 데이터 신호 확인",
@@ -402,7 +410,7 @@ export async function POST(request: Request) {
       }
     });
   }
-  const hasError = steps.some((step) => step.status === "error");
+  const hasError = hasBlockingLaunchError(steps);
   let launchConfirmation = null;
   if (!hasError) {
     try {
@@ -416,7 +424,7 @@ export async function POST(request: Request) {
         id: "launch_confirmed",
         label: "자동 운영 시작 확인",
         status: "ok",
-        message: "첫 가동과 실제 연결 테스트가 통과되어 예약 소싱과 텔레그램 다이제스트를 실행할 수 있습니다.",
+        message: "첫 가동과 핵심 연결 테스트가 통과되어 예약 소싱을 실행할 수 있습니다. 텔레그램 다이제스트는 텔레그램 연동이 준비된 경우에만 발송합니다.",
         detail: { run_id: launchConfirmation.id, confirmed_at: launchConfirmation.finished_at }
       });
     } catch (error) {
@@ -425,7 +433,7 @@ export async function POST(request: Request) {
         id: "launch_confirmed",
         label: "자동 운영 시작 확인",
         status: "error",
-        message: "첫 가동 작업은 끝났지만 자동 운영 시작 확인 기록을 저장하지 못했습니다. 예약 소싱과 텔레그램 다이제스트는 이 확인 기록이 있어야 실행됩니다.",
+        message: "첫 가동 작업은 끝났지만 자동 운영 시작 확인 기록을 저장하지 못했습니다. 예약 소싱과 준비된 선택 채널 작업은 이 확인 기록이 있어야 실행됩니다.",
         detail: {
           reason: "FIRST_LAUNCH_CONFIRMATION_FAILED",
           error: message,
@@ -434,7 +442,7 @@ export async function POST(request: Request) {
       });
     }
   }
-  const finalHasError = steps.some((step) => step.status === "error");
+  const finalHasError = hasBlockingLaunchError(steps);
 
   return NextResponse.json({
     status: finalHasError ? "completed_with_errors" : "completed",

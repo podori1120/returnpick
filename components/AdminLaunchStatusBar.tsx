@@ -18,6 +18,7 @@ type ApiReadinessSummary = {
   runtimeReady: boolean;
   launchReady: boolean;
   blockingEnv: string[];
+  optionalMissingItemIds: string[];
 };
 
 type ReadinessResponse = {
@@ -45,7 +46,7 @@ function statusCopy(readiness: ApiReadinessSummary | null) {
     return {
       label: "첫 가동 가능",
       title: "API 키와 운영 필수 설정이 준비됐습니다.",
-      body: "실제 연결 테스트를 통과시킨 뒤 첫 후보 수집, 파트너스 링크 보강, 네이버 가격 보강을 시작하세요.",
+      body: "핵심 연결 테스트를 통과시킨 뒤 첫 후보 수집과 파트너스 링크 보강을 시작하세요. 네이버 가격 비교와 텔레그램은 연결된 기능만 동작합니다.",
       tone: "border-pine/30 bg-pine/5 text-pine",
       icon: CheckCircle2
     };
@@ -64,7 +65,7 @@ function statusCopy(readiness: ApiReadinessSummary | null) {
   return {
     label: "승인 대기",
     title: "승인 전에는 수동 파트너스 링크와 공개 심사용 페이지를 유지하세요.",
-    body: "쿠팡 최종승인 후 API 키를 넣으면 자동 후보 수집, 딥링크 보강, 네이버 최저가 보강이 바로 이어집니다.",
+    body: "쿠팡 최종승인 후 API 키를 넣으면 자동 후보 수집과 딥링크 보강이 바로 이어집니다. 네이버 최저가와 텔레그램은 선택 연동입니다.",
     tone: "border-line bg-white text-ink",
     icon: ShieldCheck
   };
@@ -165,13 +166,13 @@ export default function AdminLaunchStatusBar({ password }: { password: string })
         </div>
       </div>
 
-      <div className="mt-3 grid gap-2 md:grid-cols-3">
+      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-ink">
           <p className="font-black text-steel">준비 카드</p>
           <p className="mt-1 text-base font-black">{totalCount ? `${readyCount}/${totalCount}개 준비` : "확인 중"}</p>
         </div>
         <div className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-ink">
-          <p className="font-black text-steel">API 키</p>
+          <p className="font-black text-steel">쿠팡 API 키</p>
           <p className={readiness?.apiKeysReady ? "mt-1 text-base font-black text-pine" : "mt-1 text-base font-black text-coral"}>
             {readiness?.apiKeysReady ? "입력됨" : "승인 후 입력"}
           </p>
@@ -181,6 +182,10 @@ export default function AdminLaunchStatusBar({ password }: { password: string })
           <p className={missingEnv.length ? "mt-1 break-words text-xs font-black text-coral" : "mt-1 text-base font-black text-pine"}>
             {missingEnv.length ? missingEnv.slice(0, 5).join(", ") + (missingEnv.length > 5 ? ` 외 ${missingEnv.length - 5}개` : "") : "없음"}
           </p>
+        </div>
+        <div className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-ink">
+          <p className="font-black text-steel">선택 연동 대기</p>
+          <p className="mt-1 text-base font-black text-ink">{readiness?.optionalMissingItemIds?.length ?? 0}개</p>
         </div>
       </div>
     </section>

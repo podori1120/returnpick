@@ -8,6 +8,12 @@ import {
   searchPublicWebProducts
 } from "@/lib/providers/publicWebProvider";
 import { getCustomerPublishReadiness } from "@/lib/quality";
+import {
+  OPTIONAL_CAPABILITY_ITEM_IDS,
+  OPTIONAL_CONNECTION_CHECK_IDS,
+  evaluateLaunchReadiness,
+  getRequiredConnectionCheckIds
+} from "@/lib/launchCapabilityPolicy";
 import { getSupabaseAnonClient, getSupabaseServiceClient, hasSupabaseConfig } from "@/lib/supabase";
 import type { JsonValue, ProductWithScore } from "@/lib/types";
 import { isStrongAdminPassword } from "@/lib/validators";
@@ -38,7 +44,11 @@ export type ApiReadinessSummary = {
   launchReady: boolean;
   blockingItemIds: string[];
   blockingEnv: string[];
+  optionalItemIds: string[];
+  optionalMissingItemIds: string[];
+  optionalMissingEnv: string[];
   requiredConnectionCheckIds: string[];
+  optionalConnectionCheckIds: string[];
 };
 
 export type ApiConnectionCheck = {
@@ -51,10 +61,6 @@ export type ApiConnectionCheck = {
 
 function present(name: string) {
   return Boolean(process.env[name]?.trim());
-}
-
-function missing(names: string[]) {
-  return names.filter((name) => !present(name));
 }
 
 function normalizeUrl(value: string | undefined) {
@@ -621,10 +627,6 @@ function readableTelegramConnectionCheck(check: ApiConnectionCheck): ApiConnecti
       raw_provider_message: check.message
     }
   };
-}
-
-function requiredConnectionCheckIds(publicWebEnabled: boolean) {
-  return ["coupang", "naver", "supabase", "data_quality", "telegram", "site_live", "cron", ...(publicWebEnabled ? ["public_web"] : [])];
 }
 
 function normalizeReadinessProduct(product: ProductWithScore): ProductWithScore {
@@ -1504,9 +1506,7 @@ async function runPublicSiteLiveCheck(): Promise<ApiConnectionCheck> {
 
 export function getApiReadinessSummary(): ApiReadinessSummary {
   const coupangEnv = ["COUPANG_ACCESS_KEY", "COUPANG_SECRET_KEY", "COUPANG_PARTNER_ID"];
-  const naverEnv = ["NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET"];
   const supabaseEnv = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"];
-  const telegramEnv = ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"];
   const publicWebEnabled = process.env.PUBLIC_WEB_CRAWL_ENABLED === "true";
 
   const items: ApiReadinessItem[] = [
@@ -1522,25 +1522,10 @@ export function getApiReadinessSummary(): ApiReadinessSummary {
   ];
 
   const itemById = new Map(items.map((item) => [item.id, item]));
-  const requiredItemIds = [
-    "coupang",
-    "naver",
-    "supabase",
-    "telegram",
-    "site",
-    "approval_link",
-    "admin_password",
-    "cron_secret",
-    ...(publicWebEnabled ? ["public_web"] : [])
-  ];
-  const runtimeItemIds = ["supabase", "telegram", "site", "approval_link", "admin_password", "cron_secret"];
-  const coupangReady = itemById.get("coupang")?.configured ?? false;
-  const naverReady = itemById.get("naver")?.configured ?? false;
-  const apiKeysReady = coupangReady && naverReady;
-  const runtimeReady = runtimeItemIds.every((id) => itemById.get(id)?.state === "ready");
-  const blockingItemIds = requiredItemIds.filter((id) => itemById.get(id)?.state !== "ready");
+  const optionalItemIds = [...OPTIONAL_CAPABILITY_ITEM_IDS];
+  const { apiKeysReady, runtimeReady, launchReady, blockingItemIds, optionalMissingItemIds } = evaluateLaunchReadiness(items, publicWebEnabled);
   const blockingEnv = blockingItemIds.flatMap((id) => itemById.get(id)?.missingEnv ?? []);
-  const launchReady = apiKeysReady && runtimeReady && blockingItemIds.length === 0;
+  const optionalMissingEnv = optionalMissingItemIds.flatMap((id) => itemById.get(id)?.missingEnv ?? []);
   const mode: ReadinessMode = launchReady ? "launch_ready" : apiKeysReady ? "api_ready" : "pre_approval";
 
   return {
@@ -1549,9 +1534,7 @@ export function getApiReadinessSummary(): ApiReadinessSummary {
     items,
     requiredForApiLaunch: [
       ...coupangEnv,
-      ...naverEnv,
       ...supabaseEnv,
-      ...telegramEnv,
       "ADMIN_PASSWORD",
       "CRON_SECRET",
       "NEXT_PUBLIC_SITE_URL",
@@ -1562,7 +1545,11 @@ export function getApiReadinessSummary(): ApiReadinessSummary {
     launchReady,
     blockingItemIds,
     blockingEnv,
-    requiredConnectionCheckIds: requiredConnectionCheckIds(publicWebEnabled)
+    optionalItemIds,
+    optionalMissingItemIds,
+    optionalMissingEnv,
+    requiredConnectionCheckIds: getRequiredConnectionCheckIds(publicWebEnabled),
+    optionalConnectionCheckIds: [...OPTIONAL_CONNECTION_CHECK_IDS]
   };
 }
 

@@ -24,16 +24,19 @@ const requiredGroups = [
     label: "Coupang Partners API",
     names: ["COUPANG_ACCESS_KEY", "COUPANG_SECRET_KEY", "COUPANG_PARTNER_ID"],
     action: "After final approval, copy the official Partners API values from Coupang Partners."
-  },
+  }
+];
+
+const optionalGroups = [
   {
     label: "Naver Shopping API",
     names: ["NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET"],
-    action: "Copy the official Naver Shopping Search API app credentials."
+    action: "Add the official Naver Shopping Search API credentials to activate verified price comparison; missing values do not block sourcing or site publishing."
   },
   {
     label: "Telegram",
     names: ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"],
-    action: "Copy the BotFather token and the target chat ID or @channel."
+    action: "Add the BotFather token and target chat ID to activate delivery; missing values gate only the Telegram job."
   }
 ];
 
@@ -80,7 +83,7 @@ console.log(`local env snapshot: ${loadedFiles.length ? loadedFiles.join(", ") :
 console.log("secret values: never printed");
 console.log("");
 console.log("1. Open Vercel > returnpick > Settings > Environment Variables > Production.");
-console.log("2. Fill the required values below, then redeploy Production.");
+console.log("2. Fill the core launch values below, then redeploy Production.");
 console.log("");
 
 let missingRequiredCount = 0;
@@ -102,6 +105,23 @@ for (const group of requiredGroups) {
   console.log("");
 }
 
+console.log("Optional capabilities (do not block core launch)");
+for (const group of optionalGroups) {
+  const blankOrMissing = namesByState(group.names, ["blank", "missing"]);
+  const alreadySet = namesByState(group.names, ["set"]);
+
+  console.log(`[${group.label}]`);
+  if (blankOrMissing.length) {
+    console.log("Optional values still blank:");
+    printNameList(blankOrMissing);
+  } else {
+    console.log("Optional values still blank: none from this local snapshot.");
+  }
+  console.log(`Already set locally: ${alreadySet.length}/${group.names.length}`);
+  console.log(`Capability action: ${group.action}`);
+  console.log("");
+}
+
 const defaultTargets = operationalDefaults.filter((item) => valueState(item.name) !== "set");
 const schedulerSiteUrl = envValue(["RETURNPICK_SITE_URL", "NEXT_PUBLIC_SITE_URL"]) || "https://returnpick.vercel.app";
 
@@ -120,7 +140,7 @@ console.log("");
 console.log("External hourly scheduler (GitHub Actions)");
 console.log("- Repository secret RETURNPICK_CRON_SECRET must equal the Vercel CRON_SECRET value. The value is never printed here.");
 console.log(`- Repository variable RETURNPICK_SITE_URL should be ${schedulerSiteUrl}.`);
-console.log("- After saving GitHub settings, manually run the `ReturnPick Hourly Scheduler` workflow and confirm `/api/cron/sourcing` and `/api/cron/telegram-digest?limit=1` return success.");
+console.log("- After saving GitHub settings, manually run the `ReturnPick Hourly Scheduler` workflow. Confirm `/api/cron/sourcing` runs; `/api/cron/telegram-digest?limit=1` may safely return TELEGRAM_NOT_READY until its optional values are added.");
 console.log("- This keeps hourly operation available even when Vercel Cron is configured with the deployable daily fallback.");
 
 console.log("");

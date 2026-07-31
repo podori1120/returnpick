@@ -135,7 +135,7 @@ function diagnosisQuickActions(diagnosis: SourcingDiagnosis) {
     actions.push({
       label: "API 준비도 확인",
       anchor: "admin-api-readiness",
-      helper: "쿠팡·네이버·Supabase 실제 연결 테스트로 이동합니다."
+      helper: "쿠팡·Supabase 핵심 연결과 선택 기능 테스트로 이동합니다."
     });
   }
 

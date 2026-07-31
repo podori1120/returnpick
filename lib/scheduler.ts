@@ -1,6 +1,7 @@
 import { listProducts, listTelegramLogs } from "@/lib/dataStore";
 import { getDiscountRate } from "@/lib/dealIntelligence";
 import { getApiReadinessSummary, type ApiReadinessSummary } from "@/lib/apiReadiness";
+import { isCapabilityReady } from "@/lib/launchCapabilityPolicy";
 import { getFirstLaunchConfirmation } from "@/lib/launchState";
 import { isPublicDealReady } from "@/lib/publicDeal";
 import { getLatestScore } from "@/lib/scoring";
@@ -46,8 +47,8 @@ export type SchedulerOperatorAction = {
   next_action: string;
 };
 
-export function getSchedulerBlockingItems(readiness: ApiReadinessSummary): SchedulerBlockingItem[] {
-  const blockingIds = new Set(readiness.blockingItemIds);
+export function getSchedulerBlockingItems(readiness: ApiReadinessSummary, itemIds = readiness.blockingItemIds): SchedulerBlockingItem[] {
+  const blockingIds = new Set(itemIds);
   return readiness.items
     .filter((item) => blockingIds.has(item.id))
     .map((item) => ({
@@ -61,6 +62,17 @@ export function getSchedulerBlockingItems(readiness: ApiReadinessSummary): Sched
 }
 
 export function getSchedulerOperatorAction(skippedReason: string | null, readiness: ApiReadinessSummary): SchedulerOperatorAction | null {
+  if (skippedReason === "TELEGRAM_NOT_READY") {
+    const telegram = readiness.items.find((item) => item.id === "telegram");
+    return {
+      code: "CONFIGURE_TELEGRAM",
+      label: "텔레그램 발송 연동",
+      target_anchor: "admin-api-readiness",
+      message: telegram?.message ?? "텔레그램 발송 환경변수가 아직 준비되지 않았습니다.",
+      next_action: telegram?.nextAction ?? "TELEGRAM_BOT_TOKEN과 TELEGRAM_CHAT_ID를 설정한 뒤 연결 테스트를 실행하세요."
+    };
+  }
+
   if (skippedReason === "FIRST_LAUNCH_NOT_CONFIRMED") {
     return {
       code: "RUN_FIRST_LAUNCH",
@@ -187,6 +199,27 @@ export async function runScheduledTelegramDigest(limit = 1) {
       blocking_items: getSchedulerBlockingItems(gate.readiness),
       blocking_env: gate.readiness.blockingEnv,
       operator_action: getSchedulerOperatorAction(gate.skippedReason, gate.readiness),
+      first_launch_confirmed: gate.firstLaunchConfirmed,
+      launch_confirmation_id: gate.launchConfirmation?.id ?? null,
+      error_count: 0,
+      results: []
+    };
+  }
+
+  const telegramReady = isCapabilityReady(gate.readiness.items, "telegram");
+  if (!telegramReady) {
+    const telegramBlockingItems = getSchedulerBlockingItems(gate.readiness, ["telegram"]);
+    return {
+      type: "telegram_digest",
+      status: "not_ready",
+      candidate_count: 0,
+      sent_count: 0,
+      skipped_reason: "TELEGRAM_NOT_READY",
+      readiness_mode: gate.readiness.mode,
+      blocking_item_ids: ["telegram"],
+      blocking_items: telegramBlockingItems,
+      blocking_env: telegramBlockingItems.flatMap((item) => item.missing_env),
+      operator_action: getSchedulerOperatorAction("TELEGRAM_NOT_READY", gate.readiness),
       first_launch_confirmed: gate.firstLaunchConfirmed,
       launch_confirmation_id: gate.launchConfirmation?.id ?? null,
       error_count: 0,

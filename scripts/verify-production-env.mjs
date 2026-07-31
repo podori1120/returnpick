@@ -121,10 +121,10 @@ const checks = [
   { name: "COUPANG_ACCESS_KEY", required: true, validate: (value) => validateProviderSecret(value, 8), hint: "official API key" },
   { name: "COUPANG_SECRET_KEY", required: true, validate: (value) => validateProviderSecret(value, 8), hint: "official API secret" },
   { name: "COUPANG_PARTNER_ID", required: true, validate: (value) => validateProviderSecret(value, 2), hint: "partner ID" },
-  { name: "NAVER_CLIENT_ID", required: true, validate: (value) => validateProviderSecret(value, 5), hint: "Naver client ID" },
-  { name: "NAVER_CLIENT_SECRET", required: true, validate: (value) => validateProviderSecret(value, 5), hint: "Naver client secret" },
-  { name: "TELEGRAM_BOT_TOKEN", required: true, validate: validateTelegramBotToken, hint: "123456:bot-token format" },
-  { name: "TELEGRAM_CHAT_ID", required: true, validate: validateTelegramChatId, hint: "numeric chat ID or @channel" },
+  { name: "NAVER_CLIENT_ID", required: false, validate: (value) => validateProviderSecret(value, 5), hint: "optional Naver client ID for price comparison" },
+  { name: "NAVER_CLIENT_SECRET", required: false, validate: (value) => validateProviderSecret(value, 5), hint: "optional Naver client secret for price comparison" },
+  { name: "TELEGRAM_BOT_TOKEN", required: false, validate: validateTelegramBotToken, hint: "optional 123456:bot-token for Telegram delivery" },
+  { name: "TELEGRAM_CHAT_ID", required: false, validate: validateTelegramChatId, hint: "optional numeric chat ID or @channel for Telegram delivery" },
   { name: "CRON_USE_MOCK_FALLBACK", required: false, validate: validateBooleanString, hint: "true or false" },
   { name: "SOURCING_TIME_BUDGET_MS", required: false, validate: validatePositiveInteger, hint: "positive integer milliseconds" },
   { name: "SOURCING_KEYWORD_LIMIT", required: false, validate: validatePositiveInteger, hint: "positive integer" },
@@ -263,7 +263,7 @@ function printNextActions() {
 printNextActions();
 
 if (launchMode && warnings.length) {
-  console.log("launch mode: required values must be present before live API checks and first launch.");
+  console.log("launch mode: core required values must be present before first launch; optional Naver and Telegram gaps remain warnings.");
 } else {
   console.log("report mode: missing post-approval provider keys are warnings; invalid present values are failures.");
 }

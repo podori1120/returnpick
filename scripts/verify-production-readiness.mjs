@@ -89,6 +89,8 @@ const adminUiRequiredText = [
   "후보 상품번호",
   "브라우저 확인 완료",
   "승인 대기용 출시 카탈로그",
+  "선택 연동 대기",
+  "핵심 출시와 사이트 게시는 차단하지 않습니다",
   "동일 SKU 강한 일치",
   "품질 보강 대기",
   "유입 채널별 전환",
@@ -507,7 +509,8 @@ async function checkEditorialCardTrackingBundle(pages) {
 function summarizeReadiness(readiness) {
   if (!readiness || typeof readiness !== "object") return "readiness payload missing";
   const blocking = Array.isArray(readiness.blockingItemIds) ? readiness.blockingItemIds.join(", ") : "";
-  return `mode=${readiness.mode ?? "unknown"}, launchReady=${Boolean(readiness.launchReady)}, blocking=${blocking || "none"}`;
+  const optional = Array.isArray(readiness.optionalMissingItemIds) ? readiness.optionalMissingItemIds.join(", ") : "";
+  return `mode=${readiness.mode ?? "unknown"}, launchReady=${Boolean(readiness.launchReady)}, blocking=${blocking || "none"}, optional=${optional || "none"}`;
 }
 
 function checkReadiness(readiness) {

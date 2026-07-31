@@ -11,6 +11,8 @@ const requiredTrackedFiles = [
   "app/api/admin/launch/route.ts",
   "app/products/approval-sample/page.tsx",
   "components/AdminApiReadinessPanel.tsx",
+  "lib/launchCapabilityPolicy.ts",
+  "lib/scheduler.ts",
   "next.config.mjs",
   "package-lock.json",
   "package.json",
@@ -18,6 +20,7 @@ const requiredTrackedFiles = [
   "scripts/run-production-deploy.mjs",
   "scripts/run-production-doctor.mjs",
   "scripts/run-production-launch.mjs",
+  "scripts/verify-launch-capability-policy.mjs",
   "sql/schema.sql",
   "vercel.json"
 ];

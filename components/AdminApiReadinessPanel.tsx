@@ -26,7 +26,11 @@ type ApiReadinessSummary = {
   launchReady: boolean;
   blockingItemIds: string[];
   blockingEnv: string[];
+  optionalItemIds: string[];
+  optionalMissingItemIds: string[];
+  optionalMissingEnv: string[];
   requiredConnectionCheckIds: string[];
+  optionalConnectionCheckIds: string[];
 };
 
 type ApiConnectionCheck = {
@@ -306,17 +310,16 @@ function modeLabel(readiness: ApiReadinessSummary) {
 }
 
 function nextLaunchAction(readiness: ApiReadinessSummary, checks: ApiConnectionCheck[], connectionChecksPassed: boolean) {
-  const blockingLabels = readiness.blockingItemIds
-    .map((id) => readiness.items.find((item) => item.id === id)?.label ?? id)
-    .slice(0, 8);
-  const failedChecks = checks.filter((check) => check.status === "error").map((check) => check.label);
+  const failedChecks = checks
+    .filter((check) => readiness.requiredConnectionCheckIds.includes(check.id) && check.status === "error")
+    .map((check) => check.label);
 
   if (!readiness.apiKeysReady) {
     return {
       stage: "승인 대기",
       title: "지금은 승인용 페이지와 수동 파트너스 링크를 유지하세요.",
-      body: "쿠팡 최종승인 전에는 Partners API 키가 나오지 않으므로 자동 API 수집은 대기합니다. 승인 후 쿠팡·네이버 키를 넣으면 이 카드가 다음 단계로 바뀝니다.",
-      bullets: ["승인용 페이지 캡처 유지", "상품별 수동 파트너스 링크만 게시", "Supabase·Telegram·Cron 값은 미리 준비"]
+      body: "쿠팡 최종승인 전에는 Partners API 키가 나오지 않으므로 자동 API 수집은 대기합니다. 승인 후 쿠팡 API 키를 넣으면 이 카드가 다음 단계로 바뀝니다.",
+      bullets: ["승인용 페이지 캡처 유지", "상품별 수동 파트너스 링크만 게시", "Supabase·Cron은 미리 준비"]
     };
   }
 
@@ -324,7 +327,7 @@ function nextLaunchAction(readiness: ApiReadinessSummary, checks: ApiConnectionC
     return {
       stage: "환경변수 보강",
       title: "누락 키를 Vercel에 넣고 재배포하세요.",
-      body: "API 키는 들어갔지만 운영 저장소, 텔레그램, 공개 URL, Cron 보호값 중 하나가 아직 부족합니다. 누락 키만 복사해서 Vercel Environment Variables에 채우면 됩니다.",
+      body: "쿠팡 API 키는 들어갔지만 운영 저장소, 공개 URL, Cron 보호값 중 하나가 아직 부족합니다. 누락 키만 복사해서 Vercel Environment Variables에 채우면 됩니다.",
       bullets: readiness.blockingEnv.slice(0, 10)
     };
   }
@@ -333,7 +336,7 @@ function nextLaunchAction(readiness: ApiReadinessSummary, checks: ApiConnectionC
     return {
       stage: "연결 테스트",
       title: "실제 연결 테스트를 먼저 실행하세요.",
-      body: "환경변수는 모두 있어 보입니다. 첫 가동 전에 쿠팡 딥링크, 네이버 가격, Supabase 쓰기/RLS, 공개 승인 페이지, Telegram, Cron 인증, 공개 웹 참고 수집 사용 시 robots.txt 경로를 실제로 한 번 확인해야 합니다.",
+      body: "핵심 환경변수는 모두 있어 보입니다. 첫 가동 전에 쿠팡 딥링크, Supabase 쓰기/RLS, 공개 승인 페이지, Cron 인증과 공개 웹 참고 수집 사용 시 robots.txt 경로를 실제로 한 번 확인해야 합니다. 네이버와 텔레그램은 설정된 경우 별도로 점검됩니다.",
       bullets: ["상단의 실제 연결 테스트 클릭", "오류 카드가 나오면 해당 키 또는 SQL 먼저 수정", "모두 OK면 첫 가동 실행으로 이동"]
     };
   }
@@ -342,7 +345,7 @@ function nextLaunchAction(readiness: ApiReadinessSummary, checks: ApiConnectionC
     return {
       stage: "연결 오류 수정",
       title: "실패한 연결 테스트부터 고치세요.",
-      body: "첫 가동은 실제 연결 테스트가 모두 통과해야 시작됩니다. 실패한 카드의 세부정보를 보고 키, Supabase SQL, Telegram chat ID, Cron secret, 공개 URL을 먼저 맞추세요.",
+      body: "첫 가동은 핵심 연결 테스트가 모두 통과해야 시작됩니다. 실패한 카드의 세부정보를 보고 쿠팡 키, Supabase SQL, Cron secret, 공개 URL을 먼저 맞추세요.",
       bullets: failedChecks.length ? failedChecks.slice(0, 10) : ["실제 연결 테스트를 다시 실행해 상태를 갱신"]
     };
   }
@@ -415,7 +418,8 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
   }
 
   const readyCount = useMemo(() => readiness?.items.filter((item) => item.state === "ready").length ?? 0, [readiness]);
-  const missingCount = useMemo(() => readiness?.items.filter((item) => item.state === "missing" || item.state === "partial").length ?? 0, [readiness]);
+  const missingCount = readiness?.blockingItemIds.length ?? 0;
+  const optionalMissingCount = readiness?.optionalMissingItemIds.length ?? 0;
 
   async function copyEnvTemplate(scope: "all" | "missing") {
     if (!readiness) return;
@@ -562,6 +566,8 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
   const itemById = new Map(readiness.items.map((item) => [item.id, item]));
   const checkById = new Map(checks.map((check) => [check.id, check]));
   const missingEnvSet = new Set(readiness.blockingEnv);
+  const optionalMissingEnvSet = new Set(readiness.optionalMissingEnv);
+  const optionalItemIdSet = new Set(readiness.optionalItemIds);
   const configuredEnvSet = new Set(readiness.items.flatMap((item) => item.requiredEnv.filter((env) => !item.missingEnv.includes(env))));
   const requiredRuntimeReady = readiness.runtimeReady;
   const apiEnvReady = readiness.apiKeysReady;
@@ -573,17 +579,17 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
     {
       title: "운영 필수 환경변수 입력",
       done: requiredRuntimeReady,
-      description: "관리자 비밀번호, Supabase, 텔레그램, 공개 URL, Cron 보호값, 승인용 링크가 먼저 준비되어야 합니다."
+      description: "관리자 비밀번호, Supabase, 공개 URL, Cron 보호값, 승인용 링크가 먼저 준비되어야 합니다."
     },
     {
-      title: "쿠팡·네이버 API 키 입력",
+      title: "쿠팡 API 키 입력",
       done: apiEnvReady,
-      description: "쿠팡 검색/딥링크와 네이버 최저가 보강에 필요한 키가 모두 있어야 실데이터 모드가 됩니다."
+      description: "쿠팡 검색과 딥링크 생성에 필요한 공식 API 키가 있어야 실데이터 소싱 모드가 됩니다."
     },
     {
-      title: "실제 연결 테스트 통과",
+      title: "핵심 연결 테스트 통과",
       done: connectionChecksPassed,
-      description: "위의 실제 연결 테스트로 쿠팡 딥링크, 네이버 가격 검색, Supabase 읽기·쓰기, 공개 상품 데이터 품질, 텔레그램 chat ID, 공개 승인 페이지, Cron 인증, 공개 웹 참고 수집 사용 시 robots.txt 경로를 확인합니다."
+      description: "쿠팡 딥링크, Supabase 읽기·쓰기, 공개 상품 데이터 품질, 공개 승인 페이지, Cron 인증과 공개 웹 참고 수집 사용 시 robots.txt 경로를 확인합니다."
     },
     {
       title: "목업 끄고 첫 후보 수집",
@@ -591,14 +597,14 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
       description: "자동 후보 수집에서 목업 대체 허용을 끄고 실행해 실제 API/허용 소스만 들어오는지 확인합니다."
     },
     {
-      title: "가격 보강과 후보 검수",
+      title: "선택 가격 보강과 후보 검수",
       done: false,
-      description: "네이버 최저가 보강 후 반품가, 반품등급, 제휴 URL 누락 후보를 정리합니다."
+      description: "네이버 API가 연결되면 최저가를 보강하고, 연결 전에는 가격확인필요 상태로 반품가·등급·제휴 URL을 검수합니다."
     },
     {
-      title: "게시 후 텔레그램 발송",
+      title: "게시 후 선택 채널 발송",
       done: false,
-      description: "게시 상품 상세 페이지와 구매 버튼을 확인한 뒤 텔레그램 후보 발송을 실행합니다."
+      description: "사이트 게시는 텔레그램 없이도 가능하며, Bot 연동이 준비되면 게시 상품의 텔레그램 후보 발송을 실행합니다."
     }
   ];
 
@@ -612,12 +618,17 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
           </div>
           <h2 className="mt-1 text-xl font-black">승인 후 API 즉시 가동 준비</h2>
           <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-steel">
-            지금은 승인 대기 모드로 운영하고, 쿠팡 파트너스 최종승인 후 키만 넣으면 자동 수집·최저가 보강·텔레그램 운영이 바로 이어지도록 점검합니다.
+            지금은 승인 대기 모드로 운영하고, 쿠팡 파트너스 최종승인 후 핵심 키만 넣으면 자동 수집과 사이트 게시를 시작하도록 점검합니다. 네이버 가격 비교와 텔레그램은 준비되는 즉시 기능별로 활성화됩니다.
           </p>
           {message ? <p className="mt-2 text-sm font-bold text-pine">{message}</p> : null}
           {readiness.apiKeysReady && !readiness.launchReady ? (
             <p className="mt-2 rounded-lg border border-coral/30 bg-coral/10 px-3 py-2 text-xs font-black text-coral">
               API 키는 들어갔지만 운영 필수 설정이 남아 있습니다. 누락 환경변수: {readiness.blockingEnv.length ? readiness.blockingEnv.join(", ") : "연결 테스트 필요"}
+            </p>
+          ) : null}
+          {readiness.optionalMissingItemIds.length ? (
+            <p className="mt-2 rounded-lg border border-lemon/40 bg-lemon/10 px-3 py-2 text-xs font-black text-ink">
+              선택 연동 대기: {readiness.optionalMissingItemIds.map((id) => itemById.get(id)?.label ?? id).join(", ")}. 핵심 출시와 사이트 게시는 차단하지 않습니다.
             </p>
           ) : null}
         </div>
@@ -636,7 +647,7 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-lg bg-mist p-4">
           <p className="text-xs font-black text-steel">현재 모드</p>
           <p className="mt-2 text-2xl font-black">{modeLabel(readiness)}</p>
@@ -651,6 +662,11 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
           <p className="text-xs font-black text-steel">가동 차단 설정</p>
           <p className="mt-2 text-2xl font-black text-coral">{readiness.blockingItemIds.length}개</p>
           <p className="mt-1 text-xs font-bold text-steel">{missingCount}개 설정 항목 중 운영 필수 누락</p>
+        </div>
+        <div className="rounded-lg bg-mist p-4">
+          <p className="text-xs font-black text-steel">선택 연동 대기</p>
+          <p className="mt-2 text-2xl font-black text-ink">{optionalMissingCount}개</p>
+          <p className="mt-1 text-xs font-bold text-steel">네이버 가격 비교·텔레그램 발송</p>
         </div>
       </div>
 
@@ -837,6 +853,7 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
           {vercelEnvRows.map((row) => {
             const configured = configuredEnvSet.has(row.name);
             const missing = missingEnvSet.has(row.name);
+            const optionalMissing = optionalMissingEnvSet.has(row.name);
             const generatedValue = generatedSecrets[row.name];
             return (
               <div key={row.name} className="rounded-lg bg-mist p-3">
@@ -845,8 +862,8 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
                     <p className="text-[11px] font-black text-steel">{row.group}</p>
                     <p className="break-all font-mono text-xs font-black text-ink">{row.name}</p>
                   </div>
-                  <span className={`rounded-md px-2 py-1 text-[11px] font-black ${configured ? "bg-pine/10 text-pine" : missing ? "bg-coral/10 text-coral" : "bg-white text-steel"}`}>
-                    {configured ? "입력됨" : missing ? "누락" : "확인필요"}
+                  <span className={`rounded-md px-2 py-1 text-[11px] font-black ${configured ? "bg-pine/10 text-pine" : missing ? "bg-coral/10 text-coral" : optionalMissing ? "bg-lemon/30 text-ink" : "bg-white text-steel"}`}>
+                    {configured ? "입력됨" : missing ? "필수 누락" : optionalMissing ? "선택 연동" : "확인필요"}
                   </span>
                 </div>
                 <p className="mt-1 text-xs font-semibold leading-5 text-steel">{row.note}</p>
@@ -894,13 +911,19 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
 
       <div className="grid gap-3 lg:grid-cols-2">
         {readiness.items.map((item) => {
-          const meta = stateMeta(item.state);
+          const isOptional = optionalItemIdSet.has(item.id);
+          const meta = isOptional && item.state !== "ready"
+            ? { label: "선택 대기", className: "bg-lemon/30 text-ink", icon: AlertTriangle }
+            : stateMeta(item.state);
           return (
             <article key={item.id} className="min-w-0 break-words rounded-lg border border-line p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <KeyRound className="text-pine" size={17} aria-hidden />
                   <h3 className="font-black">{item.label}</h3>
+                  <span className={isOptional ? "rounded-md bg-lemon/30 px-2 py-0.5 text-[11px] font-black text-ink" : "rounded-md bg-mist px-2 py-0.5 text-[11px] font-black text-steel"}>
+                    {isOptional ? "선택 기능" : "출시 필수"}
+                  </span>
                 </div>
                 <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-black ${meta.className}`}>
                   <meta.icon size={14} aria-hidden /> {meta.label}
@@ -908,9 +931,11 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
               </div>
               <p className="mt-2 text-sm font-semibold leading-6 text-steel">{item.message}</p>
               {item.missingEnv.length ? (
-                <p className="mt-2 break-all text-xs font-black leading-5 text-coral">누락: {item.missingEnv.join(", ")}</p>
+                <p className={isOptional ? "mt-2 break-all text-xs font-black leading-5 text-ink" : "mt-2 break-all text-xs font-black leading-5 text-coral"}>
+                  {isOptional ? "선택 연동 대기" : "누락"}: {item.missingEnv.join(", ")}
+                </p>
               ) : (
-                <p className="mt-2 text-xs font-black leading-5 text-pine">필수 값 입력 완료</p>
+                <p className="mt-2 text-xs font-black leading-5 text-pine">{isOptional ? "선택 기능 연결 완료" : "필수 값 입력 완료"}</p>
               )}
               <p className="mt-2 text-xs font-semibold leading-5 text-steel">{item.nextAction}</p>
             </article>
