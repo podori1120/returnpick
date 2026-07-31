@@ -8,6 +8,7 @@ import { getPurchaseDecision } from "@/lib/purchaseDecision";
 import { getLatestScore } from "@/lib/scoring";
 import type { ProductWithScore } from "@/lib/types";
 import CompareButton from "@/components/CompareButton";
+import SavedDealButton from "@/components/SavedDealButton";
 import ScoreBadge from "@/components/ScoreBadge";
 import VerdictBadge from "@/components/VerdictBadge";
 
@@ -100,14 +101,15 @@ export default function DealCard({ product }: { product: ProductWithScore }) {
             {decision.goodSignals[0] ?? decision.cautions[0] ?? "상세에서 가격과 반품 조건을 확인하세요."}
           </p>
         </div>
-        <div className="grid grid-cols-[1fr_auto] gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link
             href={`/deals/${product.id}`}
-            className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-ink px-4 py-3 text-sm font-black text-white hover:bg-pine"
+            className="focus-ring min-w-[140px] flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-ink px-4 py-3 text-sm font-black text-white hover:bg-pine"
           >
             자세히 보기 <ArrowRight size={16} aria-hidden />
           </Link>
           <CompareButton productId={product.id} title={product.title} />
+          <SavedDealButton productId={product.id} title={product.title} />
         </div>
       </div>
     </article>

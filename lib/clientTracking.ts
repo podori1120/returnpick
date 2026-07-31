@@ -1,5 +1,14 @@
 import type { AffiliateEventType } from "@/lib/types";
 
+export type SavedDealItem = {
+  id: string;
+  title: string;
+  savedAt: string;
+};
+
+export const savedDealsStorageKey = "returnpick_saved_deals";
+export const savedDealsChangeEvent = "returnpick_saved_deals_changed";
+
 export type ManualAffiliateEventContext =
   | "approval_sample"
   | "editorial_pick"
@@ -102,6 +111,19 @@ export function getStoredJsonArray<T>(key: string): T[] {
 export function setStoredJsonArray<T>(key: string, value: T[]) {
   if (typeof window === "undefined") return;
   setStoredValue(key, JSON.stringify(value));
+}
+
+export function getSavedDealItems() {
+  return getStoredJsonArray<SavedDealItem>(savedDealsStorageKey)
+    .filter((item) => typeof item?.id === "string" && typeof item?.title === "string" && item.id && item.title)
+    .slice(0, 12);
+}
+
+export function setSavedDealItems(items: SavedDealItem[]) {
+  setStoredJsonArray(savedDealsStorageKey, items.slice(0, 12));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(savedDealsChangeEvent));
+  }
 }
 
 function sendEventWithFetch(payload: string) {

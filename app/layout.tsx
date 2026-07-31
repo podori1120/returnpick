@@ -51,6 +51,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link className="rounded-md px-3 py-2 hover:bg-mist hover:text-ink" href="/compare">
                 비교함
               </Link>
+              <Link className="rounded-md px-3 py-2 hover:bg-mist hover:text-ink" href="/saved">
+                찜함
+              </Link>
               <Link className="rounded-md px-3 py-2 hover:bg-mist hover:text-ink" href="/guide/return-checklist">
                 수령 체크
               </Link>
@@ -76,6 +79,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </Link>
               <Link className="text-pine hover:text-ink" href="/products/approval-sample">
                 파트너스 심사 페이지
+              </Link>
+              <Link className="text-pine hover:text-ink" href="/saved">
+                찜한 딜
               </Link>
               <Link className="text-pine hover:text-ink" href="/picks/novatech-s1-window-cleaner">
                 직접 검수 추천 상품

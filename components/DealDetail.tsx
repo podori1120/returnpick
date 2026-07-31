@@ -3,6 +3,7 @@ import AffiliateButton from "@/components/AffiliateButton";
 import { DealViewTracker } from "@/components/AffiliateEventTracker";
 import Checklist from "@/components/Checklist";
 import CompareButton from "@/components/CompareButton";
+import SavedDealButton from "@/components/SavedDealButton";
 import DealQualityCard from "@/components/DealQualityCard";
 import PriceComparison from "@/components/PriceComparison";
 import PriceHistory from "@/components/PriceHistory";
@@ -53,6 +54,7 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
               {product.public_note ? <p className="text-sm font-semibold leading-6 text-steel">{product.public_note}</p> : null}
               <div className="flex flex-wrap gap-2">
                 <CompareButton productId={product.id} title={product.title} />
+                <SavedDealButton productId={product.id} title={product.title} />
                 <AffiliateButton
                   productId={product.id}
                   href={buyUrl}

@@ -647,6 +647,60 @@ if (fileExists("app/deals/page.tsx")) {
   );
 }
 
+if (fileExists("app/api/admin/products/route.ts") && fileExists("components/AdminManualProductForm.tsx") && fileExists("app/admin/page.tsx")) {
+  const adminProductsRoute = readText("app/api/admin/products/route.ts");
+  const manualProductForm = readText("components/AdminManualProductForm.tsx");
+  const adminPage = readText("app/admin/page.tsx");
+  check(
+    "admin sourcing: manual real-product draft intake",
+    adminProductsRoute.includes("export async function POST") &&
+      adminProductsRoute.includes("requireAdmin(request)") &&
+      adminProductsRoute.includes("isUsableCoupangProductUrl") &&
+      adminProductsRoute.includes("extractCoupangProductId") &&
+      adminProductsRoute.includes('source: "manual_admin"') &&
+      adminProductsRoute.includes('sourcing_status: "needs_review"') &&
+      adminProductsRoute.includes("upsertSourcedProduct") &&
+      manualProductForm.includes("쿠팡 상품 상세 URL") &&
+      manualProductForm.includes("반품등급, 반품가, 네이버 가격과 파트너스 링크는 추정하지 않고") &&
+      manualProductForm.includes("검토 후보 추가") &&
+      adminPage.includes("AdminManualProductForm"),
+    "an authenticated admin can seed a real Coupang product into needs_review while keeping missing return data unfilled and reusing the existing review/publish gates",
+    "required"
+  );
+}
+
+if (
+  fileExists("app/saved/page.tsx") &&
+  fileExists("components/SavedDealButton.tsx") &&
+  fileExists("components/SavedDealsBoard.tsx") &&
+  fileExists("lib/clientTracking.ts") &&
+  fileExists("app/layout.tsx")
+) {
+  const savedPage = readText("app/saved/page.tsx");
+  const savedButton = readText("components/SavedDealButton.tsx");
+  const savedBoard = readText("components/SavedDealsBoard.tsx");
+  const clientTracking = readText("lib/clientTracking.ts");
+  const layout = readText("app/layout.tsx");
+  const dealCard = readText("components/DealCard.tsx");
+  const dealDetail = readText("components/DealDetail.tsx");
+  check(
+    "public UX: saved deal return path",
+    savedPage.includes("robots: { index: false, follow: false }") &&
+      savedPage.includes("SavedDealsBoard") &&
+      savedButton.includes("savedDealsChangeEvent") &&
+      savedButton.includes("aria-pressed") &&
+      savedBoard.includes("/api/products/compare?ids=") &&
+      savedBoard.includes("AffiliateButton") &&
+      savedBoard.includes("AffiliateNotice") &&
+      clientTracking.includes("savedDealsChangeEvent") &&
+      layout.includes('href="/saved"') &&
+      dealCard.includes("SavedDealButton") &&
+      dealDetail.includes("SavedDealButton"),
+    "visitors can save public deals locally, return to a noindex saved-deals page, and continue through disclosed detail or affiliate CTAs without adding login or personal-data storage",
+    "required"
+  );
+}
+
 if (
   fileExists("app/deals/category/[category]/page.tsx") &&
   fileExists("lib/category.ts") &&
