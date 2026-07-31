@@ -648,6 +648,23 @@ if (fileExists("app/deals/page.tsx")) {
     "the main deal index self-canonicalizes filtered URLs and exposes consistent search and social metadata",
     "required"
   );
+  check(
+    "public SEO: honest customer-ready deal ItemList JSON-LD",
+    dealsPage.includes("const allPublished = (await listProducts({ published: true })).filter(isPublicDealReady)") &&
+      dealsPage.includes("function buildDealListJsonLd(products: ProductWithScore[])") &&
+      dealsPage.includes("products.slice(0, 60)") &&
+      dealsPage.includes('"@type": "ItemList"') &&
+      dealsPage.includes('"@type": "ListItem"') &&
+      dealsPage.includes("itemListElement: items") &&
+      dealsPage.includes("serializeJsonLd(dealListJsonLd)") &&
+      !dealsPage.includes("offers:") &&
+      !dealsPage.includes("price:") &&
+      !dealsPage.includes("availability:") &&
+      !dealsPage.includes("stock_count:") &&
+      !dealsPage.includes("affiliate_url:"),
+    "customer-ready deals expose a capped ItemList of Product name/URL identity data without price, stock, availability, Offer, or affiliate claims",
+    "required"
+  );
 }
 
 if (

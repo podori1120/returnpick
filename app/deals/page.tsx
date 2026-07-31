@@ -97,6 +97,37 @@ function sortProducts(products: ProductWithScore[], sort: string | undefined, us
   });
 }
 
+function serializeJsonLd(value: unknown) {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
+
+function buildDealListJsonLd(products: ProductWithScore[]) {
+  const items = products.slice(0, 60).map((product, index) => {
+    const url = `${canonicalUrl}/${product.id}`;
+    return {
+      "@type": "ListItem",
+      position: index + 1,
+      url,
+      item: {
+        "@type": "Product",
+        name: product.title,
+        url
+      }
+    };
+  });
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "@id": `${canonicalUrl}#deal-list`,
+    name: pageTitle,
+    url: canonicalUrl,
+    numberOfItems: items.length,
+    itemListOrder: "https://schema.org/ItemListOrderDescending",
+    itemListElement: items
+  };
+}
+
 function compactPageRange(current: number, total: number) {
   const pages = new Set([1, total, current - 1, current, current + 1].filter((page) => page >= 1 && page <= total));
   return Array.from(pages).sort((a, b) => a - b);
@@ -179,6 +210,7 @@ export default async function DealsPage({
   const selectedPriceBand = isPriceBand(priceBandParam) ? priceBandParam : undefined;
   const allPublished = (await listProducts({ published: true })).filter(isPublicDealReady);
   if (!allPublished.length) return <EmptyDealsCatalog />;
+  const dealListJsonLd = buildDealListJsonLd(sortProducts(allPublished, "score"));
 
   const filteredProducts = sortProducts(
     allPublished
@@ -263,6 +295,7 @@ export default async function DealsPage({
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(dealListJsonLd) }} />
       <ProductImpressionTracker productIds={products.map((product) => product.id)} />
       <div>
         <p className="text-sm font-black text-pine">ReturnPick Deals</p>
