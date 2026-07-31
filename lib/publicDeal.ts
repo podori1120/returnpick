@@ -2,6 +2,7 @@ import { getCategoryLabel } from "@/lib/category";
 import { getDealPrice, getDiscountRate, getPrimaryUseCase, getReferencePrice } from "@/lib/dealIntelligence";
 import { getCustomerPublishReadiness, getDealQuality } from "@/lib/quality";
 import { getLatestScore } from "@/lib/scoring";
+import { getNaverPriceTrust, type NaverPriceTrustStatus } from "@/lib/naverPriceTrust";
 import type { Category, ConditionGrade, RiskFlag, Verdict, ProductWithScore, JsonValue } from "@/lib/types";
 
 export type PublicDeal = {
@@ -21,6 +22,7 @@ export type PublicDeal = {
   return_price: number | null;
   new_price: number | null;
   naver_lowest_price: number | null;
+  naver_price_status: NaverPriceTrustStatus;
   deal_price: number | null;
   reference_price: number | null;
   discount_rate: number | null;
@@ -51,6 +53,7 @@ export function toPublicDeal(product: ProductWithScore): PublicDeal {
   const score = getLatestScore(product);
   const quality = getDealQuality(product);
   const useCase = getPrimaryUseCase(product);
+  const naverPrice = getNaverPriceTrust(product);
 
   return {
     id: product.id,
@@ -68,7 +71,8 @@ export function toPublicDeal(product: ProductWithScore): PublicDeal {
     source_price: product.source_price,
     return_price: product.return_price,
     new_price: product.new_price,
-    naver_lowest_price: product.naver_lowest_price,
+    naver_lowest_price: naverPrice.trustedPrice,
+    naver_price_status: naverPrice.status,
     deal_price: getDealPrice(product),
     reference_price: getReferencePrice(product),
     discount_rate: getDiscountRate(product),

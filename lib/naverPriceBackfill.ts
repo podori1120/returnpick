@@ -1,6 +1,7 @@
 import { calculateDealScore } from "@/lib/scoring";
 import { createDealScore, listProducts, updateProduct } from "@/lib/dataStore";
 import { getLowestPriceFromQueries, type NaverLowestPriceResult } from "@/lib/providers/naverShoppingProvider";
+import { getNaverPriceTrust, withNaverPriceFingerprint } from "@/lib/naverPriceTrust";
 import type { ProductWithScore } from "@/lib/types";
 
 type NaverPriceBackfillDetail = {
@@ -109,16 +110,22 @@ function noMatchReason(result: Awaited<ReturnType<typeof findNaverLowestPrice>>)
   return "NO_RELEVANT_PRICED_MATCH";
 }
 
-export async function backfillNaverLowestPrices(options?: { publishedOnly?: boolean; onlyMissing?: boolean; limit?: number }) {
+export async function backfillNaverLowestPrices(options?: {
+  publishedOnly?: boolean;
+  onlyMissing?: boolean;
+  clearExistingOnNoMatch?: boolean;
+  limit?: number;
+}) {
   const products = await listProducts(options?.publishedOnly ? { published: true } : undefined);
   const targets = products
-    .filter((product) => (options?.onlyMissing === false ? true : !product.naver_lowest_price))
+    .filter((product) => (options?.onlyMissing === false ? true : ["missing", "unverified"].includes(getNaverPriceTrust(product).status)))
     .filter((product) => product.sourcing_status !== "rejected" && product.sourcing_status !== "sold_out")
     .slice(0, Math.max(1, Math.min(100, options?.limit ?? 30)));
 
   let checked_count = 0;
   let updated_count = 0;
   let no_match_count = 0;
+  let cleared_price_count = 0;
   let error_count = 0;
   const details: NaverPriceBackfillDetail[] = [];
 
@@ -141,6 +148,7 @@ export async function backfillNaverLowestPrices(options?: { publishedOnly?: bool
         checked_count,
         updated_count,
         no_match_count,
+        cleared_price_count,
         error_count,
         details
       };
@@ -153,7 +161,7 @@ export async function backfillNaverLowestPrices(options?: { publishedOnly?: bool
           naver_lowest_price: result.best.price,
           raw_json: {
             ...(product.raw_json ?? {}),
-            naver_price_backfill: {
+            naver_price_backfill: withNaverPriceFingerprint({
               status: "ok",
               query: result.best.query,
               price: result.best.price,
@@ -166,7 +174,7 @@ export async function backfillNaverLowestPrices(options?: { publishedOnly?: bool
               relevance: result.best.relevance,
               match: result.best.match ?? null,
               updated_at: new Date().toISOString()
-            }
+            }, product)
           }
         });
       } catch (error) {
@@ -214,19 +222,29 @@ export async function backfillNaverLowestPrices(options?: { publishedOnly?: bool
     if (result.status === "error") error_count += 1;
     else no_match_count += 1;
 
+    const shouldClearExistingPrice =
+      options?.clearExistingOnNoMatch === true &&
+      result.status === "no_match" &&
+      product.naver_lowest_price != null;
+
     try {
-      await updateProduct(product.id, {
+      const updated = await updateProduct(product.id, {
+        ...(shouldClearExistingPrice ? { naver_lowest_price: null } : {}),
         raw_json: {
           ...(product.raw_json ?? {}),
-          naver_price_backfill: {
+          naver_price_backfill: withNaverPriceFingerprint({
             status: result.status,
             queries: result.queries,
             errors: result.errors,
             match: result.match ?? null,
             updated_at: new Date().toISOString()
-          }
+          }, product)
         }
       });
+      if (shouldClearExistingPrice) {
+        cleared_price_count += 1;
+        await createDealScore(calculateDealScore(updated));
+      }
     } catch (error) {
       error_count += 1;
       details.push({
@@ -241,7 +259,7 @@ export async function backfillNaverLowestPrices(options?: { publishedOnly?: bool
     details.push({
       product_id: product.id,
       title: product.title,
-      status: result.status,
+      status: shouldClearExistingPrice ? "cleared_price" : result.status,
       reason: noMatchReason(result),
       query: firstQuery(result.queries),
       queries: result.queries,
@@ -255,6 +273,7 @@ export async function backfillNaverLowestPrices(options?: { publishedOnly?: bool
     checked_count,
     updated_count,
     no_match_count,
+    cleared_price_count,
     error_count,
     details
   };

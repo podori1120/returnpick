@@ -7,6 +7,7 @@ import { getCustomerPublishReadiness } from "@/lib/quality";
 import { getAffiliateIdentityReadiness } from "@/lib/affiliateIdentity";
 import { getCoupangPartnersLinkIssue, isApprovalSampleAffiliateUrl, isGenericCoupangLandingUrl, isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
 import { getProductImageUrlIssue } from "@/lib/productImageUrl";
+import { getNaverPriceTrust, mergeManualNaverPriceEvidence } from "@/lib/naverPriceTrust";
 import { isConditionGrade, isSourcingStatus, requireAdmin, sanitizeText } from "@/lib/validators";
 import type { ConditionGrade, ProductWithScore, SourcedProduct, SourcingStatus } from "@/lib/types";
 
@@ -125,6 +126,29 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     let patch = normalizePatch(body, current);
     const hasAffiliateUrlPatch = "affiliate_url" in body;
     const hasImageUrlPatch = "image_url" in body;
+    const hasNaverPricePatch = "naver_lowest_price" in body;
+
+    if (hasNaverPricePatch) {
+      const nextNaverPrice = patch.naver_lowest_price ?? null;
+      const currentTrust = getNaverPriceTrust(current);
+      const identityChanged = "title" in patch || "spec_json" in patch;
+      const needsManualConfirmation =
+        nextNaverPrice != null &&
+        (nextNaverPrice !== current.naver_lowest_price || currentTrust.trustedPrice !== nextNaverPrice || identityChanged);
+      if (needsManualConfirmation && body.naver_price_confirmed !== true) {
+        return NextResponse.json(
+          {
+            error: "NAVER_PRICE_CONFIRMATION_REQUIRED",
+            message: "네이버 최저가는 동일 모델과 핵심 옵션을 직접 대조했다는 확인이 필요합니다. 확인란을 선택하거나 공식 API 재검증을 실행하세요."
+          },
+          { status: 400 }
+        );
+      }
+      if (body.naver_price_confirmed === true || nextNaverPrice == null) {
+        const projectedIdentity = { ...current, ...patch };
+        patch.raw_json = mergeManualNaverPriceEvidence(current.raw_json, projectedIdentity, nextNaverPrice);
+      }
+    }
 
   if (hasAffiliateUrlPatch && isApprovalSampleAffiliateUrl(patch.affiliate_url)) {
     return NextResponse.json(

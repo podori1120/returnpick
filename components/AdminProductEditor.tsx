@@ -6,6 +6,7 @@ import { isApprovalSampleAffiliateUrl, isGenericCoupangLandingUrl, isUsableAffil
 import { toNumberOrNull } from "@/lib/format";
 import { isUsableProductImageUrl } from "@/lib/productImageUrl";
 import { getCustomerPublishReadiness } from "@/lib/quality";
+import { getNaverPriceTrust, mergeManualNaverPriceEvidence } from "@/lib/naverPriceTrust";
 import type { ConditionGrade, ProductWithScore } from "@/lib/types";
 
 function headers(password: string) {
@@ -32,6 +33,7 @@ export default function AdminProductEditor({
     public_note: "",
     admin_memo: ""
   });
+  const [naverPriceConfirmed, setNaverPriceConfirmed] = useState(false);
   const [savingAction, setSavingAction] = useState<"save" | "publish" | null>(null);
   const [saveNotice, setSaveNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const affiliateReady = isUsableAffiliateUrl(form.affiliate_url);
@@ -39,13 +41,20 @@ export default function AdminProductEditor({
   const approvalSampleAffiliate = isApprovalSampleAffiliateUrl(form.affiliate_url);
   const regularProductUrl = !affiliateReady && isUsableCoupangProductUrl(form.affiliate_url);
   const imageUrlReady = isUsableProductImageUrl(form.image_url);
-  const projectedProduct: ProductWithScore | null = product
+  const naverPriceValue = toNumberOrNull(form.naver_lowest_price);
+  const currentNaverTrust = product ? getNaverPriceTrust(product) : null;
+  const naverPriceNeedsConfirmation = Boolean(
+    product &&
+      naverPriceValue != null &&
+      (naverPriceValue !== product.naver_lowest_price || currentNaverTrust?.trustedPrice !== naverPriceValue)
+  );
+  const projectedBase: ProductWithScore | null = product
     ? {
         ...product,
         condition_grade: form.condition_grade as ConditionGrade,
         return_price: toNumberOrNull(form.return_price),
         new_price: toNumberOrNull(form.new_price),
-        naver_lowest_price: toNumberOrNull(form.naver_lowest_price),
+        naver_lowest_price: naverPriceValue,
         stock_count: toNumberOrNull(form.stock_count),
         affiliate_url: form.affiliate_url.trim() || null,
         image_url: form.image_url.trim() || null,
@@ -53,6 +62,13 @@ export default function AdminProductEditor({
         admin_memo: form.admin_memo.trim() || null
       }
     : null;
+  const projectedProduct =
+    projectedBase && naverPriceConfirmed
+      ? {
+          ...projectedBase,
+          raw_json: mergeManualNaverPriceEvidence(projectedBase.raw_json, projectedBase, naverPriceValue)
+        }
+      : projectedBase;
   const publishReadiness = projectedProduct ? getCustomerPublishReadiness(projectedProduct) : null;
   const publishReady = publishReadiness?.ready === true;
   const saving = savingAction !== null;
@@ -71,6 +87,7 @@ export default function AdminProductEditor({
       admin_memo: product.admin_memo ?? ""
     });
     setSaveNotice(null);
+    setNaverPriceConfirmed(false);
   }, [product]);
 
   if (!product) {
@@ -90,7 +107,11 @@ export default function AdminProductEditor({
       const response = await fetch(`/api/admin/products/${product.id}`, {
         method: "PATCH",
         headers: headers(password),
-        body: JSON.stringify(action === "publish" ? { ...form, action: "publish" } : form)
+        body: JSON.stringify(
+          action === "publish"
+            ? { ...form, naver_price_confirmed: naverPriceConfirmed, action: "publish" }
+            : { ...form, naver_price_confirmed: naverPriceConfirmed }
+        )
       });
       const data = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
       if (!response.ok) {
@@ -101,6 +122,7 @@ export default function AdminProductEditor({
         type: "success",
         message: action === "publish" ? "저장하고 고객 화면에 게시했습니다." : "저장했고 점수를 다시 계산했습니다."
       });
+      setNaverPriceConfirmed(false);
       onSaved();
     } catch {
       setSaveNotice({ type: "error", message: "네트워크 문제로 저장하지 못했습니다. 잠시 후 다시 시도해 주세요." });
@@ -140,11 +162,34 @@ export default function AdminProductEditor({
             <input
               className="focus-ring mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink"
               value={form[field as keyof typeof form]}
-              onChange={(event) => setForm((current) => ({ ...current, [field]: event.target.value }))}
+              onChange={(event) => {
+                setForm((current) => ({ ...current, [field]: event.target.value }));
+                if (field === "naver_lowest_price") setNaverPriceConfirmed(false);
+              }}
               inputMode="numeric"
             />
           </label>
         ))}
+      </div>
+
+      <div className={naverPriceNeedsConfirmation ? "mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3" : "mt-3 rounded-lg border border-line bg-mist p-3"}>
+        <p className="text-xs font-black text-steel">네이버 가격 검증</p>
+        <p className="mt-1 text-sm font-bold text-ink">
+          {naverPriceNeedsConfirmation ? "입력한 가격은 동일 상품 확인 전에는 점수와 할인율에 반영되지 않습니다." : currentNaverTrust?.label ?? "네이버 가격 없음"}
+        </p>
+        {naverPriceValue != null ? (
+          <label className="mt-2 flex items-start gap-2 text-sm font-bold text-ink">
+            <input
+              checked={naverPriceConfirmed}
+              className="mt-1"
+              onChange={(event) => setNaverPriceConfirmed(event.target.checked)}
+              type="checkbox"
+            />
+            <span>네이버 쇼핑에서 모델명과 핵심 옵션을 대조해 동일 상품 가격임을 직접 확인했습니다.</span>
+          </label>
+        ) : (
+          <p className="mt-2 text-xs font-semibold text-steel">값을 비우면 저장된 네이버 가격 근거도 해제됩니다.</p>
+        )}
       </div>
 
       <label className="mt-3 block text-sm font-bold text-steel">
@@ -258,7 +303,7 @@ export default function AdminProductEditor({
         <button
           className="focus-ring inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 py-3 text-sm font-black text-ink hover:border-ink disabled:opacity-60"
           onClick={() => save("save")}
-          disabled={saving}
+          disabled={saving || (naverPriceNeedsConfirmation && !naverPriceConfirmed)}
           type="button"
         >
           <Save size={16} aria-hidden /> {savingAction === "save" ? "저장 중" : "저장 후 재점수화"}
@@ -267,7 +312,7 @@ export default function AdminProductEditor({
           aria-describedby="publish-readiness"
           className="focus-ring inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-ink px-4 py-3 text-sm font-black text-white hover:bg-pine disabled:cursor-not-allowed disabled:opacity-50"
           onClick={() => save("publish")}
-          disabled={saving || !publishReady}
+          disabled={saving || !publishReady || (naverPriceNeedsConfirmation && !naverPriceConfirmed)}
           title={publishReady ? "현재 입력값을 저장하고 즉시 게시합니다." : publishReadiness?.blockers.join(", ")}
           type="button"
         >

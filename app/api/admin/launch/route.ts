@@ -6,6 +6,7 @@ import { getNextSourcingKeywordOffset } from "@/lib/sourcingCursor";
 import { isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { markFirstLaunchConfirmed } from "@/lib/launchState";
 import { backfillNaverLowestPrices } from "@/lib/naverPriceBackfill";
+import { getNaverPriceTrust } from "@/lib/naverPriceTrust";
 import { isPublicDealReady } from "@/lib/publicDeal";
 import { runSourcing } from "@/lib/sourcing";
 import { requireAdmin } from "@/lib/validators";
@@ -90,7 +91,7 @@ async function productSummary(): Promise<ProductSummary> {
     published_affiliate_ready: publicReady.length,
     published_public_ready: publicReady.length,
     missing_affiliate: products.filter((product) => !isUsableAffiliateUrl(product.affiliate_url)).length,
-    missing_naver_lowest_price: products.filter((product) => !product.naver_lowest_price).length
+    missing_naver_lowest_price: products.filter((product) => getNaverPriceTrust(product).trustedPrice == null).length
   };
 }
 
@@ -146,7 +147,7 @@ function getLaunchRecoveryActions(before: ProductSummary, after: ProductSummary,
       id: "repair_naver_prices",
       label: "네이버 최저가 보강",
       target_anchor: "admin-price-backfill",
-      next_action: `네이버 최저가가 비어 있는 후보 ${after.missing_naver_lowest_price.toLocaleString("ko-KR")}건을 가격 보강 패널에서 다시 검색하세요.`
+      next_action: `동일 상품으로 검증된 네이버 최저가가 없는 후보 ${after.missing_naver_lowest_price.toLocaleString("ko-KR")}건을 가격 보강 패널에서 다시 검색하세요.`
     });
   }
 

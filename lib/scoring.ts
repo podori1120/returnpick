@@ -1,4 +1,5 @@
 import { calculateDiscountRate } from "@/lib/format";
+import { getPriceReferenceInfo } from "@/lib/priceReference";
 import type { DealScore, ProductWithScore, RiskFlag, SourcedProduct, Verdict } from "@/lib/types";
 
 const conditionScores: Record<string, number> = {
@@ -149,7 +150,9 @@ export function calculateDealScore(product: SourcedProduct): DealScore {
   const riskFlags: RiskFlag[] = [];
   const reasons: string[] = [];
 
-  const referencePrice = product.naver_lowest_price ?? product.new_price ?? product.source_price;
+  const referenceInfo = getPriceReferenceInfo(product);
+  const referencePrice = referenceInfo.value;
+  const trustedNaverPrice = referenceInfo.naverTrust.trustedPrice;
   const dealPrice = product.return_price ?? product.source_price;
   const hasEnoughPrice = Boolean(referencePrice && dealPrice);
   const discountRate = calculateDiscountRate(referencePrice, dealPrice);
@@ -157,7 +160,7 @@ export function calculateDealScore(product: SourcedProduct): DealScore {
 
   if (!hasEnoughPrice) riskFlags.push("RISK_PRICE_UNKNOWN");
   if (product.return_price == null) riskFlags.push("RISK_PRICE_UNKNOWN");
-  if (product.naver_lowest_price && dealPrice && dealPrice > product.naver_lowest_price) {
+  if (trustedNaverPrice && dealPrice && dealPrice > trustedNaverPrice) {
     riskFlags.push("RISK_BAD_PRICE_VS_NAVER");
   }
   if (discountRate != null && discountRate >= 0.2) {
@@ -225,6 +228,8 @@ export function calculateDealScore(product: SourcedProduct): DealScore {
     risk_flags: Array.from(new Set(riskFlags)),
     score_detail: {
       reference_price: referencePrice ?? null,
+      reference_source: referenceInfo.source,
+      naver_price_status: referenceInfo.naverTrust.status,
       deal_price: dealPrice ?? null,
       discount_rate: discountRate,
       applied_caps: {
@@ -239,6 +244,17 @@ export function calculateDealScore(product: SourcedProduct): DealScore {
 }
 
 export function getLatestScore(product: ProductWithScore) {
-  if (product.latest_score) return product.latest_score;
-  return [...(product.deal_scores ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? null;
+  const stored = product.latest_score ?? [...(product.deal_scores ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? null;
+  if (!stored) return calculateDealScore(product);
+
+  const referenceInfo = getPriceReferenceInfo(product);
+  const dealPrice = product.return_price ?? product.source_price ?? null;
+  const detail = stored.score_detail ?? {};
+  const scoreIsCurrent =
+    detail.reference_price === (referenceInfo.value ?? null) &&
+    detail.deal_price === dealPrice &&
+    detail.reference_source === referenceInfo.source &&
+    detail.naver_price_status === referenceInfo.naverTrust.status;
+
+  return scoreIsCurrent ? stored : calculateDealScore(product);
 }

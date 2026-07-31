@@ -6,6 +6,7 @@ import { getRelatedProducts } from "@/lib/dealIntelligence";
 import { getCategoryLabel } from "@/lib/category";
 import { formatPrice } from "@/lib/format";
 import { isPublicDealReady } from "@/lib/publicDeal";
+import { getPriceReferenceInfo } from "@/lib/priceReference";
 import { getSiteUrl } from "@/lib/siteUrl";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +26,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 
   const title = `${product.title} | 리턴픽 반품 딜`;
-  const description = `${getCategoryLabel(product.category)} 반품 추천 후보입니다. 반품가 ${formatPrice(product.return_price)}, 네이버 기준가 ${formatPrice(product.naver_lowest_price)}를 리턴픽 기준으로 검수했습니다.`;
+  const reference = getPriceReferenceInfo(product);
+  const description = `${getCategoryLabel(product.category)} 반품 추천 후보입니다. 반품가 ${formatPrice(product.return_price)}, ${reference.label} ${formatPrice(reference.value)}를 리턴픽 기준으로 검수했습니다.`;
 
   return {
     title,

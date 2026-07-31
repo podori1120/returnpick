@@ -69,7 +69,9 @@ export function getPurchaseDecision(product: ProductWithScore) {
   const goodSignals = unique([
     discountRate != null && discountRate > 0 ? `기준가 대비 ${formatPercent(discountRate)} 차이` : "",
     hasVerifiedReturn ? `반품등급 ${product.condition_grade} / 반품가 ${formatPrice(product.return_price)}` : "",
-    product.naver_lowest_price ? `네이버 기준가 ${formatPrice(product.naver_lowest_price)} 참고` : `${referenceInfo.label}로 보수 계산`,
+    referenceInfo.naverTrust.trustedPrice
+      ? `동일 상품 확인 네이버 기준가 ${formatPrice(referenceInfo.naverTrust.trustedPrice)} 참고`
+      : `${referenceInfo.label}로 보수 계산`,
     useCase ? `${useCase.label} 용도 적합도 ${useCase.score}점` : "",
     product.stock_count && product.stock_count > 1 ? `재고 ${product.stock_count}개 확인` : "",
     score?.reasons?.[0] ?? ""
@@ -78,7 +80,8 @@ export function getPurchaseDecision(product: ProductWithScore) {
   const cautions = unique([
     !product.return_price ? "반품가를 쿠팡에서 최종 확인하세요." : "",
     !hasVerifiedReturn ? "반품등급은 구매 직전 쿠팡 화면에서 다시 확인하세요." : "",
-    !product.naver_lowest_price ? "네이버 최저가 기준이 없어 가격 비교를 보수적으로 봐야 합니다." : "",
+    referenceInfo.naverTrust.status === "unverified" ? "저장된 네이버 가격은 동일 상품 검증 전이라 할인 계산에서 제외했습니다." : "",
+    referenceInfo.naverTrust.status === "missing" ? "네이버 최저가 기준이 없어 가격 비교를 보수적으로 봐야 합니다." : "",
     product.stock_count === 1 ? "재고 1개 상품은 가격과 재고가 빠르게 바뀔 수 있습니다." : "",
     !hasAffiliate ? "구매 링크가 준비되지 않아 관리자 확인이 필요합니다." : "",
     freshness.status === "stale" ? `마지막 관찰 후 ${freshness.ageHours ?? 0}시간이 지나 최신 조건을 재확인해야 합니다.` : "",

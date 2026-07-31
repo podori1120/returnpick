@@ -1,4 +1,6 @@
 import { calculateDiscountRate } from "@/lib/format";
+import { withNaverPriceFingerprint } from "@/lib/naverPriceTrust";
+import { getPriceReferenceInfo } from "@/lib/priceReference";
 import { calculateDealScore } from "@/lib/scoring";
 import { parseSpecsFromTitle } from "@/lib/specParser";
 import {
@@ -31,7 +33,7 @@ function isWithinKeywordPrice(product: ProviderProduct, keyword: SourcingKeyword
 
 function classifyProduct(product: SourcedProduct, minDiscountRate: number | null): SourcingStatus {
   const score = calculateDealScore(product);
-  const reference = product.naver_lowest_price ?? product.new_price ?? product.source_price;
+  const reference = getPriceReferenceInfo(product).value;
   const deal = product.return_price ?? product.source_price;
   const discountRate = calculateDiscountRate(reference, deal);
   const meaningfulDiscount = discountRate != null && discountRate >= (minDiscountRate ?? 0.12);
@@ -195,7 +197,7 @@ async function enrichNaverLowestPrice(product: ProviderProduct, specJson: Record
 
   return {
     price: result.price,
-    priceLog: {
+    priceLog: withNaverPriceFingerprint({
       status: result.status,
       queries,
       relevance_tokens: relevanceTokens,
@@ -210,8 +212,15 @@ async function enrichNaverLowestPrice(product: ProviderProduct, specJson: Record
         ? [result.item.category1, result.item.category2, result.item.category3, result.item.category4].filter(Boolean)
         : [],
       match: result.match ?? null,
-      errors: result.errors
-    }
+      errors: result.errors,
+      updated_at: new Date().toISOString()
+    }, {
+      category: product.category,
+      title: product.title,
+      brand: product.brand ?? null,
+      model_name: product.model_name ?? null,
+      spec_json: specJson
+    })
   };
 }
 

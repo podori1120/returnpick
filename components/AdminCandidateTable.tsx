@@ -9,7 +9,8 @@ import VerdictBadge from "@/components/VerdictBadge";
 import { ADMIN_CANDIDATE_QUEUE_EVENT, type AdminCandidateQueue } from "@/lib/adminNavigation";
 import { categoryOptions, getCategoryLabel } from "@/lib/category";
 import { isApprovalSampleAffiliateUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
-import { calculateDiscountRate, formatDate, formatPercent, formatPrice } from "@/lib/format";
+import { formatDate, formatPercent, formatPrice } from "@/lib/format";
+import { getAppliedDiscountRate } from "@/lib/priceReference";
 import { getCustomerPublishReadiness, getDealQuality } from "@/lib/quality";
 import type { Category, ProductWithScore, SourcingStatus } from "@/lib/types";
 
@@ -192,8 +193,8 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
       .sort((a, b) => {
         if (sort === "score") return (b.latest_score?.total_score ?? 0) - (a.latest_score?.total_score ?? 0);
         if (sort === "discount") {
-          const ad = calculateDiscountRate(a.naver_lowest_price ?? a.new_price ?? a.source_price, a.return_price ?? a.source_price) ?? -1;
-          const bd = calculateDiscountRate(b.naver_lowest_price ?? b.new_price ?? b.source_price, b.return_price ?? b.source_price) ?? -1;
+          const ad = getAppliedDiscountRate(a) ?? -1;
+          const bd = getAppliedDiscountRate(b) ?? -1;
           return bd - ad;
         }
         if (sort === "price") return (b.return_price ?? b.source_price ?? 0) - (a.return_price ?? a.source_price ?? 0);
@@ -550,7 +551,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
             </thead>
             <tbody>
               {filtered.map((product) => {
-                const discount = calculateDiscountRate(product.naver_lowest_price ?? product.new_price ?? product.source_price, product.return_price ?? product.source_price);
+                const discount = getAppliedDiscountRate(product);
                 const quality = getDealQuality(product);
                 const revenue = productMetrics[product.id];
                 const approvalSampleAffiliate = isApprovalSampleAffiliateUrl(product.affiliate_url);

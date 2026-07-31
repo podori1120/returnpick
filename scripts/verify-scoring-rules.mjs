@@ -46,11 +46,13 @@ check(
 check(
   "reference and deal price order",
   includesAll(scoring, [
-    "product.naver_lowest_price ?? product.new_price ?? product.source_price",
+    "const referenceInfo = getPriceReferenceInfo(product)",
+    "const referencePrice = referenceInfo.value",
+    "const trustedNaverPrice = referenceInfo.naverTrust.trustedPrice",
     "product.return_price ?? product.source_price",
     "calculateDiscountRate(referencePrice, dealPrice)"
   ]),
-  "reference_price and deal_price use the approved fallback order"
+  "reference_price uses only verified Naver evidence before the approved fallback order"
 );
 
 check(
@@ -99,8 +101,29 @@ check(
 
 check(
   "score detail payload",
-  includesAll(scoring, ["reference_price", "deal_price", "discount_rate", "applied_caps", "condition_unknown", "return_price_missing", "bad_price_vs_naver"]),
+  includesAll(scoring, [
+    "reference_price",
+    "reference_source",
+    "naver_price_status",
+    "deal_price",
+    "discount_rate",
+    "applied_caps",
+    "condition_unknown",
+    "return_price_missing",
+    "bad_price_vs_naver"
+  ]),
   "deal_scores keep explainable score_detail for admin and detail pages"
+);
+
+check(
+  "stale score invalidation",
+  includesAll(scoring, [
+    "detail.reference_price === (referenceInfo.value ?? null)",
+    "detail.reference_source === referenceInfo.source",
+    "detail.naver_price_status === referenceInfo.naverTrust.status",
+    "return scoreIsCurrent ? stored : calculateDealScore(product)"
+  ]),
+  "legacy scores are recalculated when their price source or Naver verification state no longer matches"
 );
 
 check(

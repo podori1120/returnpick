@@ -8,6 +8,9 @@ type Summary = {
   missing_naver_lowest_price: number;
   published_missing_naver_lowest_price: number;
   needs_review_missing_naver_lowest_price: number;
+  unverified_naver_lowest_price: number;
+  published_unverified_naver_lowest_price: number;
+  trusted_naver_lowest_price: number;
   naver_api_configured: boolean;
 };
 
@@ -17,6 +20,7 @@ type BackfillResult = {
   checked_count: number;
   updated_count: number;
   no_match_count: number;
+  cleared_price_count: number;
   error_count: number;
   details?: BackfillDetail[];
 };
@@ -73,7 +77,8 @@ function resultMessage(result: BackfillResult) {
     return "NAVER_CLIENT_ID / NAVER_CLIENT_SECRET이 없어 실제 네이버 최저가를 채울 수 없습니다.";
   }
 
-  const base = `${result.checked_count}개 확인, ${result.updated_count}개 보강, ${result.no_match_count}개 매칭 실패, ${result.error_count}개 오류`;
+  const cleared = result.cleared_price_count ? `, 근거 없는 기존 값 ${result.cleared_price_count}개 정리` : "";
+  const base = `${result.checked_count}개 확인, ${result.updated_count}개 보강, ${result.no_match_count}개 매칭 실패${cleared}, ${result.error_count}개 오류`;
   if (result.status === "completed" && result.target_count === 0) return "보강할 상품이 없습니다. 실행 범위와 네이버 최저가 누락 여부를 확인하세요.";
   if (result.status === "completed_with_errors") return `${base} · 일부 오류가 있어 상세를 확인하세요.`;
   if (result.no_match_count > 0 && result.updated_count === 0) return `${base} · 상품명이나 모델명을 보완한 뒤 다시 시도하세요.`;
@@ -86,7 +91,8 @@ function detailStatusLabel(status: string) {
     ok: "가격 보강 완료",
     no_match: "매칭 실패",
     error: "오류",
-    API_NOT_CONFIGURED: "API 키 필요"
+    API_NOT_CONFIGURED: "API 키 필요",
+    cleared_price: "기존 가격 근거 해제"
   };
   return labels[status] ?? status;
 }
@@ -184,15 +190,22 @@ export default function AdminPriceBackfillPanel({ password, onCompleted }: { pas
     void loadSummary();
   }, [password]);
 
-  async function runBackfill() {
+  async function runBackfill(revalidateExisting = false) {
     setRunning(true);
     setLastResult(null);
-    setNotice({ type: "info", message: includeCandidates ? "게시 상품과 검토 후보의 네이버 최저가 누락분을 보강 중입니다." : "게시 상품의 네이버 최저가 누락분을 보강 중입니다." });
+    setNotice({
+      type: "info",
+      message: revalidateExisting
+        ? "저장된 네이버 가격을 동일 SKU 기준으로 다시 검증 중입니다. 정상 검색에서 일치 결과가 없으면 기존 숫자는 이력만 남기고 현재 가격 근거에서 제거합니다."
+        : includeCandidates
+          ? "게시 상품과 검토 후보의 누락·미검증 네이버 최저가를 보강 중입니다."
+          : "게시 상품의 누락·미검증 네이버 최저가를 보강 중입니다."
+    });
     try {
       const response = await fetch("/api/admin/prices/backfill", {
         method: "POST",
         headers: headers(password),
-        body: JSON.stringify({ publishedOnly: !includeCandidates, onlyMissing: true, limit: 40 })
+        body: JSON.stringify({ publishedOnly: !includeCandidates, onlyMissing: true, revalidateExisting, limit: 40 })
       });
       const data = (await response.json().catch(() => ({}))) as BackfillResponse;
       const result = data.result;
@@ -221,7 +234,7 @@ export default function AdminPriceBackfillPanel({ password, onCompleted }: { pas
           <p className="text-xs font-black text-pine">Naver Price Backfill</p>
           <h2 className="text-lg font-black">네이버 최저가 보강</h2>
           <p className="mt-1 text-sm font-semibold leading-6 text-steel">
-            비어 있는 네이버 최저가를 공식 네이버 쇼핑 API로 다시 검색합니다. 모델코드와 핵심 스펙이 확인되는 동일 SKU만 채택하며, API 키가 없거나 식별 근거가 부족하면 값을 비워 둡니다.
+            비어 있거나 검증 근거가 없는 네이버 가격을 공식 쇼핑 API로 다시 검색합니다. 모델코드와 핵심 스펙이 확인되는 동일 SKU만 채택하며, API 키가 없거나 식별 근거가 부족하면 가격 판단에서 제외합니다.
           </p>
           <p className="mt-1 text-xs font-bold text-steel">
             게시 상품만 또는 검토 후보까지 포함해 최대 40개씩 처리하고, 매칭 검색어와 실패 사유를 남깁니다.
@@ -238,11 +251,19 @@ export default function AdminPriceBackfillPanel({ password, onCompleted }: { pas
           </button>
           <button
             className="focus-ring inline-flex items-center gap-2 rounded-lg bg-ink px-4 py-2 text-sm font-black text-white hover:bg-pine disabled:opacity-60"
-            onClick={runBackfill}
+            onClick={() => runBackfill(false)}
             disabled={running}
             type="button"
           >
-            <SearchCheck size={16} aria-hidden /> 누락 최저가 보강
+            <SearchCheck size={16} aria-hidden /> 누락·미검증 보강
+          </button>
+          <button
+            className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line bg-white px-4 py-2 text-sm font-black text-ink hover:bg-mist disabled:opacity-60"
+            onClick={() => runBackfill(true)}
+            disabled={running}
+            type="button"
+          >
+            <RefreshCw size={16} aria-hidden /> 기존 가격 재검증
           </button>
         </div>
       </div>
@@ -265,10 +286,18 @@ export default function AdminPriceBackfillPanel({ password, onCompleted }: { pas
         </p>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-5">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
         <div className="rounded-lg bg-mist p-3">
           <p className="text-xs font-black text-steel">전체 상품</p>
           <p className="mt-1 text-xl font-black">{summary?.total ?? 0}</p>
+        </div>
+        <div className="rounded-lg bg-mist p-3">
+          <p className="text-xs font-black text-steel">검증 완료</p>
+          <p className="mt-1 text-xl font-black text-pine">{summary?.trusted_naver_lowest_price ?? 0}</p>
+        </div>
+        <div className="rounded-lg bg-mist p-3">
+          <p className="text-xs font-black text-steel">검증 필요</p>
+          <p className="mt-1 text-xl font-black text-coral">{summary?.unverified_naver_lowest_price ?? 0}</p>
         </div>
         <div className="rounded-lg bg-mist p-3">
           <p className="text-xs font-black text-steel">전체 누락</p>
@@ -279,8 +308,8 @@ export default function AdminPriceBackfillPanel({ password, onCompleted }: { pas
           <p className="mt-1 text-xl font-black">{summary?.published_missing_naver_lowest_price ?? 0}</p>
         </div>
         <div className="rounded-lg bg-mist p-3">
-          <p className="text-xs font-black text-steel">검토 후보 누락</p>
-          <p className="mt-1 text-xl font-black">{summary?.needs_review_missing_naver_lowest_price ?? 0}</p>
+          <p className="text-xs font-black text-steel">게시 검증 필요</p>
+          <p className="mt-1 text-xl font-black">{summary?.published_unverified_naver_lowest_price ?? 0}</p>
         </div>
         <div className="rounded-lg bg-mist p-3">
           <p className="text-xs font-black text-steel">API 상태</p>

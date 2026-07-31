@@ -29,9 +29,9 @@ export default function PriceHistory({ snapshots }: { snapshots?: ProductSnapsho
                   <p className="mt-1 font-black">{snapshot.change_flags.map((flag) => changeLabels[flag] ?? flag).join(", ") || "관찰"}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-steel">반품가 / 네이버</p>
+                  <p className="text-xs font-bold text-steel">반품가 / 수집 당시 가격</p>
                   <p className="mt-1 font-black">
-                    {formatPrice(snapshot.return_price)} / {formatPrice(snapshot.naver_lowest_price)}
+                    {formatPrice(snapshot.return_price)} / {formatPrice(snapshot.source_price)}
                   </p>
                 </div>
                 <div>

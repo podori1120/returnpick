@@ -18,8 +18,10 @@ export default function PriceComparison({ product }: { product: SourcedProduct }
       </div>
       <div className="rounded-lg border border-line bg-white p-4">
         <p className="text-xs font-bold text-steel">네이버 최저가</p>
-        <p className="mt-1 text-lg font-black">{product.naver_lowest_price ? formatPrice(product.naver_lowest_price) : "확인중"}</p>
-        {!product.naver_lowest_price ? <p className="mt-1 text-xs font-bold text-coral">API 보강 필요</p> : null}
+        <p className="mt-1 text-lg font-black">{reference.naverTrust.trustedPrice ? formatPrice(reference.naverTrust.trustedPrice) : "검증 필요"}</p>
+        <p className={reference.naverTrust.trustedPrice ? "mt-1 text-xs font-bold text-pine" : "mt-1 text-xs font-bold text-coral"}>
+          {reference.naverTrust.label}
+        </p>
       </div>
       <div className="rounded-lg border border-line bg-white p-4">
         <p className="text-xs font-bold text-steel">적용 기준가</p>
@@ -33,7 +35,7 @@ export default function PriceComparison({ product }: { product: SourcedProduct }
         <p className="mt-1 text-lg font-black">{formatPercent(discount)}</p>
       </div>
       <p className="rounded-lg bg-mist px-3 py-2 text-xs font-bold leading-5 text-steel sm:col-span-2 xl:col-span-5">
-        {reference.note} 네이버 값이 비어 있어도 가격 판단은 중단하지 않고, 새상품가나 수집가를 별도 표기한 대체 기준으로 계산합니다.
+        {reference.note} 검증된 네이버 값이 없어도 새상품가나 수집가를 별도 표기한 대체 기준으로 계산합니다.
       </p>
     </div>
   );

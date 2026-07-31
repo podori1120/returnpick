@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { listProducts } from "@/lib/dataStore";
 import { backfillNaverLowestPrices } from "@/lib/naverPriceBackfill";
+import { getNaverPriceTrust } from "@/lib/naverPriceTrust";
 import { requireAdmin } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
@@ -24,12 +25,17 @@ export async function GET(request: Request) {
     const products = await listProducts();
     const published = products.filter((product) => product.is_published && product.sourcing_status === "published");
     const needsReview = products.filter((product) => product.sourcing_status === "needs_review");
+    const unverified = (items: typeof products) => items.filter((product) => getNaverPriceTrust(product).status === "unverified").length;
+    const trusted = (items: typeof products) => items.filter((product) => getNaverPriceTrust(product).trustedPrice != null).length;
     return NextResponse.json({
       summary: {
         total: products.length,
         missing_naver_lowest_price: products.filter((product) => !product.naver_lowest_price).length,
         published_missing_naver_lowest_price: published.filter((product) => !product.naver_lowest_price).length,
         needs_review_missing_naver_lowest_price: needsReview.filter((product) => !product.naver_lowest_price).length,
+        unverified_naver_lowest_price: unverified(products),
+        published_unverified_naver_lowest_price: unverified(published),
+        trusted_naver_lowest_price: trusted(products),
         naver_api_configured: Boolean(process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET)
       }
     });
@@ -44,9 +50,11 @@ export async function POST(request: Request) {
 
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    const revalidateExisting = body.revalidateExisting === true;
     const result = await backfillNaverLowestPrices({
       publishedOnly: body.publishedOnly !== false,
-      onlyMissing: body.onlyMissing !== false,
+      onlyMissing: revalidateExisting ? false : body.onlyMissing !== false,
+      clearExistingOnNoMatch: revalidateExisting,
       limit: positiveInteger(body.limit, 30)
     });
 

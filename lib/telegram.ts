@@ -3,6 +3,7 @@ import { approvalSampleProduct } from "@/lib/approvalSample";
 import { buildEditorialPickTelegramMessage } from "@/lib/editorialCampaign";
 import { formatPercent, formatPrice } from "@/lib/format";
 import { isPublicDealReady } from "@/lib/publicDeal";
+import { getAppliedDiscountRate } from "@/lib/priceReference";
 import { getLatestScore } from "@/lib/scoring";
 import { getSiteUrl } from "@/lib/siteUrl";
 import type { ProductWithScore } from "@/lib/types";
@@ -59,9 +60,7 @@ function fitTelegramMessage(message: string, detailUrl: string) {
 
 export function buildTelegramMessage(product: ProductWithScore) {
   const score = getLatestScore(product);
-  const referencePrice = product.naver_lowest_price ?? product.new_price ?? product.source_price;
-  const dealPrice = product.return_price ?? product.source_price;
-  const discountRate = referencePrice && dealPrice ? (referencePrice - dealPrice) / referencePrice : null;
+  const discountRate = getAppliedDiscountRate(product);
   const siteUrl = getSiteUrl();
   const reasons = score?.reasons?.slice(0, 2) ?? ["관리자가 가격과 상태를 확인한 추천 후보입니다."];
   const risks = score?.risk_flags?.length

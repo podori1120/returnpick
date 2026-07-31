@@ -207,6 +207,7 @@ const requiredFiles = [
   "lib/clientTracking.ts",
   "lib/launchState.ts",
   "lib/naverProductMatch.ts",
+  "lib/naverPriceTrust.ts",
   "lib/naverPriceBackfill.ts",
   "lib/productImageUrl.ts",
   "lib/providerProductMerge.ts",
@@ -232,6 +233,7 @@ const requiredFiles = [
   "scripts/verify-github-hourly-scheduler.mjs",
   "scripts/verify-affiliate-identity.mjs",
   "scripts/verify-naver-product-match.mjs",
+  "scripts/verify-naver-price-trust.mjs",
   "scripts/verify-provider-product-merge.mjs",
   "scripts/verify-scoring-rules.mjs",
   "scripts/verify-public-web-config.mjs",
@@ -384,6 +386,45 @@ if (fileExists("package.json") && fileExists("lib/naverProductMatch.ts") && file
       matcherCheck.includes("accessory rejection") &&
       matcherCheck.includes("confidence-first price ranking"),
     "Naver price matching rejects accessories, model/spec conflicts, ambiguous variants, and weak identities before comparing prices",
+    "required"
+  );
+}
+
+if (
+  fileExists("package.json") &&
+  fileExists("lib/naverPriceTrust.ts") &&
+  fileExists("scripts/verify-naver-price-trust.mjs") &&
+  fileExists("lib/priceReference.ts") &&
+  fileExists("lib/scoring.ts") &&
+  fileExists("lib/naverPriceBackfill.ts")
+) {
+  const packageJson = readText("package.json");
+  const trust = readText("lib/naverPriceTrust.ts");
+  const trustCheck = readText("scripts/verify-naver-price-trust.mjs");
+  const priceReference = readText("lib/priceReference.ts");
+  const scoring = readText("lib/scoring.ts");
+  const backfill = readText("lib/naverPriceBackfill.ts");
+  check(
+    "scripts: Naver price trust check command",
+    packageJson.includes('"naver-price-trust:check": "node scripts/verify-naver-price-trust.mjs"'),
+    "package.json exposes deterministic persisted-price provenance checks",
+    "required"
+  );
+  check(
+    "Naver price trust: evidence bound to product identity",
+    ["product_fingerprint", "verified_api", "verified_manual", "unverified", "acceptedSkuReasons"].every((value) => trust.includes(value)) &&
+      ["legacy rejection", "product-fingerprint invalidation"].every((value) => trustCheck.includes(value)),
+    "legacy prices stay untrusted unless price, accepted SKU evidence, and product fingerprint agree",
+    "required"
+  );
+  check(
+    "Naver price trust: public scoring and backfill integration",
+    priceReference.includes("getNaverPriceTrust(product)") &&
+      scoring.includes("naver_price_status") &&
+      scoring.includes("return scoreIsCurrent ? stored : calculateDealScore(product)") &&
+      backfill.includes('["missing", "unverified"].includes(getNaverPriceTrust(product).status)') &&
+      backfill.includes("withNaverPriceFingerprint"),
+    "public price calculations reject unverified legacy values and backfill rechecks them with bound evidence",
     "required"
   );
 }
@@ -3257,10 +3298,10 @@ if (fileExists("components/AdminProductEditor.tsx")) {
   check(
     "admin: atomic save and publish",
     productEditor.includes("getCustomerPublishReadiness") &&
-      productEditor.includes('action === "publish" ? { ...form, action: "publish" } : form') &&
+      productEditor.includes("naver_price_confirmed: naverPriceConfirmed") &&
       productEditor.includes("저장 후 게시") &&
       productEditor.includes("게시 전 보강이 필요합니다") &&
-      productEditor.includes("disabled={saving || !publishReady}") &&
+      productEditor.includes("disabled={saving || !publishReady || (naverPriceNeedsConfirmation && !naverPriceConfirmed)}") &&
       productRoute.includes('if (action === "publish")') &&
       productRoute.includes("projectProductForPublishCheck") &&
       productRoute.includes("PUBLIC_QUALITY_BLOCKERS_FOR_PUBLISH"),

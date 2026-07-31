@@ -4,8 +4,9 @@ import path from "path";
 import { isGenericCoupangLandingUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { demoCatalog } from "@/lib/demoCatalog";
 import { getCustomerPublishReadiness, getDealQuality } from "@/lib/quality";
+import { getNaverPriceTrust } from "@/lib/naverPriceTrust";
 import { isUsableProductImageUrl } from "@/lib/productImageUrl";
-import { calculateDealScore } from "@/lib/scoring";
+import { calculateDealScore, getLatestScore } from "@/lib/scoring";
 import { isSourcingExecutionRun } from "@/lib/sourcingRunKinds";
 import { getSupabaseServiceClient } from "@/lib/supabase";
 import { parseSpecsFromTitle } from "@/lib/specParser";
@@ -159,7 +160,11 @@ function preserveExistingReviewFields(existing: SourcedProduct, payload: Sourced
     admin_memo: existing.admin_memo,
     public_note: existing.public_note,
     image_url: isUsableProductImageUrl(existing.image_url) ? existing.image_url : payload.image_url,
-    affiliate_url: isUsableAffiliateUrl(existing.affiliate_url) ? existing.affiliate_url : payload.affiliate_url
+    affiliate_url: isUsableAffiliateUrl(existing.affiliate_url) ? existing.affiliate_url : payload.affiliate_url,
+    raw_json: {
+      ...(existing.raw_json ?? {}),
+      ...(payload.raw_json ?? {})
+    }
   };
 }
 
@@ -342,25 +347,27 @@ const memoryAffiliateEvents = memoryState.affiliateEvents;
 function normalizeProductFromDb(product: ProductWithScore): ProductWithScore {
   const dealScores = [...(product.deal_scores ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at));
   const snapshots = [...(product.product_snapshots ?? product.snapshots ?? [])].sort((a, b) => b.observed_at.localeCompare(a.observed_at));
-  return {
+  const normalized = {
     ...product,
     latest_score: dealScores[0] ?? null,
     deal_scores: dealScores,
     snapshots,
     latest_snapshot: snapshots[0] ?? null
   };
+  return { ...normalized, latest_score: getLatestScore(normalized) };
 }
 
 function attachMemoryScore(product: SourcedProduct): ProductWithScore {
   const dealScores = memoryScores.filter((score) => score.product_id === product.id).sort((a, b) => b.created_at.localeCompare(a.created_at));
   const snapshots = memorySnapshots.filter((snapshot) => snapshot.product_id === product.id).sort((a, b) => b.observed_at.localeCompare(a.observed_at));
-  return {
+  const normalized = {
     ...product,
     deal_scores: dealScores,
     latest_score: dealScores[0] ?? null,
     snapshots,
     latest_snapshot: snapshots[0] ?? null
   };
+  return { ...normalized, latest_score: getLatestScore(normalized) };
 }
 
 export async function listKeywords(options?: { activeOnly?: boolean }) {
@@ -970,7 +977,8 @@ export async function getAdminMetrics() {
   const missingAffiliateUrl = hiddenPublishedWithoutAffiliate;
   const badPrice = products.filter((product) => {
     const dealPrice = product.return_price ?? product.source_price;
-    return Boolean(product.naver_lowest_price && dealPrice && dealPrice > product.naver_lowest_price);
+    const trustedNaverPrice = getNaverPriceTrust(product).trustedPrice;
+    return Boolean(trustedNaverPrice && dealPrice && dealPrice > trustedNaverPrice);
   }).length;
   const highScore = products.filter((product) => (product.latest_score?.total_score ?? 0) >= 75).length;
   const changedRecently = products.filter((product) => (product.latest_snapshot?.change_flags?.length ?? 0) > 0).length;

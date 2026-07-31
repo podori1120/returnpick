@@ -7,6 +7,7 @@ import { getCategoryLabel } from "@/lib/category";
 import { buildCoupangSearchUrl, isApprovalSampleAffiliateUrl, isCoupangPartnersLink, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { formatPrice } from "@/lib/format";
 import { getCustomerPublishReadiness } from "@/lib/quality";
+import { getNaverPriceTrust } from "@/lib/naverPriceTrust";
 import type { ProductWithScore } from "@/lib/types";
 
 function headers(password: string) {
@@ -679,6 +680,7 @@ export default function AdminAffiliateLinkQueue({
           const identityMismatch = verification?.identity_status === "MISMATCH";
           const manualConfirmationAvailable = verification?.identity_status === "UNRESOLVED" || verification?.identity_status === "EXPECTED_ID_UNAVAILABLE";
           const searchUrl = buildCoupangSearchUrl(product);
+          const naverPrice = getNaverPriceTrust(product);
           return (
             <article key={product.id} className="rounded-lg border border-line p-4">
               <div className="grid gap-3 lg:grid-cols-[1fr_360px]">
@@ -690,7 +692,7 @@ export default function AdminAffiliateLinkQueue({
                   </div>
                   <h3 className="mt-2 line-clamp-2 text-sm font-black">{product.title}</h3>
                   <p className="mt-1 text-xs font-bold text-steel">
-                    판매가 {formatPrice(product.return_price ?? product.source_price)} · 네이버 {formatPrice(product.naver_lowest_price)} · 재고{" "}
+                    판매가 {formatPrice(product.return_price ?? product.source_price)} · 네이버 {naverPrice.trustedPrice ? formatPrice(naverPrice.trustedPrice) : naverPrice.label} · 재고{" "}
                     {product.stock_count ?? "확인필요"}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">

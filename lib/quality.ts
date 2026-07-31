@@ -2,6 +2,7 @@ import { calculateDiscountRate } from "@/lib/format";
 import { getAffiliateIdentityReadiness } from "@/lib/affiliateIdentity";
 import { isApprovalSampleAffiliateUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { isUsableProductImageUrl } from "@/lib/productImageUrl";
+import { getPriceReferenceInfo } from "@/lib/priceReference";
 import { getLatestScore } from "@/lib/scoring";
 import type { ProductWithScore } from "@/lib/types";
 
@@ -31,17 +32,20 @@ export function getDealQuality(product: ProductWithScore): DealQuality {
   const blockers: string[] = [];
   const warnings: string[] = [];
   const riskFlags = score?.risk_flags ?? [];
-  const referencePrice = product.naver_lowest_price ?? product.new_price ?? product.source_price;
+  const referenceInfo = getPriceReferenceInfo(product);
+  const referencePrice = referenceInfo.value;
+  const trustedNaverPrice = referenceInfo.naverTrust.trustedPrice;
   const dealPrice = product.return_price ?? product.source_price;
   const discountRate = calculateDiscountRate(referencePrice, dealPrice);
 
   if (!product.return_price) blockers.push("반품가 확인 필요");
   if (product.condition_grade === "확인필요" || product.condition_grade === "알수없음") blockers.push("반품등급 확인 필요");
-  if (product.naver_lowest_price && dealPrice && dealPrice > product.naver_lowest_price) blockers.push("네이버 최저가 대비 가격 불리");
+  if (trustedNaverPrice && dealPrice && dealPrice > trustedNaverPrice) blockers.push("네이버 최저가 대비 가격 불리");
   if (product.condition_grade === "중" && (dealPrice ?? 0) >= 1_000_000) blockers.push("고가 반품-중 조합");
 
   if (!isUsableAffiliateUrl(product.affiliate_url)) warnings.push("파트너스 URL 보완 권장");
-  if (!product.naver_lowest_price) warnings.push("네이버 최저가 없음");
+  if (referenceInfo.naverTrust.status === "unverified") warnings.push("네이버 최저가 동일 상품 검증 필요");
+  if (referenceInfo.naverTrust.status === "missing") warnings.push("네이버 최저가 없음");
   if (!product.stock_count) warnings.push("재고 확인 필요");
   if (product.stock_count === 1) warnings.push("재고 1개");
   if (riskFlags.includes("RISK_FREEDOS")) warnings.push("FreeDOS 설치 비용 확인");
@@ -70,7 +74,7 @@ export function getDealQuality(product: ProductWithScore): DealQuality {
   if (blockers.length === 1) {
     return { status: "manual_check", label: "수동 확인", confidence, priority, blockers, warnings };
   }
-  if (!product.naver_lowest_price || discountRate == null || discountRate < 0.12) {
+  if (!trustedNaverPrice || discountRate == null || discountRate < 0.12) {
     return { status: "watch_price", label: "가격 관찰", confidence, priority, blockers, warnings };
   }
   return { status: "ready", label: "게시 적합", confidence, priority, blockers, warnings };
