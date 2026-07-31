@@ -5,11 +5,16 @@ import { getProductById, listProducts } from "@/lib/dataStore";
 import { getRelatedProducts } from "@/lib/dealIntelligence";
 import { getCategoryLabel } from "@/lib/category";
 import { formatPrice } from "@/lib/format";
+import { isUsableProductImageUrl } from "@/lib/productImageUrl";
 import { isPublicDealReady } from "@/lib/publicDeal";
 import { getPriceReferenceInfo } from "@/lib/priceReference";
 import { getSiteUrl } from "@/lib/siteUrl";
 
 export const dynamic = "force-dynamic";
+
+function serializeJsonLd(value: unknown) {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -58,5 +63,23 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   if (!product || !isPublicDealReady(product)) notFound();
   const publishedProducts = (await listProducts({ published: true })).filter(isPublicDealReady);
   const relatedProducts = getRelatedProducts(product, publishedProducts, 4);
-  return <DealDetail product={product} relatedProducts={relatedProducts} />;
+  const canonicalUrl = `${getSiteUrl()}/deals/${product.id}`;
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "@id": `${canonicalUrl}#product`,
+    name: product.title,
+    url: canonicalUrl,
+    category: getCategoryLabel(product.category),
+    ...(isUsableProductImageUrl(product.image_url) ? { image: [product.image_url] } : {}),
+    ...(product.brand?.trim() ? { brand: { "@type": "Brand", name: product.brand.trim() } } : {}),
+    ...(product.model_name?.trim() ? { model: product.model_name.trim() } : {})
+  };
+
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(productJsonLd) }} />
+      <DealDetail product={product} relatedProducts={relatedProducts} />
+    </>
+  );
 }

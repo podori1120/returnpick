@@ -3712,6 +3712,18 @@ if (fileExists("app/deals/[id]/page.tsx")) {
     "deal detail 404s when the published product has no usable affiliate link",
     "required"
   );
+  check(
+    "public detail: safe product JSON-LD",
+    dealPage.includes('"@type": "Product"') &&
+      dealPage.includes('"@id": `${canonicalUrl}#product`') &&
+      dealPage.includes("isUsableProductImageUrl(product.image_url)") &&
+      dealPage.includes("serializeJsonLd(productJsonLd)") &&
+      dealPage.includes('replace(/</g, "\\\\u003c")') &&
+      !dealPage.includes('"@type": "Offer"') &&
+      !dealPage.includes("availability"),
+    "customer-ready deal details expose stable Product identity data without price, stock, availability, or Offer claims",
+    "required"
+  );
 }
 
 if (fileExists("vercel.json")) {

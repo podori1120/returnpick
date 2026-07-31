@@ -124,6 +124,15 @@ await withServer(3217, catalogValue(), async (baseUrl) => {
   assert.equal(detail.status, 200);
   assert.match(detailHtml, new RegExp(affiliateUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(detailHtml, /쿠팡에서 가격 확인/);
+  const productJsonLdMatch = detailHtml.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+  assert.ok(productJsonLdMatch, "customer-ready deal detail must expose Product JSON-LD");
+  const productJsonLd = JSON.parse(productJsonLdMatch[1]);
+  assert.equal(productJsonLd["@type"], "Product");
+  assert.equal(productJsonLd.name, productTitle);
+  assert.equal(productJsonLd.category, "모니터");
+  assert.equal("offers" in productJsonLd, false);
+  assert.equal("availability" in productJsonLd, false);
+  assert.equal("aggregateRating" in productJsonLd, false);
 });
 
 await withServer(3218, catalogValue({ resolvedProductId: "9999999999", identityStatus: "MATCH" }), async (baseUrl, logs) => {
