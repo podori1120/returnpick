@@ -48,6 +48,14 @@ const disclosureRequirements = {
   finalCheck: "\uCD5C\uC885 \uAD6C\uB9E4 \uC804"
 };
 
+const editorialPickRequirements = {
+  title: "Novatech S1 창문 로봇청소기 구매 전 체크",
+  purchaseCta: "쿠팡에서 가격 확인",
+  disclosure: "쿠팡 파트너스 활동의 일환",
+  share: "추천 링크 공유",
+  copy: "링크 복사"
+};
+
 const sitemapRequiredPaths = [
   "/",
   "/deals",
@@ -175,6 +183,25 @@ function checkDisclosurePage(html, status) {
     fail("disclosure page", `missing required disclosure evidence: ${missing.join(", ")}`);
   } else {
     pass("disclosure page", "affiliate disclosure, commission notice, and price/stock caveat are present");
+  }
+}
+
+function checkEditorialPickPage(html, status) {
+  if (status !== 200) {
+    fail("editorial pick", `/picks/novatech-s1-window-cleaner returned ${status}`);
+    return;
+  }
+
+  const missing = Object.entries(editorialPickRequirements)
+    .filter(([, value]) => !html.includes(value))
+    .map(([key]) => key);
+
+  if (containsLikelyMojibake(html)) missing.push("readable_korean");
+
+  if (missing.length) {
+    fail("editorial pick", `missing first-sale funnel evidence: ${missing.join(", ")}`);
+  } else {
+    pass("editorial pick", "purchase CTA, disclosure, and attributed detail sharing are present");
   }
 }
 
@@ -460,6 +487,13 @@ async function main() {
     checkDisclosurePage(disclosure.text, disclosure.response.status);
   } catch (error) {
     fail("disclosure page", error instanceof Error ? error.message : "fetch failed");
+  }
+
+  try {
+    const editorialPick = await readText("/picks/novatech-s1-window-cleaner");
+    checkEditorialPickPage(editorialPick.text, editorialPick.response.status);
+  } catch (error) {
+    fail("editorial pick", error instanceof Error ? error.message : "fetch failed");
   }
 
   try {

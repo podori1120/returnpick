@@ -190,6 +190,7 @@ const requiredFiles = [
   "components/AdminPriceBackfillPanel.tsx",
   "components/AdminProductEditor.tsx",
   "components/AffiliateEventTracker.tsx",
+  "components/EditorialShareBar.tsx",
   "components/TelegramPreview.tsx",
   "lib/affiliateLinkBackfill.ts",
   "lib/coupangAffiliateLinkVerifier.ts",
@@ -1281,7 +1282,8 @@ if (
       eventRoute.includes("isManualAffiliateTrackingRequest") &&
       eventRoute.includes("NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL") &&
       eventRoute.includes('fetchSite !== "same-origin"') &&
-      eventRoute.includes("referrerUrl.origin !== requestUrl.origin") &&
+      eventRoute.includes("referrerUrl.origin !== getPublicRequestOrigin(request)") &&
+      eventRoute.includes('request.headers.get("origin")') &&
       eventRoute.includes('pathname: "/products/approval-sample"') &&
       opsDashboard.includes('web_approval_sample: "직접 검수 추천 CTA"'),
     "the manual approval product records only explicit same-page affiliate clicks and exposes the channel in admin metrics",
@@ -1293,11 +1295,13 @@ if (
   fileExists("app/picks/novatech-s1-window-cleaner/page.tsx") &&
   fileExists("app/api/events/route.ts") &&
   fileExists("components/AffiliateEventTracker.tsx") &&
+  fileExists("components/EditorialShareBar.tsx") &&
   fileExists("app/sitemap.ts")
 ) {
   const editorialPickPage = readText("app/picks/novatech-s1-window-cleaner/page.tsx");
   const eventRoute = readText("app/api/events/route.ts");
   const eventTracker = readText("components/AffiliateEventTracker.tsx");
+  const editorialShareBar = readText("components/EditorialShareBar.tsx");
   const sitemap = readText("app/sitemap.ts");
   const approvalData = readText("lib/approvalSample.ts");
   check(
@@ -1324,11 +1328,29 @@ if (
       eventRoute.includes('pathname: "/picks/novatech-s1-window-cleaner"') &&
       eventRoute.includes('affiliateClickChannels: ["web_editorial_pick", "telegram_editorial_pick"]') &&
       eventRoute.includes('telegramDetailChannels: ["telegram_editorial_pick"]') &&
+      eventRoute.includes('shareCopyChannels: ["web_editorial_share"]') &&
+      eventRoute.includes('request.headers.get("x-forwarded-host")') &&
+      eventRoute.includes('request.headers.get("origin")') &&
+      eventRoute.includes("getPublicRequestOrigin(request)") &&
       eventRoute.includes("allowedChannels.includes(channel)") &&
       eventTracker.includes("EditorialPickViewTracker") &&
       eventTracker.includes('context: "editorial_pick"') &&
       eventTracker.includes('channel: isTelegramLanding ? "telegram_editorial_pick" : "web_editorial_pick"'),
     "only the allowlisted editorial path can record product-less views and explicit web or Telegram affiliate clicks",
+    "required"
+  );
+  check(
+    "editorial pick: disclosed detail sharing",
+    editorialPickPage.includes("EditorialShareBar") &&
+      editorialShareBar.includes('utm_source", "customer_share"') &&
+      editorialShareBar.includes('utm_medium", "referral"') &&
+      editorialShareBar.includes('channel: "web_editorial_share"') &&
+      editorialShareBar.includes('eventType: "share_copy"') &&
+      editorialShareBar.includes('context: "editorial_pick"') &&
+      editorialShareBar.includes("navigator.share") &&
+      editorialShareBar.includes("추천 링크 공유") &&
+      !editorialShareBar.includes("link.coupang.com"),
+    "customers can share the disclosed ReturnPick detail with attribution without exposing or auto-opening the affiliate destination",
     "required"
   );
   check(

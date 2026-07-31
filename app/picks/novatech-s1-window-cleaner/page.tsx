@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import ApprovalCoupangButton from "@/components/ApprovalCoupangButton";
 import { EditorialPickViewTracker } from "@/components/AffiliateEventTracker";
+import EditorialShareBar from "@/components/EditorialShareBar";
 import { approvalSampleProduct } from "@/lib/approvalSample";
 import { getSiteUrl } from "@/lib/siteUrl";
 
@@ -198,10 +199,11 @@ export default function NovatechS1PickPage() {
                 쿠팡 파트너스 링크 설정 필요
               </button>
             )}
-            <p className="mt-3 rounded-lg border border-pine/20 bg-pine/5 p-3 text-xs font-black leading-5 text-ink">{affiliateNotice}</p>
-            <Link className="mt-3 inline-flex text-sm font-black text-pine hover:text-ink" href="/disclosure">
+            <p className="mt-3 rounded-lg border border-pine/20 bg-pine/5 p-2 text-xs font-black leading-5 text-ink sm:p-3">{affiliateNotice}</p>
+            <Link className="mt-2 inline-flex text-sm font-black text-pine hover:text-ink sm:mt-3" href="/disclosure">
               제휴 안내 자세히 보기 <ChevronRight size={16} aria-hidden />
             </Link>
+            <EditorialShareBar canonicalUrl={canonicalUrl} title={`${approvalSampleProduct.name} 구매 전 체크 | ReturnPick`} />
           </div>
         </div>
       </section>

@@ -11,14 +11,16 @@ const manualTrackingSurfaces = [
     pathname: "/products/approval-sample",
     affiliateClickChannels: ["web_approval_sample"],
     detailViewChannels: [],
-    telegramDetailChannels: []
+    telegramDetailChannels: [],
+    shareCopyChannels: []
   },
   {
     context: "editorial_pick",
     pathname: "/picks/novatech-s1-window-cleaner",
     affiliateClickChannels: ["web_editorial_pick", "telegram_editorial_pick"],
     detailViewChannels: ["web_editorial_pick"],
-    telegramDetailChannels: ["telegram_editorial_pick"]
+    telegramDetailChannels: ["telegram_editorial_pick"],
+    shareCopyChannels: ["web_editorial_share"]
   }
 ] as const;
 
@@ -61,6 +63,20 @@ function cleanAnonSessionId(value: unknown) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(next) ? next : null;
 }
 
+function getPublicRequestOrigin(request: Request) {
+  const requestUrl = new URL(request.url);
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const forwardedProtocol = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const host = forwardedHost || request.headers.get("host")?.trim() || requestUrl.host;
+  const protocol = forwardedProtocol || requestUrl.protocol.replace(":", "");
+
+  try {
+    return new URL(`${protocol}://${host}`).origin;
+  } catch {
+    return requestUrl.origin;
+  }
+}
+
 function isManualAffiliateTrackingRequest(request: Request, body: Record<string, unknown>, channel: string | null) {
   if (!isCoupangPartnersLink(process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL)) return false;
 
@@ -74,7 +90,9 @@ function isManualAffiliateTrackingRequest(request: Request, body: Record<string,
         ? surface.detailViewChannels
         : body.event_type === "telegram_detail_click"
           ? surface.telegramDetailChannels
-          : [];
+          : body.event_type === "share_copy"
+            ? surface.shareCopyChannels
+            : [];
   if (!channel || !allowedChannels.includes(channel)) return false;
 
   const requestReferrer = request.headers.get("referer");
@@ -82,10 +100,11 @@ function isManualAffiliateTrackingRequest(request: Request, body: Record<string,
 
   try {
     const referrerUrl = new URL(requestReferrer);
-    const requestUrl = new URL(request.url);
     const fetchSite = request.headers.get("sec-fetch-site");
     if (fetchSite && fetchSite !== "same-origin") return false;
-    if (referrerUrl.origin !== requestUrl.origin) return false;
+    const browserOrigin = request.headers.get("origin");
+    if (browserOrigin && new URL(browserOrigin).origin !== referrerUrl.origin) return false;
+    if (referrerUrl.origin !== getPublicRequestOrigin(request)) return false;
     return referrerUrl.pathname === surface.pathname;
   } catch {
     return false;
