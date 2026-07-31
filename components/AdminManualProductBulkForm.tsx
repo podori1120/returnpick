@@ -12,6 +12,7 @@ type BulkCandidateItem = {
   title?: string | null;
   status: string;
   reason?: string | null;
+  existing_product_id?: string | null;
 };
 
 type BulkCandidateResult = {
@@ -21,6 +22,8 @@ type BulkCandidateResult = {
   updated_count: number;
   skipped_count: number;
   error_count: number;
+  existing_count?: number;
+  existing_skipped_count?: number;
   items?: BulkCandidateItem[];
   message?: string;
   error?: string;
@@ -37,6 +40,9 @@ function statusLabel(status: string) {
 function reasonLabel(reason?: string | null) {
   if (!reason) return null;
   const labels: Record<string, string> = {
+    EXISTING_COUPANG_PRODUCT_ID: "이미 등록된 쿠팡 상품번호입니다. 기존 후보는 자동으로 수정하지 않았습니다.",
+    EXISTING_TITLE_CATEGORY: "같은 카테고리·상품명 후보가 이미 있습니다. 기존 후보는 자동으로 수정하지 않았습니다.",
+    DUPLICATE_TITLE_CATEGORY: "입력 목록에서 같은 카테고리·상품명이 중복되었습니다.",
     TITLE_REQUIRED: "상품명이 짧습니다.",
     CATEGORY_REQUIRED: "카테고리를 확인하세요.",
     COUPANG_PRODUCT_URL_REQUIRED: "상품 상세 URL이 필요합니다.",
@@ -99,7 +105,7 @@ export default function AdminManualProductBulkForm({ password, onCreated }: { pa
   }
 
   return (
-    <section id="admin-manual-product-bulk" className="scroll-mt-4 rounded-lg border border-line bg-white p-5 shadow-soft">
+    <section id="admin-manual-product-bulk" data-import-policy="append-only" className="scroll-mt-4 rounded-lg border border-line bg-white p-5 shadow-soft">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-black text-pine">후보 일괄 입력</p>
@@ -108,6 +114,9 @@ export default function AdminManualProductBulkForm({ password, onCreated }: { pa
             한 줄에 상품명, 카테고리, 쿠팡 상품 상세 URL, 파트너스 링크를 탭으로 구분합니다. 새 후보는 검토 대기·비공개로 추가되고 기존 상품은 기존 상태를 유지하며, 가격·반품 정보는 자동으로 채우지 않습니다.
           </p>
         </div>
+        <p className="mt-3 max-w-3xl rounded-md border border-lemon/40 bg-lemon/15 px-3 py-2 text-xs font-bold leading-5 text-ink">
+          기존 쿠팡 상품번호 또는 같은 카테고리·상품명이 있으면 자동 갱신하지 않고 건너뜁니다. 기존 상품 수정은 후보 검토 화면에서 명시적으로 진행하세요.
+        </p>
         <FileCheck2 className="text-pine" size={24} aria-hidden />
       </div>
 
@@ -133,6 +142,11 @@ export default function AdminManualProductBulkForm({ password, onCreated }: { pa
 
       {result ? (
         <div className="mt-4 rounded-lg border border-line bg-mist p-4 text-sm font-bold text-steel">
+          {result.existing_skipped_count ? (
+            <p className="mb-3 rounded-md border border-lemon/40 bg-lemon/15 px-3 py-2 text-xs font-black text-ink">
+              기존 후보 {result.existing_skipped_count}건은 보호를 위해 자동 갱신하지 않았습니다. 후보 검토 화면에서 상품별로 확인하세요.
+            </p>
+          ) : null}
           <p className="font-black text-ink">일괄 등록 결과 · 새 후보는 검토 대기와 비공개 상태로 추가됩니다.</p>
           {result.items?.slice(0, 8).length ? (
             <ul className="mt-3 space-y-1 text-xs">

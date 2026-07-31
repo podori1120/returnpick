@@ -212,6 +212,7 @@ const requiredFiles = [
   "lib/clientTracking.ts",
   "lib/launchCapabilityPolicy.ts",
   "lib/launchState.ts",
+  "lib/manualImportIdentity.ts",
   "lib/naverProductMatch.ts",
   "lib/naverPriceTrust.ts",
   "lib/naverPriceBackfill.ts",
@@ -241,6 +242,7 @@ const requiredFiles = [
   "scripts/verify-affiliate-identity.mjs",
   "scripts/verify-bootstrap-catalog-runtime.mjs",
   "scripts/verify-launch-capability-policy.mjs",
+  "scripts/verify-manual-import-safety.mjs",
   "scripts/verify-naver-product-match.mjs",
   "scripts/verify-naver-price-trust.mjs",
   "scripts/verify-provider-product-merge.mjs",
@@ -369,6 +371,28 @@ if (fileExists("package.json") && fileExists("lib/affiliateIdentity.ts") && file
       identityCheck.includes("changedProductUrl") &&
       identityCheck.includes("access-limited resolution"),
     "affiliate identity tests cover resolved matches, hard mismatches, access limits, explicit manual confirmation, changed-link invalidation, and changed-product invalidation",
+    "required"
+  );
+}
+
+if (fileExists("package.json") && fileExists("lib/manualImportIdentity.ts") && fileExists("scripts/verify-manual-import-safety.mjs")) {
+  const packageJson = readText("package.json");
+  const manualImportIdentity = readText("lib/manualImportIdentity.ts");
+  const manualImportCheck = readText("scripts/verify-manual-import-safety.mjs");
+  check(
+    "scripts: manual import safety check command",
+    packageJson.includes('"manual-import:check": "node scripts/verify-manual-import-safety.mjs"'),
+    "package.json exposes a deterministic duplicate-safe manual candidate intake check",
+    "required"
+  );
+  check(
+    "manual import: append-only identity gate",
+    manualImportIdentity.includes("EXISTING_COUPANG_PRODUCT_ID") &&
+      manualImportIdentity.includes("EXISTING_TITLE_CATEGORY") &&
+      manualImportIdentity.includes("toLowerCase()") &&
+      manualImportCheck.includes("cross-source product IDs") &&
+      manualImportCheck.includes("distinct categories"),
+    "manual batch intake identifies existing product IDs across sources and normalized title/category collisions before any write",
     "required"
   );
 }
@@ -727,9 +751,15 @@ if (
       adminProductsImportRoute.includes('sourcing_status: "needs_review"') &&
       adminProductsImportRoute.includes("is_published: false") &&
       adminProductsImportRoute.includes("DUPLICATE_PRODUCT_ID") &&
+      adminProductsImportRoute.includes("DUPLICATE_TITLE_CATEGORY") &&
+      adminProductsImportRoute.includes("findManualImportConflict") &&
+      adminProductsImportRoute.includes("existingConflict.code") &&
+      adminProductsImportRoute.includes("insertSourcedProduct") &&
+      adminProductsImportRoute.includes("existing_skipped_count") &&
       manualProductBulkForm.includes("/api/admin/products/import") &&
       manualProductBulkForm.includes("최대 40줄") &&
       manualProductBulkForm.includes("후보 일괄 추가") &&
+      manualProductBulkForm.includes('data-import-policy="append-only"') &&
       manualProductBulkForm.includes("검토 대기·비공개") &&
       adminPage.includes("AdminManualProductBulkForm"),
     "authenticated admins can add bounded real-product candidate rows in bulk while keeping every row unpublished and review-gated",

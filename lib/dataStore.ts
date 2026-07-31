@@ -582,6 +582,32 @@ export async function listProductSnapshots(productId: string, limit = 12) {
     .slice(0, limit);
 }
 
+export async function insertSourcedProduct(input: ProductInput) {
+  const client = getSupabaseServiceClient();
+  const payload = makeProduct(input);
+  const insertPayload = { ...payload, id: input.id ?? undefined };
+
+  if (client) {
+    const { data, error } = await client.from("sourced_products").insert(insertPayload).select("*").single();
+    if (error) throw error;
+    const product = data as SourcedProduct;
+    await createProductSnapshotSafely(product, ["NEW_PRODUCT"]);
+    return { product, inserted: true as const };
+  }
+
+  const existing = memoryProducts.find(
+    (product) =>
+      (payload.source_product_id && product.source === payload.source && product.source_product_id === payload.source_product_id) ||
+      (product.category === payload.category && product.title.toLowerCase() === payload.title.toLowerCase())
+  );
+  if (existing) throw new Error("EXISTING_PRODUCT_CONFLICT");
+
+  memoryProducts.unshift(payload);
+  memorySnapshots.unshift(makeSnapshot(payload, ["NEW_PRODUCT"]));
+  persistMemoryState();
+  return { product: payload, inserted: true as const };
+}
+
 export async function upsertSourcedProduct(input: ProductInput) {
   const client = getSupabaseServiceClient();
   const payload = makeProduct(input);

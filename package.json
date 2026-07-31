@@ -24,6 +24,7 @@
     "scheduler:check": "node scripts/verify-github-hourly-scheduler.mjs",
     "scoring:check": "node scripts/verify-scoring-rules.mjs",
     "freshness:check": "node scripts/verify-deal-freshness.mjs",
+    "manual-import:check": "node scripts/verify-manual-import-safety.mjs",
     "affiliate-identity:check": "node scripts/verify-affiliate-identity.mjs",
     "bootstrap-catalog:check": "node scripts/verify-bootstrap-catalog-runtime.mjs",
     "launch-capabilities:check": "node scripts/verify-launch-capability-policy.mjs",

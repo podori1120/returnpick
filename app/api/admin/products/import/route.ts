@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { extractCoupangProductId } from "@/lib/affiliateIdentity";
 import { getCoupangPartnersLinkIssue, isApprovalSampleAffiliateUrl, isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
-import { createDealScore, upsertSourcedProduct } from "@/lib/dataStore";
+import { createDealScore, insertSourcedProduct, listProducts } from "@/lib/dataStore";
+import { findManualImportConflict, getManualImportTitleKey } from "@/lib/manualImportIdentity";
 import { getProductImageUrlIssue, isUsableProductImageUrl } from "@/lib/productImageUrl";
 import { calculateDealScore } from "@/lib/scoring";
 import { parseSpecsFromTitle } from "@/lib/specParser";
@@ -12,6 +13,7 @@ type ImportItem = {
   title: string | null;
   status: "inserted" | "updated" | "skipped" | "error";
   reason?: string;
+  existing_product_id?: string | null;
 };
 
 const MAX_ROWS = 40;
@@ -49,10 +51,19 @@ export async function POST(request: Request) {
 
     const items: ImportItem[] = [];
     let insertedCount = 0;
-    let updatedCount = 0;
+    const updatedCount = 0;
     let skippedCount = 0;
     let errorCount = 0;
     const seenSourceProductIds = new Set<string>();
+    const seenTitleCategoryKeys = new Set<string>();
+    const existingIdentityProducts = (await listProducts()).map((product) => ({
+      id: product.id,
+      source_product_id: product.source_product_id,
+      category: product.category,
+      title: product.title
+    }));
+    let existingCount = 0;
+    let existingSkippedCount = 0;
 
     for (const { entry, row } of rows) {
       const fields = entry.split("\t");
@@ -85,12 +96,6 @@ export async function POST(request: Request) {
         items.push({ product_id: sourceProductId, title, status: "skipped", reason: "COUPANG_PRODUCT_URL_AND_ID_REQUIRED" });
         continue;
       }
-      if (seenSourceProductIds.has(sourceProductId)) {
-        skippedCount += 1;
-        items.push({ product_id: sourceProductId, title, status: "skipped", reason: "DUPLICATE_PRODUCT_ID" });
-        continue;
-      }
-      seenSourceProductIds.add(sourceProductId);
       if (affiliateUrl && (isApprovalSampleAffiliateUrl(affiliateUrl) || !isUsableAffiliateUrl(affiliateUrl))) {
         skippedCount += 1;
         items.push({
@@ -108,9 +113,41 @@ export async function POST(request: Request) {
         items.push({ product_id: sourceProductId, title, status: "skipped", reason: getProductImageUrlIssue(imageUrl) ?? "INVALID_IMAGE_URL" });
         continue;
       }
+      const titleCategoryKey = getManualImportTitleKey(category, title);
+      if (seenSourceProductIds.has(sourceProductId)) {
+        skippedCount += 1;
+        items.push({ product_id: sourceProductId, title, status: "skipped", reason: "DUPLICATE_PRODUCT_ID" });
+        continue;
+      }
+      if (seenTitleCategoryKeys.has(titleCategoryKey)) {
+        skippedCount += 1;
+        items.push({ product_id: sourceProductId, title, status: "skipped", reason: "DUPLICATE_TITLE_CATEGORY" });
+        continue;
+      }
+      seenSourceProductIds.add(sourceProductId);
+      seenTitleCategoryKeys.add(titleCategoryKey);
+
+      const existingConflict = findManualImportConflict(existingIdentityProducts, {
+        sourceProductId,
+        category,
+        title
+      });
+      if (existingConflict) {
+        existingCount += 1;
+        existingSkippedCount += 1;
+        skippedCount += 1;
+        items.push({
+          product_id: sourceProductId,
+          title,
+          status: "skipped",
+          reason: existingConflict.code,
+          existing_product_id: existingConflict.product_id
+        });
+        continue;
+      }
 
       try {
-        const result = await upsertSourcedProduct({
+        const result = await insertSourcedProduct({
           source: "manual_admin",
           source_product_id: sourceProductId,
           category,
@@ -144,9 +181,14 @@ export async function POST(request: Request) {
         });
         await createDealScore(calculateDealScore(result.product));
 
-        if (result.inserted) insertedCount += 1;
-        else updatedCount += 1;
-        items.push({ product_id: result.product.id, title: result.product.title, status: result.inserted ? "inserted" : "updated" });
+        insertedCount += 1;
+        existingIdentityProducts.push({
+          id: result.product.id,
+          source_product_id: result.product.source_product_id,
+          category: result.product.category,
+          title: result.product.title
+        });
+        items.push({ product_id: result.product.id, title: result.product.title, status: "inserted" });
       } catch (error) {
         errorCount += 1;
         const reason = error instanceof Error && error.message ? error.message.slice(0, 160) : "UPSERT_FAILED";
@@ -161,6 +203,8 @@ export async function POST(request: Request) {
       updated_count: updatedCount,
       skipped_count: skippedCount,
       error_count: errorCount,
+      existing_count: existingCount,
+      existing_skipped_count: existingSkippedCount,
       items
     });
   } catch (error) {
