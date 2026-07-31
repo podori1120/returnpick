@@ -88,6 +88,7 @@ const adminUiRequiredText = [
   "저장 후 게시",
   "후보 상품번호",
   "브라우저 확인 완료",
+  "승인 대기용 출시 카탈로그",
   "동일 SKU 강한 일치",
   "품질 보강 대기",
   "유입 채널별 전환",
@@ -95,6 +96,8 @@ const adminUiRequiredText = [
   "품질 보강 후보로 이동",
   "/api/admin/session",
   "/api/admin/editorial-campaign",
+  "/api/admin/bootstrap-catalog",
+  "RETURNPICK_BOOTSTRAP_CATALOG_JSON",
   "returnpick_admin_password"
 ];
 const editorialCardBundleRequiredText = [

@@ -25,6 +25,7 @@
     "scoring:check": "node scripts/verify-scoring-rules.mjs",
     "freshness:check": "node scripts/verify-deal-freshness.mjs",
     "affiliate-identity:check": "node scripts/verify-affiliate-identity.mjs",
+    "bootstrap-catalog:check": "node scripts/verify-bootstrap-catalog-runtime.mjs",
     "naver-match:check": "node scripts/verify-naver-product-match.mjs",
     "naver-price-trust:check": "node scripts/verify-naver-price-trust.mjs",
     "provider-merge:check": "node scripts/verify-provider-product-merge.mjs",

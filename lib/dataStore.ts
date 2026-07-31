@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import path from "path";
+import { readBootstrapCatalog } from "@/lib/bootstrapCatalog";
 import { isGenericCoupangLandingUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { demoCatalog } from "@/lib/demoCatalog";
 import { getCustomerPublishReadiness, getDealQuality } from "@/lib/quality";
@@ -241,7 +242,7 @@ function getSnapshotChangeFlags(previous: SourcedProduct | null | undefined, nex
 
 function createMemoryState(): MemoryState {
   const products = createInitialProducts();
-  return hydrateDemoCatalog({
+  return hydrateBootstrapCatalog(hydrateDemoCatalog({
     keywords: createInitialKeywords(),
     products,
     scores: products.map((product) => ({
@@ -253,7 +254,7 @@ function createMemoryState(): MemoryState {
     runs: [],
     telegramLogs: [],
     affiliateEvents: []
-  });
+  }));
 }
 
 const localDbPath = path.join(process.cwd(), ".returnpick", "local-db.json");
@@ -305,12 +306,49 @@ function hydrateDemoCatalog(state: MemoryState): MemoryState {
   return state;
 }
 
+function hydrateBootstrapCatalog(state: MemoryState): MemoryState {
+  const catalog = readBootstrapCatalog();
+  if (!catalog.configured) return state;
+  if (!catalog.ok) {
+    console.error("RETURNPICK_BOOTSTRAP_CATALOG_REJECTED", {
+      issue_count: catalog.issues.length,
+      issue_codes: Array.from(new Set(catalog.issues.map((issue) => issue.code))).slice(0, 8),
+      byte_size: catalog.byte_size
+    });
+    return state;
+  }
+
+  for (const product of catalog.products) {
+    const existingIndex = state.products.findIndex(
+      (item) =>
+        item.id === product.id ||
+        (item.source === product.source && item.source_product_id === product.source_product_id)
+    );
+    if (existingIndex >= 0) state.products[existingIndex] = product;
+    else state.products.unshift(product);
+
+    state.scores = state.scores.filter((score) => score.product_id !== product.id);
+    state.scores.unshift({
+      ...calculateDealScore(product),
+      id: randomUUID(),
+      product_id: product.id
+    });
+
+    if (!state.snapshots.some((snapshot) => snapshot.product_id === product.id)) {
+      const snapshot = makeSnapshot(product, ["NEW_PRODUCT"]);
+      snapshot.observed_at = product.last_observed_at ?? product.updated_at;
+      state.snapshots.unshift(snapshot);
+    }
+  }
+  return state;
+}
+
 function loadMemoryState(): MemoryState {
   if (!existsSync(localDbPath)) return createMemoryState();
   try {
     const parsed = JSON.parse(readFileSync(localDbPath, "utf8")) as Partial<MemoryState>;
     const fallback = createMemoryState();
-    return hydrateDemoCatalog({
+    return hydrateBootstrapCatalog(hydrateDemoCatalog({
       keywords: Array.isArray(parsed.keywords) ? (parsed.keywords as SourcingKeyword[]) : fallback.keywords,
       products: Array.isArray(parsed.products) ? (parsed.products as SourcedProduct[]) : fallback.products,
       scores: Array.isArray(parsed.scores) ? (parsed.scores as DealScore[]) : fallback.scores,
@@ -318,7 +356,7 @@ function loadMemoryState(): MemoryState {
       runs: Array.isArray(parsed.runs) ? (parsed.runs as SourcingRun[]) : fallback.runs,
       telegramLogs: Array.isArray(parsed.telegramLogs) ? (parsed.telegramLogs as TelegramLog[]) : fallback.telegramLogs,
       affiliateEvents: Array.isArray(parsed.affiliateEvents) ? (parsed.affiliateEvents as AffiliateEvent[]) : fallback.affiliateEvents
-    });
+    }));
   } catch {
     return createMemoryState();
   }

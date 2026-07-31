@@ -169,6 +169,7 @@ const requiredFiles = [
   "app/api/admin/affiliate-links/backfill/route.ts",
   "app/api/admin/affiliate-links/import/route.ts",
   "app/api/admin/affiliate-links/verify/route.ts",
+  "app/api/admin/bootstrap-catalog/route.ts",
   "app/api/admin/keywords/route.ts",
   "app/api/admin/launch/route.ts",
   "app/api/admin/prices/backfill/route.ts",
@@ -186,6 +187,7 @@ const requiredFiles = [
   "components/ApprovalSampleCard.tsx",
   "components/AdminApiReadinessPanel.tsx",
   "components/AdminAffiliateLinkQueue.tsx",
+  "components/AdminBootstrapCatalogPanel.tsx",
   "components/AdminLaunchRunner.tsx",
   "components/AdminKeywordManager.tsx",
   "components/AdminCandidateTable.tsx",
@@ -198,6 +200,7 @@ const requiredFiles = [
   "components/TelegramPreview.tsx",
   "lib/affiliateLinkBackfill.ts",
   "lib/affiliateIdentity.ts",
+  "lib/bootstrapCatalog.ts",
   "lib/coupangAffiliateLinkVerifier.ts",
   "lib/editorialCampaign.ts",
   "lib/approvalSample.ts",
@@ -232,6 +235,7 @@ const requiredFiles = [
   "scripts/verify-git-deploy-readiness.mjs",
   "scripts/verify-github-hourly-scheduler.mjs",
   "scripts/verify-affiliate-identity.mjs",
+  "scripts/verify-bootstrap-catalog-runtime.mjs",
   "scripts/verify-naver-product-match.mjs",
   "scripts/verify-naver-price-trust.mjs",
   "scripts/verify-provider-product-merge.mjs",
@@ -358,6 +362,55 @@ if (fileExists("package.json") && fileExists("lib/affiliateIdentity.ts") && file
       identityCheck.includes("URL-change invalidation") &&
       identityCheck.includes("access-limited resolution"),
     "affiliate identity tests cover resolved matches, hard mismatches, access limits, explicit manual confirmation, and changed-link invalidation",
+    "required"
+  );
+}
+
+if (
+  fileExists("package.json") &&
+  fileExists("lib/bootstrapCatalog.ts") &&
+  fileExists("lib/dataStore.ts") &&
+  fileExists("scripts/verify-bootstrap-catalog-runtime.mjs") &&
+  fileExists("app/api/admin/bootstrap-catalog/route.ts") &&
+  fileExists("components/AdminBootstrapCatalogPanel.tsx")
+) {
+  const packageJson = readText("package.json");
+  const catalog = readText("lib/bootstrapCatalog.ts");
+  const dataStore = readText("lib/dataStore.ts");
+  const runtimeCheck = readText("scripts/verify-bootstrap-catalog-runtime.mjs");
+  const route = readText("app/api/admin/bootstrap-catalog/route.ts");
+  const panel = readText("components/AdminBootstrapCatalogPanel.tsx");
+  check(
+    "scripts: bootstrap catalog runtime check command",
+    packageJson.includes('"bootstrap-catalog:check": "node scripts/verify-bootstrap-catalog-runtime.mjs"'),
+    "package.json exposes a production-runtime bootstrap catalog hydration check",
+    "required"
+  );
+  check(
+    "bootstrap catalog: verified temporary persistence",
+    catalog.includes('BOOTSTRAP_CATALOG_ENV = "RETURNPICK_BOOTSTRAP_CATALOG_JSON"') &&
+      catalog.includes("BOOTSTRAP_CATALOG_MAX_BYTES = 28_000") &&
+      catalog.includes("BOOTSTRAP_CATALOG_MAX_PRODUCTS = 12") &&
+      catalog.includes("isSyntheticSource") &&
+      catalog.includes("identityBoundToCurrentProduct") &&
+      catalog.includes("LAST_OBSERVED_AT_REQUIRED") &&
+      catalog.includes("isPublicDealReady") &&
+      dataStore.includes("hydrateBootstrapCatalog") &&
+      dataStore.includes("snapshot.observed_at = product.last_observed_at") &&
+      runtimeCheck.includes("stale or forged affiliate identity rejection"),
+    "preapproval catalog only restores fresh, non-demo, public-ready products whose exact affiliate destination remains bound to the candidate",
+    "required"
+  );
+  check(
+    "admin: bootstrap catalog export",
+    route.includes("requireAdmin") &&
+      route.includes("createBootstrapCatalog") &&
+      route.includes('"Cache-Control": "no-store, max-age=0"') &&
+      panel.includes("승인 대기용 출시 카탈로그") &&
+      panel.includes("/api/admin/bootstrap-catalog") &&
+      panel.includes("Value 복사") &&
+      panel.includes("Supabase 운영 DB 연결이 여전히 필요합니다"),
+    "admin can export a bounded reviewed catalog without treating the temporary bridge as a replacement for Supabase",
     "required"
   );
 }

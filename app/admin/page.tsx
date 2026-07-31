@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import AdminApiReadinessPanel from "@/components/AdminApiReadinessPanel";
 import AdminAffiliateLinkQueue from "@/components/AdminAffiliateLinkQueue";
+import AdminBootstrapCatalogPanel from "@/components/AdminBootstrapCatalogPanel";
 import AdminCandidateTable from "@/components/AdminCandidateTable";
 import AdminEditorialTelegramCampaign from "@/components/AdminEditorialTelegramCampaign";
 import AdminKeywordManager from "@/components/AdminKeywordManager";
@@ -21,7 +22,11 @@ export default function AdminPage() {
   const handleLogin = useCallback(() => setAuthState("authenticated"), []);
 
   useEffect(() => {
-    window.localStorage.removeItem("returnpick_admin_password");
+    try {
+      window.localStorage.removeItem("returnpick_admin_password");
+    } catch {
+      // Some privacy-focused browsers disable storage; session-cookie auth must still continue.
+    }
     let cancelled = false;
     fetch("/api/admin/session", { cache: "no-store" })
       .then((response) => {
@@ -98,6 +103,7 @@ export default function AdminPage() {
       <AdminSchedulerPanel password={password} refreshToken={refreshToken} onCompleted={() => setRefreshToken((value) => value + 1)} />
       <AdminPriceBackfillPanel password={password} onCompleted={() => setRefreshToken((value) => value + 1)} />
       <AdminAffiliateLinkQueue password={password} refreshToken={refreshToken} onCompleted={() => setRefreshToken((value) => value + 1)} />
+      <AdminBootstrapCatalogPanel />
       <AdminKeywordManager password={password} />
       <AdminSourcingRunner password={password} onCompleted={() => setRefreshToken((value) => value + 1)} />
       <AdminCandidateTable password={password} refreshToken={refreshToken} />
