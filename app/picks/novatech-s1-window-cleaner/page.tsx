@@ -21,6 +21,8 @@ import { getSiteUrl } from "@/lib/siteUrl";
 const affiliateNotice = "이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.";
 const canonicalUrl = `${getSiteUrl()}${approvalSampleProduct.detailPath}`;
 const editorialImageUrl = `${getSiteUrl()}${approvalSampleProduct.imageSrc}`;
+const socialImageUrl = `${canonicalUrl}/opengraph-image`;
+const twitterImageUrl = `${canonicalUrl}/twitter-image`;
 
 const fitReasons = [
   "고층이나 넓은 유리창을 손으로 반복 청소하는 부담을 줄이고 싶은 경우",
@@ -81,18 +83,18 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "Novatech S1 창문 로봇청소기 구매 전 체크 | ReturnPick",
-    description: "창문청소 로봇이 필요한 상황과 구매 전 확인할 안전·구성·가격 조건을 한 번에 확인하세요.",
+    description: "창문청소 로봇의 안전·구성·가격 조건을 구매 전에 확인하세요. 쿠팡 파트너스 제휴 링크가 포함된 직접 검수 콘텐츠입니다.",
     url: canonicalUrl,
     siteName: "ReturnPick",
     type: "article",
     locale: "ko_KR",
-    images: [{ url: editorialImageUrl, width: 1400, height: 933, alt: approvalSampleProduct.imageAlt }]
+    images: [{ url: socialImageUrl, width: 1200, height: 630, alt: "Novatech S1 창문 로봇청소기 구매 전 체크" }]
   },
   twitter: {
     card: "summary_large_image",
     title: "Novatech S1 창문 로봇청소기 구매 전 체크",
-    description: "5800Pa, 자동 물 분사와 구매 전 확인할 안전 조건을 정리했습니다.",
-    images: [editorialImageUrl]
+    description: "5800Pa, 자동 물 분사와 구매 전 확인할 안전 조건을 정리한 제휴 링크 포함 콘텐츠입니다.",
+    images: [twitterImageUrl]
   }
 };
 

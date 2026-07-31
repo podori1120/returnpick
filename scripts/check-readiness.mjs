@@ -179,6 +179,8 @@ const requiredFiles = [
   "app/api/cron/telegram-digest/route.ts",
   "app/api/events/route.ts",
   "app/picks/novatech-s1-window-cleaner/page.tsx",
+  "app/picks/novatech-s1-window-cleaner/opengraph-image.tsx",
+  "app/picks/novatech-s1-window-cleaner/twitter-image.tsx",
   "components/AdminLaunchStatusBar.tsx",
   "components/ApprovalSampleCard.tsx",
   "components/AdminApiReadinessPanel.tsx",
@@ -210,6 +212,7 @@ const requiredFiles = [
   "lib/providers/naverShoppingProvider.ts",
   "lib/providers/mockProvider.ts",
   "lib/validators.ts",
+  "types/sharp.d.ts",
   "scripts/print-production-env-template.mjs",
   "scripts/patch-brace-expansion-compat.mjs",
   "scripts/print-vercel-env-repair-plan.mjs",
@@ -1296,12 +1299,16 @@ if (
   fileExists("app/api/events/route.ts") &&
   fileExists("components/AffiliateEventTracker.tsx") &&
   fileExists("components/EditorialShareBar.tsx") &&
+  fileExists("app/picks/novatech-s1-window-cleaner/opengraph-image.tsx") &&
+  fileExists("app/picks/novatech-s1-window-cleaner/twitter-image.tsx") &&
   fileExists("app/sitemap.ts")
 ) {
   const editorialPickPage = readText("app/picks/novatech-s1-window-cleaner/page.tsx");
   const eventRoute = readText("app/api/events/route.ts");
   const eventTracker = readText("components/AffiliateEventTracker.tsx");
   const editorialShareBar = readText("components/EditorialShareBar.tsx");
+  const editorialOpenGraphImage = readText("app/picks/novatech-s1-window-cleaner/opengraph-image.tsx");
+  const editorialTwitterImage = readText("app/picks/novatech-s1-window-cleaner/twitter-image.tsx");
   const sitemap = readText("app/sitemap.ts");
   const approvalData = readText("lib/approvalSample.ts");
   check(
@@ -1351,6 +1358,25 @@ if (
       editorialShareBar.includes("추천 링크 공유") &&
       !editorialShareBar.includes("link.coupang.com"),
     "customers can share the disclosed ReturnPick detail with attribution without exposing or auto-opening the affiliate destination",
+    "required"
+  );
+  check(
+    "editorial pick: disclosed social preview",
+    editorialPickPage.includes('const socialImageUrl = `${canonicalUrl}/opengraph-image`') &&
+      editorialPickPage.includes('const twitterImageUrl = `${canonicalUrl}/twitter-image`') &&
+      editorialPickPage.includes("쿠팡 파트너스 제휴 링크가 포함된 직접 검수 콘텐츠입니다") &&
+      editorialOpenGraphImage.includes('size = { width: 1200, height: 630 }') &&
+      editorialOpenGraphImage.includes('runtime = "nodejs"') &&
+      editorialOpenGraphImage.includes('import sharp from "sharp"') &&
+      editorialOpenGraphImage.includes(".png().toBuffer()") &&
+      editorialOpenGraphImage.includes("approvalSampleProduct.imageSrc") &&
+      editorialOpenGraphImage.includes("직접 검수 추천") &&
+      editorialOpenGraphImage.includes("제휴 링크 포함") &&
+      editorialOpenGraphImage.includes("제품 사용 연출 이미지") &&
+      editorialOpenGraphImage.includes("가격·재고 실시간 확인") &&
+      editorialTwitterImage.includes('import OpenGraphImage from "./opengraph-image"') &&
+      !editorialOpenGraphImage.includes("link.coupang.com"),
+    "shared links use a product-specific 1200x630 preview with visible editorial and affiliate context but no direct affiliate destination",
     "required"
   );
   check(

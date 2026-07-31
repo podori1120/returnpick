@@ -53,8 +53,10 @@ const editorialPickRequirements = {
   purchaseCta: "쿠팡에서 가격 확인",
   disclosure: "쿠팡 파트너스 활동의 일환",
   share: "추천 링크 공유",
-  copy: "링크 복사"
+  copy: "링크 복사",
+  socialImage: "/picks/novatech-s1-window-cleaner/opengraph-image"
 };
+const editorialSocialImagePath = "/picks/novatech-s1-window-cleaner/opengraph-image";
 
 const sitemapRequiredPaths = [
   "/",
@@ -113,6 +115,12 @@ async function readText(path, init = {}) {
   const response = await fetchWithTimeout(`${siteUrl}${path}`, init);
   const text = await response.text();
   return { response, text };
+}
+
+async function readBytes(path, init = {}) {
+  const response = await fetchWithTimeout(`${siteUrl}${path}`, init);
+  const bytes = await response.arrayBuffer();
+  return { response, byteLength: bytes.byteLength };
 }
 
 async function readUrlText(url, init = {}) {
@@ -203,6 +211,16 @@ function checkEditorialPickPage(html, status) {
   } else {
     pass("editorial pick", "purchase CTA, disclosure, and attributed detail sharing are present");
   }
+}
+
+function checkEditorialSocialImage(response, byteLength) {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (response.status !== 200 || !contentType.startsWith("image/") || byteLength < 10_000) {
+    fail("editorial social image", `status=${response.status}, content-type=${contentType || "missing"}, bytes=${byteLength}`);
+    return;
+  }
+
+  pass("editorial social image", `product-specific preview is ${contentType} and ${byteLength} bytes`);
 }
 
 function checkRobotsTxt(text, status) {
@@ -494,6 +512,13 @@ async function main() {
     checkEditorialPickPage(editorialPick.text, editorialPick.response.status);
   } catch (error) {
     fail("editorial pick", error instanceof Error ? error.message : "fetch failed");
+  }
+
+  try {
+    const editorialSocialImage = await readBytes(editorialSocialImagePath);
+    checkEditorialSocialImage(editorialSocialImage.response, editorialSocialImage.byteLength);
+  } catch (error) {
+    fail("editorial social image", error instanceof Error ? error.message : "fetch failed");
   }
 
   try {
