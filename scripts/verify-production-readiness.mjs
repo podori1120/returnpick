@@ -52,7 +52,7 @@ const sitemapRequiredPaths = [
   "/",
   "/deals",
   "/disclosure",
-  "/products/approval-sample",
+  "/picks/novatech-s1-window-cleaner",
   "/guide/return-checklist",
   "/guide/safe-categories"
 ];
@@ -204,7 +204,7 @@ function checkSitemapXml(xml, status) {
   if (missing.length) {
     fail("sitemap.xml", `missing public routes: ${missing.join(", ")}`);
   } else {
-    pass("sitemap.xml", "core public, approval, disclosure, and guide routes are listed");
+    pass("sitemap.xml", "core public, editorial, disclosure, and guide routes are listed");
   }
 }
 
