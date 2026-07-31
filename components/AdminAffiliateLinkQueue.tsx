@@ -63,6 +63,8 @@ type BulkImportResult = {
   valid_count?: number;
   updated_count: number;
   published_count?: number;
+  identity_pending_count?: number;
+  publish_blocked_count?: number;
   skipped_count: number;
   error_count: number;
   dry_run?: boolean;
@@ -109,11 +111,22 @@ function backfillMessage(result: BackfillResult) {
 
 function bulkImportMessage(result: BulkImportResult) {
   const valid = result.dry_run ? `, 저장 가능 ${result.valid_count ?? 0}개` : "";
-  const published = result.published_count ? `, 게시 ${result.published_count}개` : "";
-  const base = `확인 ${result.scanned_count}줄${valid}, 저장 ${result.updated_count}개${published}, 건너뜀 ${result.skipped_count}개, 오류 ${result.error_count}개`;
+  const published = result.publish_requested ? `, 게시 ${result.published_count ?? 0}개` : "";
+  const identityPending = result.identity_pending_count ? `, 목적지 확인 필요 ${result.identity_pending_count}개` : "";
+  const publishBlocked = result.publish_blocked_count ? `, 품질 확인 필요 ${result.publish_blocked_count}개` : "";
+  const base = `확인 ${result.scanned_count}줄${valid}, 저장 ${result.updated_count}개${published}${identityPending}${publishBlocked}, 건너뜀 ${result.skipped_count}개, 오류 ${result.error_count}개`;
   if (result.dry_run) return `대량 링크 검증 완료: ${base}`;
+  if (result.publish_requested && (result.identity_pending_count || result.publish_blocked_count)) {
+    return `링크 저장 완료, 게시 전 확인 필요: ${base}`;
+  }
   if (result.status === "partial" || result.status === "error") return `대량 링크 입력 일부 실패: ${base}`;
   return `대량 링크 입력 완료: ${base}`;
+}
+
+function bulkImportNoticeType(result: BulkImportResult): "info" | "success" | "error" {
+  if (result.status === "error") return "error";
+  if (result.status === "partial" || (result.publish_requested && (result.published_count ?? 0) === 0)) return "info";
+  return "success";
 }
 
 function linkResultStatusLabel(status: string) {
@@ -138,6 +151,7 @@ function linkResultStatusClassName(status: string) {
 
 function linkResultReasonLabel(reason?: string | null) {
   if (!reason) return null;
+  if (reason === "AFFILIATE_IDENTITY_VERIFICATION_REQUIRED") return "링크는 저장했지만 목적지 확인 전이라 게시하지 않았습니다. 각 행에서 링크 확인을 실행하세요.";
   if (reason === "COUPANG_API_NOT_CONFIGURED") return "쿠팡 파트너스 API 키가 아직 없습니다.";
   if (reason === "PRODUCT_ID_AND_LINK_REQUIRED") return "상품 ID와 파트너스 링크가 모두 필요합니다.";
   if (reason === "DUPLICATE_PRODUCT_ID") return "같은 상품 ID가 중복 입력되었습니다.";
@@ -405,7 +419,7 @@ export default function AdminAffiliateLinkQueue({
         return;
       }
       setBulkImportResult(data);
-      setNotice({ type: data.status === "ok" ? "success" : "error", message: bulkImportMessage(data) });
+      setNotice({ type: bulkImportNoticeType(data), message: bulkImportMessage(data) });
       if (mode === "save") {
         await loadProducts();
         onCompleted();
@@ -622,8 +636,13 @@ export default function AdminAffiliateLinkQueue({
             <p className="font-black text-ink">
               대량 입력 결과: <span className={linkResultStatusClassName(bulkImportResult.status)}>{linkResultStatusLabel(bulkImportResult.status)}</span> · 확인 {bulkImportResult.scanned_count}줄
               {bulkImportResult.dry_run ? ` · 저장 가능 ${bulkImportResult.valid_count ?? 0}개` : ""} · 저장 {bulkImportResult.updated_count}개
-              {bulkImportResult.published_count ? ` · 게시 ${bulkImportResult.published_count}개` : ""} · 건너뜀 {bulkImportResult.skipped_count}개 · 오류 {bulkImportResult.error_count}개
+              {bulkImportResult.publish_requested ? ` · 게시 ${bulkImportResult.published_count ?? 0}개` : ""}
+              {bulkImportResult.identity_pending_count ? ` · 목적지 확인 필요 ${bulkImportResult.identity_pending_count}개` : ""}
+              {bulkImportResult.publish_blocked_count ? ` · 품질 확인 필요 ${bulkImportResult.publish_blocked_count}개` : ""} · 건너뜀 {bulkImportResult.skipped_count}개 · 오류 {bulkImportResult.error_count}개
             </p>
+            {bulkImportResult.publish_requested && bulkImportResult.identity_pending_count ? (
+              <p className="mt-2 font-black text-coral">저장된 링크는 각 상품 행에서 링크 확인을 실행한 뒤에만 게시할 수 있습니다.</p>
+            ) : null}
             {bulkImportResult.items?.slice(0, 4).length ? (
               <ul className="mt-2 space-y-1 text-xs">
                 {bulkImportResult.items.slice(0, 4).map((item, index) => (

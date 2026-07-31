@@ -25,6 +25,7 @@ export default function AdminManualProductForm({ password, onCreated }: { passwo
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [createdProductId, setCreatedProductId] = useState<string | null>(null);
   const urlReady = isUsableCoupangProductUrl(form.coupang_url.trim());
 
   function update(field: Exclude<keyof typeof emptyForm, "category">, value: string) {
@@ -34,18 +35,20 @@ export default function AdminManualProductForm({ password, onCreated }: { passwo
   async function submit() {
     setSaving(true);
     setNotice(null);
+    setCreatedProductId(null);
     try {
       const response = await fetch("/api/admin/products", {
         method: "POST",
         headers: headers(password),
         body: JSON.stringify(form)
       });
-      const data = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
+      const data = (await response.json().catch(() => ({}))) as { message?: string; error?: string; product?: { id?: string | null } };
       if (!response.ok) {
         setNotice({ type: "error", message: data.message ?? data.error ?? "후보를 추가하지 못했습니다." });
         return;
       }
       setNotice({ type: "success", message: data.message ?? "검토 대기 후보를 추가했습니다." });
+      setCreatedProductId(data.product?.id ?? null);
       setForm(emptyForm);
       onCreated();
     } catch {
@@ -72,6 +75,15 @@ export default function AdminManualProductForm({ password, onCreated }: { passwo
         <p className={`mt-4 rounded-lg border px-3 py-2 text-sm font-bold ${notice.type === "success" ? "border-pine/30 bg-pine/10 text-pine" : "border-coral/30 bg-coral/10 text-coral"}`} role="status">
           {notice.message}
         </p>
+      ) : null}
+
+      {createdProductId ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-pine/30 bg-pine/10 px-3 py-3 text-sm font-bold text-pine">
+          <p>상품 ID <code className="break-all">{createdProductId}</code>가 생성됐습니다. 다음은 상품별 파트너스 링크 확인입니다.</p>
+          <a className="focus-ring shrink-0 rounded-lg bg-pine px-3 py-2 text-xs font-black text-white hover:bg-ink" href="#admin-affiliate-links">
+            링크 보강 큐로 이동
+          </a>
+        </div>
       ) : null}
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">

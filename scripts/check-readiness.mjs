@@ -663,6 +663,8 @@ if (fileExists("app/api/admin/products/route.ts") && fileExists("components/Admi
       manualProductForm.includes("쿠팡 상품 상세 URL") &&
       manualProductForm.includes("반품등급, 반품가, 네이버 가격과 파트너스 링크는 추정하지 않고") &&
       manualProductForm.includes("검토 후보 추가") &&
+      manualProductForm.includes("상품 ID") &&
+      manualProductForm.includes("#admin-affiliate-links") &&
       adminPage.includes("AdminManualProductForm"),
     "an authenticated admin can seed a real Coupang product into needs_review while keeping missing return data unfilled and reusing the existing review/publish gates",
     "required"
@@ -3154,6 +3156,16 @@ if (fileExists("components/AdminAffiliateLinkQueue.tsx")) {
     "required"
   );
   check(
+    "admin: bulk publish identity accounting",
+    linkQueue.includes("AFFILIATE_IDENTITY_VERIFICATION_REQUIRED") &&
+      linkQueue.includes("identity_pending_count") &&
+      linkQueue.includes("published_count ?? 0") &&
+      linkQueue.includes("목적지 확인 필요") &&
+      linkQueue.includes("저장된 링크는 각 상품 행에서 링크 확인을 실행한 뒤에만 게시할 수 있습니다"),
+    "bulk save-and-publish results distinguish saved links from links still waiting for destination identity verification",
+    "required"
+  );
+  check(
     "admin: affiliate backfill manual retry links",
     linkQueue.includes("backfillResultLinks") &&
       linkQueue.includes("manual_search_url") &&
@@ -3272,6 +3284,8 @@ if (fileExists("app/api/admin/affiliate-links/import/route.ts")) {
       affiliateImportRoute.includes("dryRun") &&
       affiliateImportRoute.includes("publish_requested") &&
       affiliateImportRoute.includes("published_count") &&
+      affiliateImportRoute.includes("identity_pending_count") &&
+      affiliateImportRoute.includes("AFFILIATE_IDENTITY_VERIFICATION_REQUIRED") &&
       affiliateImportRoute.includes('sourcing_status: "published"') &&
       affiliateImportRoute.includes(".slice(0, 80)"),
     "admin-protected bulk import route validates, updates, or publishes only product-id matched, non-sample Coupang Partners links and clamps batch size",
@@ -3283,8 +3297,9 @@ if (fileExists("app/api/admin/affiliate-links/import/route.ts")) {
       affiliateImportRoute.includes("PUBLISH_BLOCKED_PUBLIC_QUALITY") &&
       affiliateImportRoute.includes("readiness.blockers") &&
       affiliateImportRoute.includes('await updateProduct(productId, { affiliate_url: affiliateUrl })') &&
+      affiliateImportRoute.includes("publishBlockedCount") &&
       affiliateImportRoute.includes("publishedCount += 1"),
-    "bulk link import saves valid links but does not publish products with public quality blockers",
+    "bulk link import saves valid links but does not publish products before identity or public quality checks",
     "required"
   );
 }

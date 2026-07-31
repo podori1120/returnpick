@@ -55,6 +55,8 @@ export async function POST(request: Request) {
     let validCount = 0;
     let updatedCount = 0;
     let publishedCount = 0;
+    let identityPendingCount = 0;
+    let publishBlockedCount = 0;
     let skippedCount = 0;
     let errorCount = 0;
     const seenProductIds = new Set<string>();
@@ -101,7 +103,23 @@ export async function POST(request: Request) {
       try {
         if (dryRun) {
           validCount += 1;
-          items.push({ product_id: productId, title: product.title, status: "valid", affiliate_url: affiliateUrl });
+          const reason = publish && !affiliateIdentity.ready ? "AFFILIATE_IDENTITY_VERIFICATION_REQUIRED" : undefined;
+          if (reason) identityPendingCount += 1;
+          items.push({ product_id: productId, title: product.title, status: "valid", reason, affiliate_url: affiliateUrl });
+          continue;
+        }
+
+        if (publish && !affiliateIdentity.ready) {
+          await updateProduct(productId, { affiliate_url: affiliateUrl });
+          updatedCount += 1;
+          identityPendingCount += 1;
+          items.push({
+            product_id: productId,
+            title: product.title,
+            status: "updated",
+            reason: "AFFILIATE_IDENTITY_VERIFICATION_REQUIRED",
+            affiliate_url: affiliateUrl
+          });
           continue;
         }
 
@@ -110,6 +128,7 @@ export async function POST(request: Request) {
           if (!readiness.ready) {
             await updateProduct(productId, { affiliate_url: affiliateUrl });
             updatedCount += 1;
+            publishBlockedCount += 1;
             items.push({
               product_id: productId,
               title: product.title,
@@ -137,12 +156,15 @@ export async function POST(request: Request) {
       }
     }
 
+    const hasPublishBlockers = identityPendingCount > 0 || publishBlockedCount > 0;
     return NextResponse.json({
-      status: errorCount > 0 ? (updatedCount > 0 ? "partial" : "error") : "ok",
+      status: errorCount > 0 ? (updatedCount > 0 ? "partial" : "error") : hasPublishBlockers ? "partial" : "ok",
       scanned_count: lines.length,
       valid_count: validCount,
       updated_count: updatedCount,
       published_count: publishedCount,
+      identity_pending_count: identityPendingCount,
+      publish_blocked_count: publishBlockedCount,
       skipped_count: skippedCount,
       error_count: errorCount,
       dry_run: dryRun,
