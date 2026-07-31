@@ -24,6 +24,7 @@
     "scheduler:check": "node scripts/verify-github-hourly-scheduler.mjs",
     "scoring:check": "node scripts/verify-scoring-rules.mjs",
     "freshness:check": "node scripts/verify-deal-freshness.mjs",
+    "provider-merge:check": "node scripts/verify-provider-product-merge.mjs",
     "public-web:check": "node scripts/verify-public-web-config.mjs",
     "schema:setup": "node scripts/print-supabase-setup-runbook.mjs",
     "schema:production": "node scripts/verify-supabase-schema.mjs",

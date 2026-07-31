@@ -207,6 +207,7 @@ const requiredFiles = [
   "lib/launchState.ts",
   "lib/naverPriceBackfill.ts",
   "lib/productImageUrl.ts",
+  "lib/providerProductMerge.ts",
   "lib/scoring.ts",
   "lib/sourcingRunKinds.ts",
   "lib/sourcing.ts",
@@ -227,6 +228,7 @@ const requiredFiles = [
   "scripts/run-production-launch.mjs",
   "scripts/verify-git-deploy-readiness.mjs",
   "scripts/verify-github-hourly-scheduler.mjs",
+  "scripts/verify-provider-product-merge.mjs",
   "scripts/verify-scoring-rules.mjs",
   "scripts/verify-public-web-config.mjs",
   "scripts/print-supabase-setup-runbook.mjs",
@@ -302,6 +304,29 @@ if (fileExists("package.json") && fileExists("scripts/verify-scoring-rules.mjs")
       scoringCheck.includes("public type contract") &&
       scoringCheck.includes("secret values") === false,
     "scoring check guards price bands, condition scores, verdict caps, risk flags, type strings, and sourcing score persistence without reading secrets",
+    "required"
+  );
+}
+
+if (fileExists("package.json") && fileExists("lib/providerProductMerge.ts") && fileExists("scripts/verify-provider-product-merge.mjs")) {
+  const packageJson = readText("package.json");
+  const providerMerge = readText("lib/providerProductMerge.ts");
+  const providerMergeCheck = readText("scripts/verify-provider-product-merge.mjs");
+  check(
+    "scripts: provider product merge check command",
+    packageJson.includes('"provider-merge:check": "node scripts/verify-provider-product-merge.mjs"'),
+    "package.json exposes a deterministic supplemental-provider merge check",
+    "required"
+  );
+  check(
+    "sourcing: supplemental provider merge safety",
+    providerMerge.includes("mergeProviderProductBatches") &&
+      providerMerge.includes("exact_normalized_title") &&
+      providerMerge.includes("source_product_id") &&
+      providerMerge.includes("hasReturnEvidence") &&
+      providerMergeCheck.includes("supplemental retention") &&
+      providerMergeCheck.includes("source-id deduplication"),
+    "official and allowed public-web candidates retain distinct products, deduplicate conservative identities, and prefer explicit return evidence",
     "required"
   );
 }
@@ -894,11 +919,22 @@ if (fileExists("lib/sourcing.ts")) {
   );
   check(
     "sourcing: provider error fallback",
-    sourcing.includes("recordProviderError") &&
+    sourcing.includes("recordProviderResult") &&
+      sourcing.includes('sourceResult.status !== "error"') &&
       sourcing.includes('result.status === "error"') &&
       sourcing.includes("provider_issues") &&
       sourcing.includes("naver_shopping_candidate"),
     "sourcing logs provider errors and still tries allowed fallback sources for the keyword",
+    "required"
+  );
+  check(
+    "sourcing: public web is supplemental",
+    sourcing.includes("const webResult = await searchPublicWebProducts") &&
+      sourcing.includes("mergeProviderProductBatches") &&
+      sourcing.includes('{ provider: "public_web", products: webResult.products }') &&
+      sourcing.includes("merged_deduplicated_count") &&
+      sourcing.includes("provider_contributions"),
+    "robots-safe allowlisted public-web return candidates supplement successful official API searches instead of running only after zero results",
     "required"
   );
   check(

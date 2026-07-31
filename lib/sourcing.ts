@@ -16,7 +16,8 @@ import { searchMockProducts } from "@/lib/providers/mockProvider";
 import { searchNaverReturnCandidates } from "@/lib/providers/naverCandidateProvider";
 import { getLowestPriceFromQueries } from "@/lib/providers/naverShoppingProvider";
 import { searchPublicWebProducts } from "@/lib/providers/publicWebProvider";
-import type { ProviderProduct } from "@/lib/providers/types";
+import type { ProviderProduct, ProviderSearchResult } from "@/lib/providers/types";
+import { mergeProviderProductBatches } from "@/lib/providerProductMerge";
 import type { JsonValue, SourcedProduct, SourcingKeyword, SourcingStatus } from "@/lib/types";
 import { extractReturnInfoFromText, toReturnInfoJson } from "@/lib/webReturnInfo";
 
@@ -330,8 +331,15 @@ export async function runSourcing(options?: RunSourcingOptions) {
         let result = await searchCoupangProducts(keyword.keyword, keyword.category);
         let provider = "coupang_partners";
         const providerIssues: Array<Record<string, JsonValue>> = [];
+        const providerContributions: Array<Record<string, JsonValue>> = [];
 
-        const recordProviderError = (source: string, sourceResult: typeof result) => {
+        const recordProviderResult = (source: string, sourceResult: ProviderSearchResult) => {
+          providerContributions.push({
+            provider: source,
+            status: sourceResult.status,
+            fetched: sourceResult.products.length,
+            provider_meta: sourceResult.meta ?? null
+          });
           if (sourceResult.status !== "error") return;
           errorCount += 1;
           const issue = {
@@ -349,32 +357,61 @@ export async function runSourcing(options?: RunSourcingOptions) {
           });
         };
 
-        recordProviderError("coupang_partners", result);
+        recordProviderResult("coupang_partners", result);
 
         if (result.status === "API_NOT_CONFIGURED" || result.status === "error" || result.products.length === 0) {
           const naverResult = await searchNaverReturnCandidates(keyword.keyword, keyword.category);
-          recordProviderError("naver_shopping_candidate", naverResult);
+          recordProviderResult("naver_shopping_candidate", naverResult);
           if (naverResult.status === "ok" && naverResult.products.length > 0) {
             result = naverResult;
             provider = "naver_shopping_candidate";
           }
         }
 
-        if (result.status === "API_NOT_CONFIGURED" || result.status === "DISABLED" || result.status === "error" || result.products.length === 0) {
-          const webResult = await searchPublicWebProducts(keyword.keyword, keyword.category);
-          if (webResult.status === "ok" && webResult.products.length > 0) {
-            result = webResult;
-            provider = "public_web";
-        } else if (["ROBOTS_DISALLOWED", "ROBOTS_UNAVAILABLE", "INVALID_TEMPLATE", "UNSUPPORTED_CONTENT_TYPE", "CONTENT_TOO_LARGE", "REDIRECT_BLOCKED", "CRAWL_DELAY_TOO_HIGH"].includes(webResult.status)) {
+        const webResult = await searchPublicWebProducts(keyword.keyword, keyword.category);
+        recordProviderResult("public_web", webResult);
+        if (webResult.status === "ok" && webResult.products.length > 0) {
+          const primaryProvider = provider;
+          const primaryStatus = result.status;
+          const primaryMeta = result.meta ?? null;
+          const merged = mergeProviderProductBatches([
+            { provider: primaryProvider, products: result.products },
+            { provider: "public_web", products: webResult.products }
+          ]);
+          result = {
+            status: "ok",
+            products: merged.products,
+            meta: {
+              ...(webResult.meta ?? {}),
+              primary_provider: primaryProvider,
+              primary_status: primaryStatus,
+              primary_meta: primaryMeta,
+              supplemental_public_web_status: webResult.status,
+              supplemental_public_web_meta: webResult.meta ?? null,
+              merged_fetched_count: merged.fetchedCount,
+              merged_deduplicated_count: merged.deduplicatedCount
+            }
+          };
+          provider = merged.providers.join("+") || "public_web";
+        } else if (
+          [
+            "ROBOTS_DISALLOWED",
+            "ROBOTS_UNAVAILABLE",
+            "INVALID_TEMPLATE",
+            "UNSUPPORTED_CONTENT_TYPE",
+            "CONTENT_TOO_LARGE",
+            "REDIRECT_BLOCKED",
+            "CRAWL_DELAY_TOO_HIGH"
+          ].includes(webResult.status)
+        ) {
           logs.push({
             keyword: keyword.keyword,
             category: keyword.category,
             provider: "public_web",
-              status: webResult.status,
-              error: webResult.error ?? null,
-              provider_meta: webResult.meta ?? null
-            });
-          }
+            status: webResult.status,
+            error: webResult.error ?? null,
+            provider_meta: webResult.meta ?? null
+          });
         }
 
         if (
@@ -388,6 +425,7 @@ export async function runSourcing(options?: RunSourcingOptions) {
         ) {
           result = await searchMockProducts(keyword.keyword, keyword.category);
           provider = "mock";
+          recordProviderResult("mock", result);
         }
 
         if (result.status === "error") {
@@ -440,6 +478,7 @@ export async function runSourcing(options?: RunSourcingOptions) {
           fetched: result.products.length,
           accepted: candidates.length,
           provider_meta: result.meta ?? null,
+          provider_contributions: providerContributions,
           provider_issues: providerIssues
         });
       } catch (error) {
