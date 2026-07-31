@@ -84,6 +84,11 @@ const adminUiRequiredText = [
   "/api/admin/editorial-campaign",
   "returnpick_admin_password"
 ];
+const editorialCardBundleRequiredText = [
+  "returnpick_impressed_editorial_surfaces",
+  "web_editorial_card_home",
+  "web_editorial_card_deals"
+];
 const maxAdminScriptChunksToScan = 25;
 const maxAdminScriptChunkCharacters = 1_500_000;
 
@@ -415,6 +420,45 @@ async function checkAdminUiBundle(html, status) {
   }
 }
 
+async function checkEditorialCardTrackingBundle(pages) {
+  const unavailable = pages.find((page) => page.status !== 200);
+  if (unavailable) {
+    fail("editorial card tracking bundle", `${unavailable.path} returned ${unavailable.status}`);
+    return;
+  }
+
+  const scriptSources = [...new Set(pages.flatMap((page) => staticScriptSourcesFromHtml(page.html)))];
+  if (!scriptSources.length) {
+    fail("editorial card tracking bundle", "no Next.js static script chunks found on public card pages");
+    return;
+  }
+
+  const missing = new Set(editorialCardBundleRequiredText);
+  let scanned = 0;
+  let fetched = 0;
+  for (const source of scriptSources.slice(0, maxAdminScriptChunksToScan)) {
+    scanned += 1;
+    try {
+      const script = await readUrlText(new URL(source, siteUrl).toString());
+      if (!script.response.ok) continue;
+      fetched += 1;
+      const text = script.text.slice(0, maxAdminScriptChunkCharacters);
+      for (const requiredText of [...missing]) {
+        if (text.includes(requiredText)) missing.delete(requiredText);
+      }
+      if (!missing.size) break;
+    } catch {
+      // Continue scanning other chunks so one stale asset does not hide the deployed contract.
+    }
+  }
+
+  if (missing.size) {
+    fail("editorial card tracking bundle", `missing deployed tracking text: ${[...missing].join(", ")}; fetched ${fetched}/${scanned} chunks`);
+  } else {
+    pass("editorial card tracking bundle", `home/deals card impressions are present in deployed client chunks; fetched ${fetched}/${scanned} chunks`);
+  }
+}
+
 function summarizeReadiness(readiness) {
   if (!readiness || typeof readiness !== "object") return "readiness payload missing";
   const blocking = Array.isArray(readiness.blockingItemIds) ? readiness.blockingItemIds.join(", ") : "";
@@ -578,6 +622,16 @@ async function main() {
     checkPublicSecurityHeaders(home.response);
   } catch (error) {
     fail("public security headers", error instanceof Error ? error.message : "fetch failed");
+  }
+
+  try {
+    const [home, deals] = await Promise.all([readText("/"), readText("/deals")]);
+    await checkEditorialCardTrackingBundle([
+      { path: "/", html: home.text, status: home.response.status },
+      { path: "/deals", html: deals.text, status: deals.response.status }
+    ]);
+  } catch (error) {
+    fail("editorial card tracking bundle", error instanceof Error ? error.message : "fetch failed");
   }
 
   try {

@@ -46,7 +46,7 @@ export default async function HomePage() {
             {featured[0] ? (
               <DealCard product={featured[0]} />
             ) : (
-              <ApprovalSampleCard />
+              <ApprovalSampleCard placement="home" />
             )}
           </div>
         </div>

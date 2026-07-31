@@ -363,7 +363,7 @@ export default async function DealsPage({
             </p>
             <p className="mt-3 text-xs font-semibold leading-5 text-steel">가격과 재고는 표시 시점에 따라 달라질 수 있어 쿠팡 상품 페이지에서 최종 확인하도록 안내합니다.</p>
           </div>
-          <ApprovalSampleCard />
+          <ApprovalSampleCard placement="deals" />
         </section>
       ) : null}
 

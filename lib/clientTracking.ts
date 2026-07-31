@@ -1,6 +1,10 @@
 import type { AffiliateEventType } from "@/lib/types";
 
-export type ManualAffiliateEventContext = "approval_sample" | "editorial_pick";
+export type ManualAffiliateEventContext =
+  | "approval_sample"
+  | "editorial_pick"
+  | "editorial_home_card"
+  | "editorial_deals_card";
 
 const sessionKey = "returnpick_anon_session_id";
 const utmSourceKey = "returnpick_utm_source";

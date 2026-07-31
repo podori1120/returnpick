@@ -1390,12 +1390,20 @@ if (
 
 if (
   fileExists("components/ApprovalSampleCard.tsx") &&
+  fileExists("components/AffiliateEventTracker.tsx") &&
   fileExists("lib/approvalSample.ts") &&
-  fileExists("app/products/approval-sample/page.tsx")
+  fileExists("app/products/approval-sample/page.tsx") &&
+  fileExists("app/api/events/route.ts") &&
+  fileExists("app/page.tsx") &&
+  fileExists("app/deals/page.tsx")
 ) {
   const approvalCard = readText("components/ApprovalSampleCard.tsx");
+  const eventTracker = readText("components/AffiliateEventTracker.tsx");
   const approvalData = readText("lib/approvalSample.ts");
   const approvalPage = readText("app/products/approval-sample/page.tsx");
+  const eventRoute = readText("app/api/events/route.ts");
+  const homePage = readText("app/page.tsx");
+  const dealsPage = readText("app/deals/page.tsx");
   check(
     "approval sample: customer-ready visual without invented commerce data",
     approvalCard.includes("next/image") &&
@@ -1409,6 +1417,26 @@ if (
       approvalPage.includes("sku: approvalSampleProduct.coupangProductNumber") &&
       !approvalPage.includes("https://schema.org/InStock"),
     "the manual approval product uses a disclosed editorial image and does not invent price, stock, or availability",
+    "required"
+  );
+  check(
+    "editorial pick: measured card impressions",
+    approvalCard.includes("EditorialPickImpressionTracker") &&
+      approvalCard.includes('placement: "home" | "deals"') &&
+      eventTracker.includes("returnpick_impressed_editorial_surfaces") &&
+      eventTracker.includes('eventType: "impression"') &&
+      eventTracker.includes('context: "editorial_home_card"') &&
+      eventTracker.includes('context: "editorial_deals_card"') &&
+      eventTracker.includes('channel: "web_editorial_card_home"') &&
+      eventTracker.includes('channel: "web_editorial_card_deals"') &&
+      eventRoute.includes('pathname: "/"') &&
+      eventRoute.includes('impressionChannels: ["web_editorial_card_home"]') &&
+      eventRoute.includes('pathname: "/deals"') &&
+      eventRoute.includes('impressionChannels: ["web_editorial_card_deals"]') &&
+      eventRoute.includes('body.event_type === "impression"') &&
+      homePage.includes('<ApprovalSampleCard placement="home" />') &&
+      dealsPage.includes('<ApprovalSampleCard placement="deals" />'),
+    "the home and deals fallback cards record one session-safe impression through exact path and channel allowlists",
     "required"
   );
 }

@@ -9,6 +9,7 @@ const manualTrackingSurfaces = [
   {
     context: "approval_sample",
     pathname: "/products/approval-sample",
+    impressionChannels: [],
     affiliateClickChannels: ["web_approval_sample"],
     detailViewChannels: [],
     telegramDetailChannels: [],
@@ -17,10 +18,29 @@ const manualTrackingSurfaces = [
   {
     context: "editorial_pick",
     pathname: "/picks/novatech-s1-window-cleaner",
+    impressionChannels: [],
     affiliateClickChannels: ["web_editorial_pick", "telegram_editorial_pick"],
     detailViewChannels: ["web_editorial_pick"],
     telegramDetailChannels: ["telegram_editorial_pick"],
     shareCopyChannels: ["web_editorial_share"]
+  },
+  {
+    context: "editorial_home_card",
+    pathname: "/",
+    impressionChannels: ["web_editorial_card_home"],
+    affiliateClickChannels: [],
+    detailViewChannels: [],
+    telegramDetailChannels: [],
+    shareCopyChannels: []
+  },
+  {
+    context: "editorial_deals_card",
+    pathname: "/deals",
+    impressionChannels: ["web_editorial_card_deals"],
+    affiliateClickChannels: [],
+    detailViewChannels: [],
+    telegramDetailChannels: [],
+    shareCopyChannels: []
   }
 ] as const;
 
@@ -84,15 +104,17 @@ function isManualAffiliateTrackingRequest(request: Request, body: Record<string,
   if (!surface) return false;
 
   const allowedChannels: readonly string[] =
-    body.event_type === "affiliate_click"
-      ? surface.affiliateClickChannels
-      : body.event_type === "detail_view"
-        ? surface.detailViewChannels
-        : body.event_type === "telegram_detail_click"
-          ? surface.telegramDetailChannels
-          : body.event_type === "share_copy"
-            ? surface.shareCopyChannels
-            : [];
+    body.event_type === "impression"
+      ? surface.impressionChannels
+      : body.event_type === "affiliate_click"
+        ? surface.affiliateClickChannels
+        : body.event_type === "detail_view"
+          ? surface.detailViewChannels
+          : body.event_type === "telegram_detail_click"
+            ? surface.telegramDetailChannels
+            : body.event_type === "share_copy"
+              ? surface.shareCopyChannels
+              : [];
   if (!channel || !allowedChannels.includes(channel)) return false;
 
   const requestReferrer = request.headers.get("referer");

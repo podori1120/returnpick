@@ -1,13 +1,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Droplets, Gauge, ShieldCheck } from "lucide-react";
+import { EditorialPickImpressionTracker } from "@/components/AffiliateEventTracker";
 import { approvalSampleProduct } from "@/lib/approvalSample";
 
 const highlightIcons = [Gauge, Droplets, ShieldCheck];
 
-export default function ApprovalSampleCard() {
+export default function ApprovalSampleCard({ placement }: { placement: "home" | "deals" }) {
   return (
     <article className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">
+      <EditorialPickImpressionTracker placement={placement} />
       <Link className="focus-ring group block" href={approvalSampleProduct.detailPath} aria-label={`${approvalSampleProduct.name} 상세 보기`}>
         <div className="relative aspect-[3/2] overflow-hidden bg-mist">
           <Image

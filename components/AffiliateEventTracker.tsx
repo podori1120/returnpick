@@ -54,3 +54,33 @@ export function EditorialPickViewTracker() {
 
   return null;
 }
+
+const editorialCardTracking = {
+  home: {
+    context: "editorial_home_card",
+    channel: "web_editorial_card_home"
+  },
+  deals: {
+    context: "editorial_deals_card",
+    channel: "web_editorial_card_deals"
+  }
+} as const;
+
+export function EditorialPickImpressionTracker({ placement }: { placement: keyof typeof editorialCardTracking }) {
+  useEffect(() => {
+    const tracking = editorialCardTracking[placement];
+    const seenKey = "returnpick_impressed_editorial_surfaces";
+    const seen = new Set(getStoredJsonArray<string>(seenKey));
+    if (seen.has(tracking.context)) return;
+
+    trackAffiliateEvent({
+      eventType: "impression",
+      channel: tracking.channel,
+      context: tracking.context
+    });
+    seen.add(tracking.context);
+    setStoredJsonArray(seenKey, Array.from(seen));
+  }, [placement]);
+
+  return null;
+}
