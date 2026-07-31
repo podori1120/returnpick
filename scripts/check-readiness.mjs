@@ -215,6 +215,7 @@ const requiredFiles = [
   "lib/naverPriceBackfill.ts",
   "lib/productImageUrl.ts",
   "lib/providerProductMerge.ts",
+  "lib/publicWebUrlSafety.ts",
   "lib/scoring.ts",
   "lib/sourcingRunKinds.ts",
   "lib/sourcing.ts",
@@ -243,6 +244,7 @@ const requiredFiles = [
   "scripts/verify-provider-product-merge.mjs",
   "scripts/verify-scoring-rules.mjs",
   "scripts/verify-public-web-config.mjs",
+  "scripts/verify-public-web-url-safety.mjs",
   "scripts/print-supabase-setup-runbook.mjs",
   "scripts/verify-production-readiness.mjs",
   "scripts/verify-supabase-schema.mjs",
@@ -615,6 +617,32 @@ if (fileExists("app/robots.ts") && fileExists("app/sitemap.ts")) {
       sitemap.includes('/picks/novatech-s1-window-cleaner') &&
       !sitemap.includes('/products/approval-sample'),
     "robots protects admin/API while sitemap exposes core public, guide, disclosure, and indexable editorial routes",
+    "required"
+  );
+  check(
+    "public SEO: customer-ready detail sitemap",
+    sitemap.includes("export const revalidate = 300") &&
+      sitemap.includes("listProducts({ published: true })") &&
+      sitemap.includes("products.filter(isPublicDealReady)") &&
+      sitemap.includes("path: `/deals/${product.id}`") &&
+      sitemap.includes("product.last_observed_at ?? product.updated_at"),
+    "the sitemap refreshes customer-ready published detail URLs while keeping incomplete and approval-only products out",
+    "required"
+  );
+}
+
+if (fileExists("app/deals/page.tsx")) {
+  const dealsPage = readText("app/deals/page.tsx");
+  check(
+    "public SEO: canonical deals index",
+    dealsPage.includes('const canonicalUrl = `${getSiteUrl()}/deals`') &&
+      dealsPage.includes("export const metadata: Metadata") &&
+      dealsPage.includes("alternates: { canonical: canonicalUrl }") &&
+      dealsPage.includes("robots: { index: true, follow: true }") &&
+      dealsPage.includes("url: canonicalUrl") &&
+      dealsPage.includes('images: [{ url: `${getSiteUrl()}/opengraph-image` }]') &&
+      dealsPage.includes('images: [`${getSiteUrl()}/twitter-image`]'),
+    "the main deal index self-canonicalizes filtered URLs and exposes consistent search and social metadata",
     "required"
   );
 }
@@ -1329,8 +1357,10 @@ if (fileExists("lib/providers/naverShoppingProvider.ts")) {
 
 if (fileExists("lib/providers/publicWebProvider.ts")) {
   const publicWebProvider = readText("lib/providers/publicWebProvider.ts");
+  const publicWebUrlSafety = fileExists("lib/publicWebUrlSafety.ts") ? readText("lib/publicWebUrlSafety.ts") : "";
   const packageJson = fileExists("package.json") ? readText("package.json") : "";
   const publicWebConfigVerifier = fileExists("scripts/verify-public-web-config.mjs") ? readText("scripts/verify-public-web-config.mjs") : "";
+  const publicWebUrlVerifier = fileExists("scripts/verify-public-web-url-safety.mjs") ? readText("scripts/verify-public-web-url-safety.mjs") : "";
   check(
     "provider: public web robots fail closed",
     publicWebProvider.includes("ROBOTS_UNAVAILABLE") &&
@@ -1356,18 +1386,28 @@ if (fileExists("lib/providers/publicWebProvider.ts")) {
       publicWebProvider.includes("readTextWithLimit") &&
       publicWebProvider.includes("UNSUPPORTED_CONTENT_TYPE") &&
       publicWebProvider.includes("CONTENT_TOO_LARGE") &&
-      publicWebProvider.includes("isPublicHostname"),
+      publicWebProvider.includes("isPublicWebHostname"),
     "public web collection reads only public-host HTML responses within bounded byte limits",
     "required"
   );
   check(
     "provider: public web extracted href safety",
-    publicWebProvider.includes("safeExtractedProductHref") &&
-      publicWebProvider.includes('!["http:", "https:"].includes(url.protocol)') &&
-      publicWebProvider.includes("url.username || url.password") &&
-      publicWebProvider.includes("!isPublicHostname(url.hostname)") &&
-      publicWebProvider.includes("if (!href) continue"),
-    "public web collection stores only http(s) public-host anchor URLs as candidate source links",
+    publicWebProvider.includes("safeAllowlistedPublicUrl") &&
+      publicWebProvider.includes("extractCards(html, category, keyword, url, hosts)") &&
+      publicWebUrlSafety.includes('!["http:", "https:"].includes(url.protocol)') &&
+      publicWebUrlSafety.includes("url.username || url.password") &&
+      publicWebUrlSafety.includes("!allowedHosts.has(hostname)"),
+    "public web collection stores only http(s) anchor URLs whose exact host remains inside the reviewed allowlist",
+    "required"
+  );
+  check(
+    "scripts: public web extracted URL safety check",
+    packageJson.includes('"public-web-url:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-public-web-url-safety.mjs"') &&
+      publicWebUrlVerifier.includes("off-allowlist host") &&
+      publicWebUrlVerifier.includes("unlisted subdomain") &&
+      publicWebUrlVerifier.includes("credential-bearing URL") &&
+      publicWebUrlVerifier.includes("loopback URL"),
+    "deterministic checks cover accepted allowlisted URLs and rejected cross-host, subdomain, credential, scheme, and loopback boundaries",
     "required"
   );
   check(

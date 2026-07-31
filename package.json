@@ -31,6 +31,7 @@
     "naver-price-trust:check": "node scripts/verify-naver-price-trust.mjs",
     "provider-merge:check": "node scripts/verify-provider-product-merge.mjs",
     "public-web:check": "node scripts/verify-public-web-config.mjs",
+    "public-web-url:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-public-web-url-safety.mjs",
     "schema:setup": "node scripts/print-supabase-setup-runbook.mjs",
     "schema:production": "node scripts/verify-supabase-schema.mjs",
     "sourcing:diagnose": "node scripts/diagnose-sourcing-recovery.mjs",

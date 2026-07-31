@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, RefreshCw, ShieldCheck } from "lucide-react";
 import DealRadar from "@/components/DealRadar";
@@ -24,9 +25,36 @@ import { listProducts } from "@/lib/dataStore";
 import { approvalSampleProduct } from "@/lib/approvalSample";
 import { isPublicDealReady } from "@/lib/publicDeal";
 import { getDealQuality, type DealQualityStatus } from "@/lib/quality";
+import { getSiteUrl } from "@/lib/siteUrl";
 import type { Category, ConditionGrade, ProductWithScore } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+const canonicalUrl = `${getSiteUrl()}/deals`;
+const pageTitle = "검수된 반품·리퍼 딜 비교";
+const pageDescription = "반품·리퍼 상품의 가격, 상태, 반품 근거와 상품별 쿠팡 파트너스 링크를 한곳에서 비교하세요.";
+
+export const metadata: Metadata = {
+  title: pageTitle,
+  description: pageDescription,
+  alternates: { canonical: canonicalUrl },
+  robots: { index: true, follow: true },
+  openGraph: {
+    title: `${pageTitle} | ReturnPick`,
+    description: pageDescription,
+    url: canonicalUrl,
+    type: "website",
+    locale: "ko_KR",
+    siteName: "ReturnPick",
+    images: [{ url: `${getSiteUrl()}/opengraph-image` }]
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${pageTitle} | ReturnPick`,
+    description: pageDescription,
+    images: [`${getSiteUrl()}/twitter-image`]
+  }
+};
 
 function getParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;

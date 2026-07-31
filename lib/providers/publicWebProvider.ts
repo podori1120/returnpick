@@ -2,6 +2,7 @@ import type { Category } from "@/lib/types";
 import type { ProviderProduct, ProviderSearchResult } from "@/lib/providers/types";
 import { extractReturnInfoFromText, toReturnInfoJson } from "@/lib/webReturnInfo";
 import { getSiteUrl } from "@/lib/siteUrl";
+import { isPublicWebHostname, safeAllowlistedPublicUrl } from "@/lib/publicWebUrlSafety";
 
 const robotsCache = new Map<string, Promise<RobotsFetchResult>>();
 const originNextFetchAt = new Map<string, number>();
@@ -246,20 +247,13 @@ async function waitForOriginRateLimit(origin: string, delayMs: number) {
   originNextFetchAt.set(origin, Date.now() + delayMs);
 }
 
-function isPublicHostname(hostname: string) {
-  const value = hostname.trim().toLowerCase();
-  if (!value) return false;
-  if (value === "localhost" || value === "127.0.0.1" || value === "0.0.0.0" || value === "::1" || value.endsWith(".local")) return false;
-  return /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}$/.test(value);
-}
-
 function safeTemplateUrl(template: string, keyword: string) {
   if (!template.includes("{keyword}")) return null;
   try {
     const url = new URL(template.replace("{keyword}", encodeURIComponent(keyword)));
     if (!["http:", "https:"].includes(url.protocol)) return null;
     if (url.username || url.password) return null;
-    if (!isPublicHostname(url.hostname)) return null;
+    if (!isPublicWebHostname(url.hostname)) return null;
     return url;
   } catch {
     return null;
@@ -280,26 +274,15 @@ function safeRedirectTarget(location: string | null, baseUrl: URL, status: numbe
   }
 }
 
-function safeExtractedProductHref(value: string, pageUrl: URL) {
-  try {
-    const url = new URL(value, pageUrl);
-    if (!["http:", "https:"].includes(url.protocol)) return null;
-    if (url.username || url.password) return null;
-    if (!isPublicHostname(url.hostname)) return null;
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
-
-function extractCards(html: string, category: Category, keyword: string, pageUrl: string): ProviderProduct[] {
+function extractCards(html: string, category: Category, keyword: string, pageUrl: string, allowedHosts: ReadonlySet<string>): ProviderProduct[] {
   const anchorMatches = [...html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,1500}?)<\/a>/gi)];
   const base = new URL(pageUrl);
   const products: ProviderProduct[] = [];
 
   for (const [index, match] of anchorMatches.entries()) {
-    const href = safeExtractedProductHref(match[1], base);
-    if (!href) continue;
+    const productUrl = safeAllowlistedPublicUrl(match[1], base, allowedHosts);
+    if (!productUrl) continue;
+    const href = productUrl.toString();
     const block = match[2].replace(/<script[\s\S]*?<\/script>/gi, " ");
     const text = block.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
     const returnInfo = extractReturnInfoFromText(text, href);
@@ -421,7 +404,7 @@ export async function searchPublicWebProducts(keyword: string, category: Categor
     }
 
     const html = htmlResult.text;
-    const extracted = extractCards(html, category, keyword, url);
+    const extracted = extractCards(html, category, keyword, url, hosts);
     diagnostics.push({
       status: "FETCHED_HTML",
       url,
