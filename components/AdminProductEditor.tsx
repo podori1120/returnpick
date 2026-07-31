@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Save } from "lucide-react";
 import { isApprovalSampleAffiliateUrl, isGenericCoupangLandingUrl, isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
+import { isUsableProductImageUrl } from "@/lib/productImageUrl";
 import type { ProductWithScore } from "@/lib/types";
 
 function headers(password: string) {
@@ -25,6 +26,7 @@ export default function AdminProductEditor({
     naver_lowest_price: "",
     stock_count: "",
     affiliate_url: "",
+    image_url: "",
     public_note: "",
     admin_memo: ""
   });
@@ -34,6 +36,7 @@ export default function AdminProductEditor({
   const genericAffiliate = isGenericCoupangLandingUrl(form.affiliate_url);
   const approvalSampleAffiliate = isApprovalSampleAffiliateUrl(form.affiliate_url);
   const regularProductUrl = !affiliateReady && isUsableCoupangProductUrl(form.affiliate_url);
+  const imageUrlReady = isUsableProductImageUrl(form.image_url);
 
   useEffect(() => {
     if (!product) return;
@@ -44,6 +47,7 @@ export default function AdminProductEditor({
       naver_lowest_price: product.naver_lowest_price?.toString() ?? "",
       stock_count: product.stock_count?.toString() ?? "",
       affiliate_url: product.affiliate_url ?? "",
+      image_url: product.image_url ?? "",
       public_note: product.public_note ?? "",
       admin_memo: product.admin_memo ?? ""
     });
@@ -119,6 +123,32 @@ export default function AdminProductEditor({
             />
           </label>
         ))}
+      </div>
+
+      <label className="mt-3 block text-sm font-bold text-steel">
+        상품 이미지 URL
+        <input
+          aria-invalid={form.image_url.trim().length > 0 && !imageUrlReady}
+          className="focus-ring mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink"
+          value={form.image_url}
+          onChange={(event) => setForm((current) => ({ ...current, image_url: event.target.value }))}
+          placeholder="https://.../product-image.jpg"
+          type="url"
+        />
+      </label>
+      <div className={imageUrlReady ? "mt-2 rounded-lg bg-pine/10 p-3 text-sm font-bold text-pine" : "mt-2 rounded-lg bg-lemon/30 p-3 text-sm font-bold text-ink"}>
+        <div className="flex items-start gap-2">
+          {imageUrlReady ? <CheckCircle2 className="mt-0.5 shrink-0" size={16} aria-hidden /> : <AlertTriangle className="mt-0.5 shrink-0" size={16} aria-hidden />}
+          <div className="min-w-0">
+            <p>{imageUrlReady ? "상품 이미지 URL 준비됨" : "게시 전 상품 이미지 URL이 필요합니다."}</p>
+            <p className="mt-1 text-xs font-semibold">공식 API나 사용이 허용된 원본의 HTTPS 공개 주소만 입력하세요. localhost, 내부망, 계정 정보가 포함된 URL은 차단됩니다.</p>
+            {imageUrlReady ? (
+              <a className="focus-ring mt-2 inline-flex text-xs font-black underline underline-offset-2" href={form.image_url} target="_blank" rel="noopener noreferrer">
+                새 탭에서 이미지 확인
+              </a>
+            ) : null}
+          </div>
+        </div>
       </div>
 
       <label className="mt-3 block text-sm font-bold text-steel">

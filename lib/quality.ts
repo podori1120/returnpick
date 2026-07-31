@@ -1,5 +1,6 @@
 import { calculateDiscountRate } from "@/lib/format";
 import { isApprovalSampleAffiliateUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
+import { isUsableProductImageUrl } from "@/lib/productImageUrl";
 import { getLatestScore } from "@/lib/scoring";
 import type { ProductWithScore } from "@/lib/types";
 
@@ -83,7 +84,9 @@ export function getCustomerPublishReadiness(product: ProductWithScore): Customer
     blockers.add(isApprovalSampleAffiliateUrl(product.affiliate_url) ? "승인용 샘플 링크 사용 중" : "상품별 파트너스 링크 필요");
   }
   for (const blocker of quality.blockers) blockers.add(blocker);
-  if (!product.image_url) blockers.add("상품 이미지 확인 필요");
+  if (!isUsableProductImageUrl(product.image_url)) {
+    blockers.add(product.image_url ? "상품 이미지 URL 확인 필요" : "상품 이미지 확인 필요");
+  }
   for (const warning of quality.warnings) warnings.add(warning);
   if (!product.public_note?.trim()) warnings.add("공개 설명 보강 권장");
 

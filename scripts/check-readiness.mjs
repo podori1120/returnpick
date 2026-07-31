@@ -200,6 +200,7 @@ const requiredFiles = [
   "lib/clientTracking.ts",
   "lib/launchState.ts",
   "lib/naverPriceBackfill.ts",
+  "lib/productImageUrl.ts",
   "lib/scoring.ts",
   "lib/sourcingRunKinds.ts",
   "lib/sourcing.ts",
@@ -2865,6 +2866,8 @@ if (fileExists("components/AdminLaunchRunner.tsx")) {
 
 if (fileExists("components/AdminProductEditor.tsx")) {
   const productEditor = readText("components/AdminProductEditor.tsx");
+  const productRoute = readText("app/api/admin/products/[id]/route.ts");
+  const quality = readText("lib/quality.ts");
   check(
     "admin: no approval link bulk misuse",
     !productEditor.includes("승인용 파트너스 링크 채우기") && !productEditor.includes("NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL"),
@@ -2887,6 +2890,20 @@ if (fileExists("components/AdminProductEditor.tsx")) {
       productEditor.includes("role=\"status\"") &&
       productEditor.includes("저장 중"),
     "product editor shows API validation errors and network failures instead of silently refreshing",
+    "required"
+  );
+  check(
+    "admin: missing product image repair path",
+    productEditor.includes("image_url") &&
+      productEditor.includes("상품 이미지 URL") &&
+      productEditor.includes("isUsableProductImageUrl") &&
+      productEditor.includes("새 탭에서 이미지 확인") &&
+      productRoute.includes('"image_url"') &&
+      productRoute.includes("getProductImageUrlIssue") &&
+      productRoute.includes("INVALID_IMAGE_URL_FOR_PRODUCT") &&
+      quality.includes("isUsableProductImageUrl(product.image_url)") &&
+      quality.includes("상품 이미지 URL 확인 필요"),
+    "admin can safely repair a missing product image and unsafe image URLs cannot pass the public quality gate",
     "required"
   );
 }
@@ -3277,10 +3294,11 @@ if (fileExists("app/api/admin/sourcing/run/route.ts") && fileExists("lib/dataSto
       dataStore.includes("payload.return_price ?? existing.return_price") &&
       dataStore.includes("payload.naver_lowest_price ?? existing.naver_lowest_price") &&
       dataStore.includes("payload.stock_count ?? existing.stock_count") &&
+      dataStore.includes("isUsableProductImageUrl(existing.image_url)") &&
       dataStore.includes("isUsableAffiliateUrl(existing.affiliate_url)") &&
       dataStore.includes("...preserveExistingReviewFields(existing, payload)") &&
       dataStore.includes("...preserveExistingReviewFields(memoryProducts[existingIndex], payload)"),
-    "hourly resourcing keeps manual return price, condition, stock, public notes, and product-level affiliate links when providers return weak or empty values",
+    "hourly resourcing keeps manual return price, condition, stock, public notes, verified images, and product-level affiliate links when providers return weak or empty values",
     "required"
   );
 }

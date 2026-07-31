@@ -4,6 +4,7 @@ import path from "path";
 import { isGenericCoupangLandingUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { demoCatalog } from "@/lib/demoCatalog";
 import { getCustomerPublishReadiness, getDealQuality } from "@/lib/quality";
+import { isUsableProductImageUrl } from "@/lib/productImageUrl";
 import { calculateDealScore } from "@/lib/scoring";
 import { isSourcingExecutionRun } from "@/lib/sourcingRunKinds";
 import { getSupabaseServiceClient } from "@/lib/supabase";
@@ -156,6 +157,7 @@ function preserveExistingReviewFields(existing: SourcedProduct, payload: Sourced
         : payload.condition_grade,
     admin_memo: existing.admin_memo,
     public_note: existing.public_note,
+    image_url: isUsableProductImageUrl(existing.image_url) ? existing.image_url : payload.image_url,
     affiliate_url: isUsableAffiliateUrl(existing.affiliate_url) ? existing.affiliate_url : payload.affiliate_url
   };
 }

@@ -5,6 +5,7 @@ import { parseSpecsFromTitle } from "@/lib/specParser";
 import { toNumberOrNull } from "@/lib/format";
 import { getCustomerPublishReadiness } from "@/lib/quality";
 import { getCoupangPartnersLinkIssue, isApprovalSampleAffiliateUrl, isGenericCoupangLandingUrl, isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
+import { getProductImageUrlIssue } from "@/lib/productImageUrl";
 import { isConditionGrade, isSourcingStatus, requireAdmin, sanitizeText } from "@/lib/validators";
 import type { ConditionGrade, ProductWithScore, SourcedProduct, SourcingStatus } from "@/lib/types";
 
@@ -16,7 +17,7 @@ function productMutationErrorResponse(error: unknown) {
 
 function normalizePatch(body: Record<string, unknown>, current: SourcedProduct) {
   const patch: Partial<SourcedProduct> = {};
-  const textFields = ["affiliate_url", "source_url", "coupang_url", "public_note", "admin_memo", "rejection_reason"] as const;
+  const textFields = ["affiliate_url", "source_url", "coupang_url", "image_url", "public_note", "admin_memo", "rejection_reason"] as const;
   const numberFields = ["return_price", "new_price", "naver_lowest_price", "stock_count", "source_price"] as const;
 
   for (const field of textFields) {
@@ -55,6 +56,14 @@ function invalidAffiliateUrlMessage(value: string | null | undefined) {
     return "테스트, 샘플, dryrun처럼 보이는 파트너스 링크 코드는 저장할 수 없습니다. 쿠팡 파트너스에서 실제 상품별 링크를 다시 생성하세요.";
   }
   return "affiliate_url에는 https://link.coupang.com/a/... 형태의 상품별 쿠팡 파트너스 링크만 저장할 수 있습니다.";
+}
+
+function invalidImageUrlMessage(value: string | null | undefined) {
+  const issue = getProductImageUrlIssue(value);
+  if (issue === "IMAGE_URL_TOO_LONG") return "상품 이미지 URL은 2,000자 이하로 입력하세요.";
+  if (issue === "IMAGE_URL_PUBLIC_HOST_REQUIRED") return "상품 이미지는 localhost나 내부망 주소가 아닌 공개 호스트의 URL이어야 합니다.";
+  if (issue === "IMAGE_URL_CREDENTIALS_OR_PORT_NOT_ALLOWED") return "상품 이미지 URL에는 계정 정보나 별도 포트를 포함할 수 없습니다.";
+  return "상품 이미지는 https://로 시작하는 공개 이미지 URL을 입력하세요.";
 }
 
 function projectProductForPublishCheck(current: ProductWithScore, patch: Partial<SourcedProduct>): ProductWithScore {
@@ -114,6 +123,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const action = typeof body.action === "string" ? body.action : null;
     let patch = normalizePatch(body, current);
     const hasAffiliateUrlPatch = "affiliate_url" in body;
+    const hasImageUrlPatch = "image_url" in body;
 
   if (hasAffiliateUrlPatch && isApprovalSampleAffiliateUrl(patch.affiliate_url)) {
     return NextResponse.json(
@@ -129,6 +139,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       {
         error: "INVALID_AFFILIATE_URL_FOR_PRODUCT",
         message: invalidAffiliateUrlMessage(patch.affiliate_url)
+      },
+      { status: 400 }
+    );
+  }
+  if (hasImageUrlPatch && patch.image_url && getProductImageUrlIssue(patch.image_url)) {
+    return NextResponse.json(
+      {
+        error: "INVALID_IMAGE_URL_FOR_PRODUCT",
+        message: invalidImageUrlMessage(patch.image_url)
       },
       { status: 400 }
     );
