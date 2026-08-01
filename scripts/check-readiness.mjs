@@ -247,6 +247,7 @@ const requiredFiles = [
   "scripts/verify-scheduled-affiliate-backfill.mjs",
   "scripts/verify-affiliate-identity.mjs",
   "scripts/verify-bootstrap-catalog-runtime.mjs",
+  "scripts/verify-supabase-config-guard.mjs",
   "scripts/verify-product-distribution-kit.mjs",
   "scripts/verify-launch-capability-policy.mjs",
   "scripts/verify-manual-import-safety.mjs",
@@ -467,6 +468,16 @@ if (
       panel.includes("Value 복사") &&
       panel.includes("Supabase 운영 DB 연결이 여전히 필요합니다"),
     "admin can export a bounded reviewed catalog without treating the temporary bridge as a replacement for Supabase",
+    "required"
+  );
+  check(
+    "supabase: invalid environment guard",
+    fileExists("lib/supabase.ts") &&
+      fileExists("scripts/verify-supabase-config-guard.mjs") &&
+      packageJson.includes('"supabase-config:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-supabase-config-guard.mjs"') &&
+      readText("lib/supabase.ts").includes("getSupabaseKey") &&
+      readText("lib/supabase.ts").includes("getValidSupabaseUrl"),
+    "Supabase clients remain disabled for missing, invalid, short, or masked deployment values",
     "required"
   );
 }

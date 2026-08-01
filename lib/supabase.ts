@@ -10,6 +10,12 @@ function getEnvValue(name: string) {
   return value;
 }
 
+function getSupabaseKey(name: string) {
+  const value = getEnvValue(name);
+  if (!value || value.length < 40 || /\s/.test(value)) return null;
+  return value;
+}
+
 function getValidSupabaseUrl() {
   const value = getEnvValue("NEXT_PUBLIC_SUPABASE_URL");
   if (!value) return null;
@@ -26,14 +32,14 @@ function getValidSupabaseUrl() {
 export function hasSupabaseConfig() {
   return Boolean(
     getValidSupabaseUrl() &&
-      getEnvValue("NEXT_PUBLIC_SUPABASE_ANON_KEY") &&
-      getEnvValue("SUPABASE_SERVICE_ROLE_KEY")
+      getSupabaseKey("NEXT_PUBLIC_SUPABASE_ANON_KEY") &&
+      getSupabaseKey("SUPABASE_SERVICE_ROLE_KEY")
   );
 }
 
 export function getSupabaseBrowserClient() {
   const url = getValidSupabaseUrl();
-  const key = getEnvValue("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  const key = getSupabaseKey("NEXT_PUBLIC_SUPABASE_ANON_KEY");
   if (!url || !key) return null;
   if (!browserClient) browserClient = createClient(url, key);
   return browserClient;
@@ -45,7 +51,7 @@ export function getSupabaseAnonClient() {
 
 export function getSupabaseServiceClient() {
   const url = getValidSupabaseUrl();
-  const key = getEnvValue("SUPABASE_SERVICE_ROLE_KEY");
+  const key = getSupabaseKey("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !key) return null;
   if (!serviceClient) {
     serviceClient = createClient(url, key, {
