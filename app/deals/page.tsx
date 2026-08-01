@@ -32,8 +32,8 @@ import type { Category, ConditionGrade, ProductWithScore } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 const canonicalUrl = `${getSiteUrl()}/deals`;
-const pageTitle = "검수된 반품·리퍼 딜 비교";
-const pageDescription = "반품·리퍼 상품의 가격, 상태, 반품 근거와 상품별 쿠팡 파트너스 링크를 한곳에서 비교하세요.";
+const pageTitle = "검수된 반품·리퍼·가격 비교 딜";
+const pageDescription = "반품 정보가 확인된 상품과 반품 정보 확인필요 상품을 구분해 가격, 스펙, 주의점과 쿠팡 파트너스 링크를 비교하세요.";
 
 export const metadata: Metadata = {
   title: pageTitle,
@@ -342,7 +342,7 @@ export default async function DealsPage({
           ["평균 점수", `${averageScore}점`],
           ["최대 할인", formatPercent(bestDiscount)],
           ["최저 판매가", formatPrice(cheapest)],
-          ["반품 확인", `${verifiedCount.toLocaleString("ko-KR")}개`]
+          ["반품 근거 확인", `${verifiedCount.toLocaleString("ko-KR")}개`]
         ].map(([label, value]) => (
           <div key={label} className="rounded-lg border border-line bg-white p-4 shadow-soft">
             <p className="text-xs font-black text-steel">{label}</p>

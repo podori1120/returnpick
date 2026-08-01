@@ -1,16 +1,18 @@
 import { formatPercent, formatPrice } from "@/lib/format";
 import { getAppliedDiscountRate, getPriceReferenceInfo } from "@/lib/priceReference";
+import { getDealPriceLabel } from "@/lib/quality";
 import type { SourcedProduct } from "@/lib/types";
 
 export default function PriceComparison({ product }: { product: SourcedProduct }) {
   const reference = getPriceReferenceInfo(product);
   const discount = getAppliedDiscountRate(product);
+  const dealPrice = product.return_price ?? product.source_price ?? product.new_price;
 
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
       <div className="rounded-lg border border-line bg-white p-4">
-        <p className="text-xs font-bold text-steel">반품가</p>
-        <p className="mt-1 text-lg font-black">{formatPrice(product.return_price)}</p>
+        <p className="text-xs font-bold text-steel">{getDealPriceLabel(product)}</p>
+        <p className="mt-1 text-lg font-black">{formatPrice(dealPrice)}</p>
       </div>
       <div className="rounded-lg border border-line bg-white p-4">
         <p className="text-xs font-bold text-steel">수집 당시 가격</p>

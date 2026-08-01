@@ -23,6 +23,24 @@ export interface CustomerPublishReadiness {
   warnings: string[];
 }
 
+export function hasVerifiedReturnEvidence(product: Pick<ProductWithScore, "return_price" | "condition_grade">) {
+  return Boolean(product.return_price && !["확인필요", "알수없음"].includes(product.condition_grade));
+}
+
+export function getReturnEvidenceLabel(product: Pick<ProductWithScore, "return_price" | "condition_grade">) {
+  if (hasVerifiedReturnEvidence(product)) return "반품 근거 확인";
+  if (product.return_price) return "반품등급 확인필요";
+  if (product.condition_grade === "확인필요" || product.condition_grade === "알수없음") return "반품 정보 확인필요";
+  return "반품가 확인필요";
+}
+
+export function getDealPriceLabel(product: Pick<ProductWithScore, "return_price" | "source_price" | "new_price">) {
+  if (product.return_price) return "반품가";
+  if (product.source_price) return "현재 판매가";
+  if (product.new_price) return "새상품가";
+  return "가격";
+}
+
 function clamp(value: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, value));
 }
@@ -35,14 +53,15 @@ export function getDealQuality(product: ProductWithScore): DealQuality {
   const referenceInfo = getPriceReferenceInfo(product);
   const referencePrice = referenceInfo.value;
   const trustedNaverPrice = referenceInfo.naverTrust.trustedPrice;
-  const dealPrice = product.return_price ?? product.source_price;
+  const dealPrice = product.return_price ?? product.source_price ?? product.new_price;
   const discountRate = calculateDiscountRate(referencePrice, dealPrice);
 
-  if (!product.return_price) blockers.push("반품가 확인 필요");
-  if (product.condition_grade === "확인필요" || product.condition_grade === "알수없음") blockers.push("반품등급 확인 필요");
+  if (!dealPrice) blockers.push("판매 가격 확인 필요");
   if (trustedNaverPrice && dealPrice && dealPrice > trustedNaverPrice) blockers.push("네이버 최저가 대비 가격 불리");
   if (product.condition_grade === "중" && (dealPrice ?? 0) >= 1_000_000) blockers.push("고가 반품-중 조합");
 
+  if (!product.return_price) warnings.push("반품가 확인 필요");
+  if (product.condition_grade === "확인필요" || product.condition_grade === "알수없음") warnings.push("반품등급 확인 필요");
   if (!isUsableAffiliateUrl(product.affiliate_url)) warnings.push("파트너스 URL 보완 권장");
   if (referenceInfo.naverTrust.status === "unverified") warnings.push("네이버 최저가 동일 상품 검증 필요");
   if (referenceInfo.naverTrust.status === "missing") warnings.push("네이버 최저가 없음");

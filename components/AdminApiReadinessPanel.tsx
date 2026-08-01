@@ -280,7 +280,7 @@ function publicQualityActionButtonsFromDetail(detail?: Record<string, unknown>) 
     actions.push({
       label: "공개 보강 후보로 이동",
       anchor: "admin-candidate-review",
-      helper: "반품가, 등급, 이미지, 설명 같은 공개 품질 blocker를 확인합니다."
+      helper: "가격·이미지·상품별 링크 같은 공개 품질 blocker와 반품 정보 확인필요 경고를 확인합니다."
     });
   }
 

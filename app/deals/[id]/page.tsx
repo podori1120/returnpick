@@ -8,6 +8,7 @@ import { formatPrice } from "@/lib/format";
 import { isUsableProductImageUrl } from "@/lib/productImageUrl";
 import { isPublicDealReady } from "@/lib/publicDeal";
 import { getPriceReferenceInfo } from "@/lib/priceReference";
+import { getDealPriceLabel, getReturnEvidenceLabel } from "@/lib/quality";
 import { getSiteUrl } from "@/lib/siteUrl";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +33,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
   const title = `${product.title} | 리턴픽 반품 딜`;
   const reference = getPriceReferenceInfo(product);
-  const description = `${getCategoryLabel(product.category)} 반품 추천 후보입니다. 반품가 ${formatPrice(product.return_price)}, ${reference.label} ${formatPrice(reference.value)}를 리턴픽 기준으로 검수했습니다.`;
+  const dealPrice = product.return_price ?? product.source_price ?? product.new_price;
+  const description = `${getCategoryLabel(product.category)} 검수 상품입니다. ${getDealPriceLabel(product)} ${formatPrice(dealPrice)}, ${getReturnEvidenceLabel(product)}, ${reference.label} ${formatPrice(reference.value)}를 리턴픽 기준으로 확인했습니다.`;
 
   return {
     title,

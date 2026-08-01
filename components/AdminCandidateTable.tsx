@@ -187,7 +187,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
       .filter((product) => (query ? product.title.toLowerCase().includes(query.toLowerCase()) : true))
       .filter((product) => (product.latest_score?.total_score ?? 0) >= minScoreValue)
       .filter((product) => {
-        const price = product.return_price ?? product.source_price ?? 0;
+        const price = product.return_price ?? product.source_price ?? product.new_price ?? 0;
         return price >= minPriceValue && price <= maxPriceValue;
       })
       .sort((a, b) => {
@@ -590,7 +590,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
                     <td className="px-3 py-3">
                       <ScoreBadge score={product.latest_score?.total_score} />
                     </td>
-                    <td className="px-3 py-3 font-bold">{formatPrice(product.return_price ?? product.source_price)}</td>
+                    <td className="px-3 py-3 font-bold">{formatPrice(product.return_price ?? product.source_price ?? product.new_price)}</td>
                     <td className="px-3 py-3 font-bold">{formatPercent(discount)}</td>
                     <td className="px-3 py-3">{product.sourcing_status}</td>
                     <td className="px-3 py-3 text-xs font-bold text-steel">

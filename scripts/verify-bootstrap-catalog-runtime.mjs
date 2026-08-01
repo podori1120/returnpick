@@ -13,7 +13,7 @@ if (!fs.existsSync(buildIdPath)) {
   throw new Error("NEXT_BUILD_REQUIRED: run npm run build before bootstrap-catalog:check");
 }
 
-function catalogValue({ resolvedProductId = "9200000001", identityStatus } = {}) {
+function catalogValue({ resolvedProductId = "9200000001", identityStatus, includeReturnEvidence = true } = {}) {
   const now = new Date().toISOString();
   return JSON.stringify({
     version: 1,
@@ -33,10 +33,10 @@ function catalogValue({ resolvedProductId = "9200000001", identityStatus } = {})
         coupang_url: "https://www.coupang.com/vp/products/9200000001?itemId=27000000001",
         affiliate_url: affiliateUrl,
         source_price: 150000,
-        return_price: 150000,
+        return_price: includeReturnEvidence ? 150000 : null,
         new_price: 220000,
         naver_lowest_price: null,
-        condition_grade: "최상",
+        condition_grade: includeReturnEvidence ? "최상" : "확인필요",
         stock_count: 2,
         spec_json: { size: "27인치", resolution: "QHD", refresh_rate: "144Hz" },
         raw_json: {
@@ -143,4 +143,18 @@ await withServer(3218, catalogValue({ resolvedProductId: "9999999999", identityS
   assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
 });
 
-console.log("Bootstrap catalog runtime checks passed: verified product hydration and stale or forged affiliate identity rejection.");
+await withServer(3219, catalogValue({ includeReturnEvidence: false }), async (baseUrl) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.match(dealsHtml, new RegExp(productTitle));
+  assert.match(dealsHtml, /반품 정보 확인필요/);
+
+  const detail = await fetch(`${baseUrl}/deals/${productId}`);
+  const detailHtml = await detail.text();
+  assert.equal(detail.status, 200);
+  assert.match(detailHtml, /현재 판매가/);
+  assert.match(detailHtml, /반품 정보가 확인되지 않은 항목은 쿠팡 상품 페이지에서 최종 확인하세요/);
+});
+
+console.log("Bootstrap catalog runtime checks passed: verified product hydration, price-only publication, and stale or forged affiliate identity rejection.");

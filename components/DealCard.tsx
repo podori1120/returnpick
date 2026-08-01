@@ -3,7 +3,7 @@ import { AlertTriangle, ArrowRight, CheckCircle2 } from "lucide-react";
 import { getCategoryLabel } from "@/lib/category";
 import { getDealPrice, getDiscountRate, getPrimaryUseCase, getReferencePrice } from "@/lib/dealIntelligence";
 import { formatPercent, formatPrice } from "@/lib/format";
-import { getDealQuality } from "@/lib/quality";
+import { getDealQuality, getReturnEvidenceLabel } from "@/lib/quality";
 import { getPurchaseDecision } from "@/lib/purchaseDecision";
 import { getDealFreshness } from "@/lib/dealFreshness";
 import { getLatestScore } from "@/lib/scoring";
@@ -22,7 +22,6 @@ export default function DealCard({ product }: { product: ProductWithScore }) {
   const primaryUseCase = getPrimaryUseCase(product);
   const decision = getPurchaseDecision(product);
   const freshness = getDealFreshness(product);
-  const isVerifiedReturn = Boolean(product.return_price && !["확인필요", "알수없음"].includes(product.condition_grade));
   const firstReason = score?.reasons?.[0] ?? product.public_note;
   const primaryCheck = quality.blockers[0] ?? quality.warnings[0];
   const riskCount = score?.risk_flags?.length ?? 0;
@@ -51,8 +50,8 @@ export default function DealCard({ product }: { product: ProductWithScore }) {
         <div className="flex flex-wrap items-center gap-2">
           <VerdictBadge verdict={score?.verdict} />
           <span className="rounded-md bg-mist px-2.5 py-1 text-xs font-bold text-steel">상태 {product.condition_grade}</span>
-          <span className={isVerifiedReturn ? "rounded-md bg-pine/10 px-2.5 py-1 text-xs font-bold text-pine" : "rounded-md bg-coral/10 px-2.5 py-1 text-xs font-bold text-coral"}>
-            {isVerifiedReturn ? "반품 확인" : "확인필요"}
+          <span className={product.return_price && !["확인필요", "알수없음"].includes(product.condition_grade) ? "rounded-md bg-pine/10 px-2.5 py-1 text-xs font-bold text-pine" : "rounded-md bg-coral/10 px-2.5 py-1 text-xs font-bold text-coral"}>
+            {getReturnEvidenceLabel(product)}
           </span>
           <span className="rounded-md bg-mist px-2.5 py-1 text-xs font-bold text-steel">
             {quality.label} {quality.confidence}

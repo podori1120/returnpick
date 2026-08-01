@@ -3846,6 +3846,24 @@ if (fileExists("lib/publicDeal.ts")) {
   );
 }
 
+if (fileExists("lib/quality.ts") && fileExists("components/DealDetail.tsx") && fileExists("components/PriceComparison.tsx")) {
+  const quality = readText("lib/quality.ts");
+  const dealDetail = readText("components/DealDetail.tsx");
+  const priceComparison = readText("components/PriceComparison.tsx");
+  check(
+    "public deals: price-only return evidence mode",
+    quality.includes('if (!dealPrice) blockers.push("판매 가격 확인 필요")') &&
+      quality.includes('warnings.push("반품가 확인 필요")') &&
+      quality.includes('warnings.push("반품등급 확인 필요")') &&
+      quality.includes('return "현재 판매가"') &&
+      dealDetail.includes("getDealPriceLabel(product)") &&
+      dealDetail.includes("반품 정보가 확인되지 않은 항목은 쿠팡 상품 페이지에서 최종 확인하세요") &&
+      priceComparison.includes("getDealPriceLabel(product)"),
+    "products with a verified selling price but missing return evidence can be published with explicit customer-facing warnings; products without any price remain blocked",
+    "required"
+  );
+}
+
 if (fileExists("lib/telegram.ts")) {
   const telegram = readText("lib/telegram.ts");
   check(
@@ -3885,7 +3903,8 @@ if (fileExists("lib/telegram.ts")) {
       telegram.includes("return fitTelegramMessage(message, detailUrl)") &&
       telegram.includes("\uC81C\uD734 \uC548\uB0B4:") &&
       telegram.includes("\uC790\uC138\uD788 \uBCF4\uAE30:") &&
-      telegram.includes("\uBC18\uD488\uAC00:") &&
+      telegram.includes("getDealPriceLabel") &&
+      telegram.includes("getReturnEvidenceLabel") &&
       telegram.includes("\uCFE0\uD321 \uD30C\uD2B8\uB108\uC2A4 \uD65C\uB3D9\uC758 \uC77C\uD658"),
     "Telegram message generation stays below Telegram length limits while preserving readable Korean copy, detail URL, and affiliate notice",
     "required"

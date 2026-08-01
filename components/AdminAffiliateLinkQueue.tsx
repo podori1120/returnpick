@@ -798,7 +798,7 @@ export default function AdminAffiliateLinkQueue({
                   </div>
                   <h3 className="mt-2 line-clamp-2 text-sm font-black">{product.title}</h3>
                   <p className="mt-1 text-xs font-bold text-steel">
-                    판매가 {formatPrice(product.return_price ?? product.source_price)} · 네이버 {naverPrice.trustedPrice ? formatPrice(naverPrice.trustedPrice) : naverPrice.label} · 재고{" "}
+                    판매가 {formatPrice(product.return_price ?? product.source_price ?? product.new_price)} · 네이버 {naverPrice.trustedPrice ? formatPrice(naverPrice.trustedPrice) : naverPrice.label} · 재고{" "}
                     {product.stock_count ?? "확인필요"}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">

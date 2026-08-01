@@ -153,7 +153,7 @@ export function calculateDealScore(product: SourcedProduct): DealScore {
   const referenceInfo = getPriceReferenceInfo(product);
   const referencePrice = referenceInfo.value;
   const trustedNaverPrice = referenceInfo.naverTrust.trustedPrice;
-  const dealPrice = product.return_price ?? product.source_price;
+  const dealPrice = product.return_price ?? product.source_price ?? product.new_price;
   const hasEnoughPrice = Boolean(referencePrice && dealPrice);
   const discountRate = calculateDiscountRate(referencePrice, dealPrice);
   const priceScore = scorePrice(discountRate, hasEnoughPrice);
@@ -248,7 +248,7 @@ export function getLatestScore(product: ProductWithScore) {
   if (!stored) return calculateDealScore(product);
 
   const referenceInfo = getPriceReferenceInfo(product);
-  const dealPrice = product.return_price ?? product.source_price ?? null;
+  const dealPrice = product.return_price ?? product.source_price ?? product.new_price ?? null;
   const detail = stored.score_detail ?? {};
   const scoreIsCurrent =
     detail.reference_price === (referenceInfo.value ?? null) &&

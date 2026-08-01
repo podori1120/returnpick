@@ -4,6 +4,7 @@ import { buildEditorialPickTelegramMessage } from "@/lib/editorialCampaign";
 import { formatPercent, formatPrice } from "@/lib/format";
 import { isPublicDealReady } from "@/lib/publicDeal";
 import { getAppliedDiscountRate } from "@/lib/priceReference";
+import { getDealPriceLabel, getReturnEvidenceLabel } from "@/lib/quality";
 import { getLatestScore } from "@/lib/scoring";
 import { getSiteUrl } from "@/lib/siteUrl";
 import type { ProductWithScore } from "@/lib/types";
@@ -67,12 +68,14 @@ export function buildTelegramMessage(product: ProductWithScore) {
     ? ["가격과 재고는 변동될 수 있습니다.", "반품등급과 구성품은 구매 전 쿠팡 상품 페이지에서 다시 확인하세요."]
     : ["가격과 재고는 변동될 수 있습니다."];
   const detailUrl = `${siteUrl.replace(/\/$/, "")}/deals/${product.id}?utm_source=telegram`;
+  const dealPrice = product.return_price ?? product.source_price ?? product.new_price;
 
   const message = [
     `[리턴픽 ${score?.verdict ?? "추천"}] ${score?.total_score ?? "-"}점`,
     "",
     product.title,
-    `반품가: ${formatPrice(product.return_price)}`,
+    `${getDealPriceLabel(product)}: ${formatPrice(dealPrice)}`,
+    `반품 정보: ${getReturnEvidenceLabel(product)}`,
     `할인율: 약 ${formatPercent(discountRate)}`,
     "",
     "좋은 점:",

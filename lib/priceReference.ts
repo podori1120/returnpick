@@ -61,6 +61,6 @@ export function getPriceReferenceInfo(product: PriceReferenceProduct) {
 
 export function getAppliedDiscountRate(product: PriceReferenceProduct) {
   const reference = getPriceReferenceInfo(product);
-  const dealPrice = product.return_price ?? product.source_price;
+  const dealPrice = product.return_price ?? product.source_price ?? product.new_price;
   return calculateDiscountRate(reference.value, dealPrice);
 }

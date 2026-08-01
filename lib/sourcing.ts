@@ -34,7 +34,7 @@ function isWithinKeywordPrice(product: ProviderProduct, keyword: SourcingKeyword
 function classifyProduct(product: SourcedProduct, minDiscountRate: number | null): SourcingStatus {
   const score = calculateDealScore(product);
   const reference = getPriceReferenceInfo(product).value;
-  const deal = product.return_price ?? product.source_price;
+  const deal = product.return_price ?? product.source_price ?? product.new_price;
   const discountRate = calculateDiscountRate(reference, deal);
   const meaningfulDiscount = discountRate != null && discountRate >= (minDiscountRate ?? 0.12);
 

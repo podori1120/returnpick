@@ -17,6 +17,7 @@ import { getCategoryLabel } from "@/lib/category";
 import { getCoupangOutboundLink } from "@/lib/coupangLink";
 import { getDiscountRate, getUseCaseMatches } from "@/lib/dealIntelligence";
 import { formatPercent, formatPrice } from "@/lib/format";
+import { getDealPriceLabel, getReturnEvidenceLabel } from "@/lib/quality";
 import { getLatestScore } from "@/lib/scoring";
 import type { ProductWithScore } from "@/lib/types";
 import { getSiteUrl } from "@/lib/siteUrl";
@@ -30,6 +31,8 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
   const useCases = getUseCaseMatches(product).slice(0, 4);
   const discount = getDiscountRate(product);
   const priceReference = getPriceReferenceInfo(product);
+  const dealPrice = product.return_price ?? product.source_price ?? product.new_price;
+  const dealPriceLabel = getDealPriceLabel(product);
   const canonicalUrl = `${getSiteUrl()}/deals/${product.id}`;
 
   return (
@@ -50,14 +53,17 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
                 <span className="rounded-md bg-pine/10 px-2.5 py-1 text-xs font-black text-pine">{getCategoryLabel(product.category)}</span>
                 <VerdictBadge verdict={score?.verdict} />
                 <span className="rounded-md bg-mist px-2.5 py-1 text-xs font-bold text-steel">반품등급 {product.condition_grade}</span>
+                <span className={product.return_price && !["확인필요", "알수없음"].includes(product.condition_grade) ? "rounded-md bg-pine/10 px-2.5 py-1 text-xs font-bold text-pine" : "rounded-md bg-coral/10 px-2.5 py-1 text-xs font-bold text-coral"}>
+                  {getReturnEvidenceLabel(product)}
+                </span>
                 <span className="rounded-md bg-mist px-2.5 py-1 text-xs font-bold text-steel">할인율 {formatPercent(discount)}</span>
               </div>
               <h1 className="text-2xl font-black leading-tight sm:text-3xl">{product.title}</h1>
               {product.public_note ? <p className="text-sm font-semibold leading-6 text-steel">{product.public_note}</p> : null}
               <div className="grid grid-cols-3 divide-x divide-line border-y border-line py-3">
                 <div className="min-w-0 pr-3">
-                  <p className="text-xs font-bold text-steel">리턴픽 표시가</p>
-                  <p className="mt-1 truncate text-base font-black sm:text-lg">{formatPrice(product.return_price)}</p>
+                  <p className="text-xs font-bold text-steel">{dealPriceLabel}</p>
+                  <p className="mt-1 truncate text-base font-black sm:text-lg">{formatPrice(dealPrice)}</p>
                 </div>
                 <div className="min-w-0 px-3">
                   <p className="text-xs font-bold text-steel">비교 기준가</p>
@@ -72,6 +78,9 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
               </div>
               <p className="text-xs font-semibold leading-5 text-steel">
                 {priceReference.note} 가격·재고·배송 조건은 구매 직전 쿠팡 상품 페이지에서 최종 확인하세요.
+              </p>
+              <p className={product.return_price && !["확인필요", "알수없음"].includes(product.condition_grade) ? "rounded-lg bg-pine/5 p-3 text-xs font-bold leading-5 text-pine" : "rounded-lg bg-coral/5 p-3 text-xs font-bold leading-5 text-coral"}>
+                {getReturnEvidenceLabel(product)}. 반품 정보가 확인되지 않은 항목은 쿠팡 상품 페이지에서 최종 확인하세요.
               </p>
               <div className="flex flex-wrap gap-2">
                 <CompareButton productId={product.id} title={product.title} />
@@ -175,8 +184,8 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
             </div>
             <div className="mt-5 space-y-3 text-sm">
               <div className="flex justify-between gap-3">
-                <span className="font-bold text-steel">반품가</span>
-                <span className="font-black">{formatPrice(product.return_price)}</span>
+                <span className="font-bold text-steel">{dealPriceLabel}</span>
+                <span className="font-black">{formatPrice(dealPrice)}</span>
               </div>
               <div className="flex justify-between gap-3">
                 <span className="font-bold text-steel">재고</span>

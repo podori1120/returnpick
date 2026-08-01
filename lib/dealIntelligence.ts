@@ -62,7 +62,7 @@ export function getReferencePrice(product: ProductWithScore) {
 }
 
 export function getDealPrice(product: ProductWithScore) {
-  return product.return_price ?? product.source_price ?? null;
+  return product.return_price ?? product.source_price ?? product.new_price ?? null;
 }
 
 export function getDiscountRate(product: ProductWithScore) {

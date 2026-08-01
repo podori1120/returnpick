@@ -1060,7 +1060,7 @@ export async function getAdminMetrics() {
   const missingReturnPrice = products.filter((product) => product.return_price == null).length;
   const missingAffiliateUrl = hiddenPublishedWithoutAffiliate;
   const badPrice = products.filter((product) => {
-    const dealPrice = product.return_price ?? product.source_price;
+    const dealPrice = product.return_price ?? product.source_price ?? product.new_price;
     const trustedNaverPrice = getNaverPriceTrust(product).trustedPrice;
     return Boolean(trustedNaverPrice && dealPrice && dealPrice > trustedNaverPrice);
   }).length;
