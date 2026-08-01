@@ -20,6 +20,7 @@ import { formatPercent, formatPrice } from "@/lib/format";
 import { getLatestScore } from "@/lib/scoring";
 import type { ProductWithScore } from "@/lib/types";
 import { getSiteUrl } from "@/lib/siteUrl";
+import { getPriceReferenceInfo } from "@/lib/priceReference";
 import DealShareBar from "@/components/DealShareBar";
 
 export default function DealDetail({ product, relatedProducts = [] }: { product: ProductWithScore; relatedProducts?: ProductWithScore[] }) {
@@ -28,6 +29,7 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
   const buyUrl = outboundLink.href;
   const useCases = getUseCaseMatches(product).slice(0, 4);
   const discount = getDiscountRate(product);
+  const priceReference = getPriceReferenceInfo(product);
   const canonicalUrl = `${getSiteUrl()}/deals/${product.id}`;
 
   return (
@@ -52,6 +54,25 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
               </div>
               <h1 className="text-2xl font-black leading-tight sm:text-3xl">{product.title}</h1>
               {product.public_note ? <p className="text-sm font-semibold leading-6 text-steel">{product.public_note}</p> : null}
+              <div className="grid grid-cols-3 divide-x divide-line border-y border-line py-3">
+                <div className="min-w-0 pr-3">
+                  <p className="text-xs font-bold text-steel">리턴픽 표시가</p>
+                  <p className="mt-1 truncate text-base font-black sm:text-lg">{formatPrice(product.return_price)}</p>
+                </div>
+                <div className="min-w-0 px-3">
+                  <p className="text-xs font-bold text-steel">비교 기준가</p>
+                  <p className="mt-1 truncate text-base font-black sm:text-lg">{formatPrice(priceReference.value)}</p>
+                  <p className="mt-0.5 truncate text-[11px] font-bold text-steel">{priceReference.label}</p>
+                </div>
+                <div className="min-w-0 pl-3">
+                  <p className="text-xs font-bold text-steel">가격 판단</p>
+                  <p className="mt-1 truncate text-base font-black text-pine sm:text-lg">{formatPercent(discount)}</p>
+                  <p className="mt-0.5 truncate text-[11px] font-bold text-steel">수집 시점 기준</p>
+                </div>
+              </div>
+              <p className="text-xs font-semibold leading-5 text-steel">
+                {priceReference.note} 가격·재고·배송 조건은 구매 직전 쿠팡 상품 페이지에서 최종 확인하세요.
+              </p>
               <div className="flex flex-wrap gap-2">
                 <CompareButton productId={product.id} title={product.title} />
                 <SavedDealButton productId={product.id} title={product.title} />
