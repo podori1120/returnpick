@@ -97,7 +97,6 @@ const adminUiRequiredText = [
   "유입 채널별 전환",
   "상품별 채널 배포 키트",
   "/api/admin/content-kit?product_id=",
-  "deal_distribution",
   "링크 보강 큐로 이동",
   "품질 보강 후보로 이동",
   "/api/admin/session",
