@@ -1,4 +1,6 @@
 import { buildCoupangSearchUrl, cleanCoupangSearchQuery, isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
+import { assessAffiliateIdentity, getAffiliateIdentityReadiness, mergeAffiliateIdentityRecord } from "@/lib/affiliateIdentity";
+import { verifyCoupangAffiliateLinkResolution } from "@/lib/coupangAffiliateLinkVerifier";
 import { listProducts, updateProduct } from "@/lib/dataStore";
 import { createCoupangDeeplink, searchCoupangProducts } from "@/lib/providers/coupangPartnersProvider";
 import type { ProductWithScore, SourcedProduct } from "@/lib/types";
@@ -27,6 +29,8 @@ export type AffiliateBackfillItem = {
   affiliate_url?: string | null;
   matched_title?: string | null;
   match?: AffiliateBackfillMatch | null;
+  identity_status?: string | null;
+  identity_code?: string | null;
 };
 
 export type AffiliateBackfillResult = {
@@ -179,6 +183,19 @@ async function resolveAffiliateLink(product: ProductWithScore) {
   const relevanceTokens = buildAffiliateBackfillRelevanceTokens(product);
   const minRelevance = relevanceTokens.length ? Math.min(2, relevanceTokens.length) : 0;
   const directProductUrl = candidateProductUrls(product)[0];
+  const existingAffiliateUrl = isUsableAffiliateUrl(product.affiliate_url) ? product.affiliate_url : null;
+  if (existingAffiliateUrl) {
+    return {
+      status: "provided" as const,
+      affiliateUrl: existingAffiliateUrl,
+      query,
+      sourceUrl: directProductUrl ?? null,
+      manualSearchUrl,
+      matchedTitle: product.title,
+      match: null,
+      reason: undefined
+    };
+  }
   let directFailureReason: string | undefined;
   if (directProductUrl) {
     const deeplink = await createCoupangDeeplink(directProductUrl);
@@ -312,11 +329,11 @@ async function resolveAffiliateLink(product: ProductWithScore) {
 export async function backfillCoupangAffiliateLinks(options?: { limit?: number; dryRun?: boolean; timeBudgetMs?: number }) {
   const limit = Math.min(Math.max(Number(options?.limit ?? 20), 1), 80);
   const dryRun = Boolean(options?.dryRun);
-  const timeBudgetMs = Math.max(0, Math.floor(Number(options?.timeBudgetMs ?? 0)));
+  const timeBudgetMs = Math.min(55_000, Math.max(0, Math.floor(Number(options?.timeBudgetMs ?? 0))));
   const startedAt = Date.now();
   const products = await listProducts();
   const targets = products
-    .filter((product) => !isUsableAffiliateUrl(product.affiliate_url))
+    .filter((product) => !isUsableAffiliateUrl(product.affiliate_url) || !getAffiliateIdentityReadiness(product).ready)
     .sort((a, b) => {
       const aPublished = a.is_published || a.sourcing_status === "published" ? 1 : 0;
       const bPublished = b.is_published || b.sourcing_status === "published" ? 1 : 0;
@@ -359,7 +376,8 @@ export async function backfillCoupangAffiliateLinks(options?: { limit?: number; 
       break;
     }
 
-    if (!isUsableAffiliateUrl(resolved.affiliateUrl)) {
+    const affiliateUrl = resolved.affiliateUrl;
+    if (typeof affiliateUrl !== "string" || !isUsableAffiliateUrl(affiliateUrl)) {
       const isError = resolved.status === "error";
       if (isError) result.error_count += 1;
       else result.skipped_count += 1;
@@ -377,22 +395,48 @@ export async function backfillCoupangAffiliateLinks(options?: { limit?: number; 
       continue;
     }
 
+    if (timeBudgetMs > 0 && Date.now() - startedAt >= timeBudgetMs) {
+      result.timed_out = true;
+      break;
+    }
+
+    const verification = await verifyCoupangAffiliateLinkResolution(affiliateUrl);
+    const identity = assessAffiliateIdentity({
+      product,
+      affiliateUrl,
+      resolvedProductId: verification.product_id,
+      resolutionCode: verification.code,
+      checkedAt: verification.checked_at
+    });
+    const identityReason =
+      identity.status === "MATCH"
+        ? undefined
+        : identity.status === "MISMATCH"
+          ? "AFFILIATE_TARGET_MISMATCH"
+          : "AFFILIATE_IDENTITY_VERIFICATION_REQUIRED";
+
     if (!dryRun) {
       try {
         await updateProduct(product.id, {
-          affiliate_url: resolved.affiliateUrl,
+          affiliate_url: affiliateUrl,
           coupang_url: resolved.sourceUrl ?? product.coupang_url,
           source_url: product.source_url ?? resolved.sourceUrl ?? null,
-          raw_json: mergeBackfillRawJson(product, {
-            status: "ok",
-            query: resolved.query,
-            source_url: resolved.sourceUrl ?? null,
-            manual_search_url: resolved.manualSearchUrl ?? null,
-            affiliate_url: resolved.affiliateUrl,
-            matched_title: resolved.matchedTitle ?? null,
-            relevance_tokens: buildAffiliateBackfillRelevanceTokens(product),
-            match: resolved.match ?? null
-          })
+          raw_json: mergeAffiliateIdentityRecord(
+            {
+              raw_json: mergeBackfillRawJson(product, {
+                status: "ok",
+                query: resolved.query,
+                source_url: resolved.sourceUrl ?? null,
+                manual_search_url: resolved.manualSearchUrl ?? null,
+                affiliate_url: affiliateUrl,
+                matched_title: resolved.matchedTitle ?? null,
+                relevance_tokens: buildAffiliateBackfillRelevanceTokens(product),
+                match: resolved.match ?? null,
+                affiliate_verification_response: verification
+              })
+            },
+            identity
+          )
         });
       } catch (error) {
         result.error_count += 1;
@@ -404,7 +448,7 @@ export async function backfillCoupangAffiliateLinks(options?: { limit?: number; 
           query: resolved.query,
           source_url: resolved.sourceUrl,
           manual_search_url: resolved.manualSearchUrl,
-          affiliate_url: resolved.affiliateUrl,
+          affiliate_url: affiliateUrl,
           matched_title: resolved.matchedTitle,
           match: resolved.match ?? null
         });
@@ -420,9 +464,12 @@ export async function backfillCoupangAffiliateLinks(options?: { limit?: number; 
       query: resolved.query,
       source_url: resolved.sourceUrl,
       manual_search_url: resolved.manualSearchUrl,
-      affiliate_url: resolved.affiliateUrl,
+      affiliate_url: affiliateUrl,
       matched_title: resolved.matchedTitle,
-      match: resolved.match ?? null
+      match: resolved.match ?? null,
+      identity_status: identity.status,
+      identity_code: verification.code,
+      ...(identityReason ? { reason: identityReason } : {})
     });
   }
 

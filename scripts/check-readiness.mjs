@@ -3377,6 +3377,16 @@ if (fileExists("lib/affiliateLinkBackfill.ts")) {
     "required"
   );
   check(
+    "affiliate backfill: destination identity verification",
+    affiliateBackfill.includes("getAffiliateIdentityReadiness") &&
+      affiliateBackfill.includes("verifyCoupangAffiliateLinkResolution") &&
+      affiliateBackfill.includes("assessAffiliateIdentity") &&
+      affiliateBackfill.includes("mergeAffiliateIdentityRecord") &&
+      affiliateBackfill.includes("affiliate_verification_response"),
+    "successful product links record a verified Coupang destination before the public quality gate can expose them",
+    "required"
+  );
+  check(
     "affiliate backfill: direct deeplink fallback",
     affiliateBackfill.includes("directDeeplinkFailureReason") &&
       affiliateBackfill.includes("DIRECT_DEEPLINK_FAILED") &&

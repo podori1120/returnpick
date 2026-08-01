@@ -499,7 +499,7 @@ Supabase 운영 DB를 연결하기 전 승인 대기 기간에는 관리자 `승
 
 이미 검수한 후보를 바로 공개해야 하는 경우 `저장한 상품을 바로 게시 상태로 전환`을 켜고 `대량 저장 후 게시`를 실행합니다. 이때도 상품별 쿠팡 파트너스 링크가 검증된 줄만 `published`와 `is_published=true`로 바뀌며, 차단된 줄은 게시하지 않습니다.
 
-쿠팡 파트너스 API 키가 발급된 뒤에는 같은 큐의 `API로 24개 자동 보강` 버튼을 사용할 수 있습니다. 이 기능은 제휴 링크가 없는 기존 후보를 점수순으로 가져와 쿠팡 상품 검색 API로 실제 상품 URL을 찾고, 딥링크 API로 상품별 파트너스 링크를 만든 뒤 `affiliate_url`에 저장합니다. API 키가 없으면 데이터를 임의 생성하지 않고 `API_NOT_CONFIGURED`로 멈춥니다.
+쿠팡 파트너스 API 키가 발급된 뒤에는 같은 큐의 `API로 24개 자동 보강` 버튼을 사용할 수 있습니다. 이 기능은 제휴 링크가 없거나 목적지 확인이 끝나지 않은 기존 후보를 점수순으로 가져와 쿠팡 상품 검색 API로 실제 상품 URL을 찾고, 딥링크 API로 상품별 파트너스 링크를 만든 뒤 `affiliate_url`에 저장합니다. 저장 직후 단축 링크가 원래 쿠팡 상품번호로 이동하는지 자동 확인하고, 일치할 때만 `affiliate_verification`에 `MATCH`를 기록합니다. 링크가 다른 상품으로 이동하거나 쿠팡 요청 제한으로 확인할 수 없으면 링크는 비공개 후보로 남고 관리자 목적지 검수 큐에서 다시 확인해야 합니다. 자동 보강은 절대로 상품을 자동 게시하지 않습니다. API 키가 없으면 데이터를 임의 생성하지 않고 `API_NOT_CONFIGURED`로 멈춥니다.
 
 기존 후보에 들어 있던 `source_url` 또는 `coupang_url`을 바로 딥링크로 바꾸지 못해도 자동 보강은 즉시 포기하지 않고 상품명 기반 쿠팡 검색으로 한 번 더 시도합니다. 이때 직접 딥링크 실패 원인은 `DIRECT_DEEPLINK_FAILED`와 함께 항목별 결과에 남겨, 승인 후 첫 보강에서 URL 문제와 검색 매칭 문제를 구분할 수 있습니다.
 
@@ -678,7 +678,7 @@ AFFILIATE_BACKFILL_LIMIT=10
 
 `CRON_SECRET`은 Vercel 프로젝트 환경변수에 16자 이상 랜덤 문자열로 설정합니다. Vercel Cron이 호출할 때 이 값이 `Authorization: Bearer ...` 헤더로 전달되며, API는 이 헤더가 맞을 때만 실행됩니다. 로컬 개발 환경에서는 `CRON_SECRET`이 없어도 테스트 호출이 가능합니다.
 
-Cron 라우트는 `?probe=1`을 붙이면 인증만 확인하고 실제 소싱·링크 보강·텔레그램 발송은 시작하지 않습니다. `/admin`의 실제 연결 테스트는 `NEXT_PUBLIC_SITE_URL/api/cron/sourcing?probe=1`, `/api/cron/affiliate-backfill?probe=1`, `/api/cron/telegram-digest?probe=1`을 `CRON_SECRET`으로 호출해, 배포 alias와 Cron 인증이 맞는지 첫 가동 전에 확인합니다. `AFFILIATE_BACKFILL_LIMIT`은 매시 링크 보강 최대 건수이며 기본값 10, 최대 20입니다.
+Cron 라우트는 `?probe=1`을 붙이면 인증만 확인하고 실제 소싱·링크 보강·텔레그램 발송은 시작하지 않습니다. `/admin`의 실제 연결 테스트는 `NEXT_PUBLIC_SITE_URL/api/cron/sourcing?probe=1`, `/api/cron/affiliate-backfill?probe=1`, `/api/cron/telegram-digest?probe=1`을 `CRON_SECRET`으로 호출해, 배포 alias와 Cron 인증이 맞는지 첫 가동 전에 확인합니다. `AFFILIATE_BACKFILL_LIMIT`은 매시 링크 보강 최대 건수이며 기본값 10, 최대 20입니다. 링크 보강과 목적지 검증은 한 번에 최대 52초로 제한되며, 남은 후보는 다음 시간 실행으로 넘겨 Vercel 함수 시간 초과가 전체 예약 흐름을 끊지 않도록 합니다.
 
 예약 실행 중 예외가 발생해도 Cron 라우트는 일반 HTML 오류 대신 `CRON_SOURCING_FAILED`, `CRON_AFFILIATE_BACKFILL_FAILED` 또는 `CRON_TELEGRAM_DIGEST_FAILED` JSON을 반환합니다. 응답에는 실행 시각, 작업 종류, 안전하게 잘린 오류 메시지만 포함되며 API 키나 토큰 원문은 노출하지 않습니다.
 

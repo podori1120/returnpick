@@ -16,6 +16,8 @@ const readiness = read("lib/apiReadiness.ts");
 assert.match(scheduler, /runScheduledAffiliateBackfill/);
 assert.match(scheduler, /backfillCoupangAffiliateLinks/);
 assert.match(scheduler, /AFFILIATE_BACKFILL_LIMIT/);
+assert.match(scheduler, /timeBudgetMs = 52_000/);
+assert.match(scheduler, /time_budget_ms: timeBudgetMs/);
 assert.match(route, /cronProbeJson\("affiliate_backfill"\)/);
 assert.match(route, /CRON_AFFILIATE_BACKFILL_FAILED/);
 assert.match(workflow, /\/api\/cron\/sourcing[\s\S]*\/api\/cron\/affiliate-backfill[\s\S]*\/api\/cron\/telegram-digest/);

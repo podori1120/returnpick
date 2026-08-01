@@ -192,6 +192,7 @@ export async function runScheduledSourcing() {
 
 export async function runScheduledAffiliateBackfill() {
   const limit = getScheduledAffiliateBackfillLimit();
+  const timeBudgetMs = 52_000;
   const gate = await getScheduledAutomationGate();
   if (gate.shouldGate) {
     return {
@@ -212,17 +213,19 @@ export async function runScheduledAffiliateBackfill() {
       skipped_count: 0,
       error_count: 0,
       dry_run: false,
+      time_budget_ms: timeBudgetMs,
       items: []
     };
   }
 
-  const result = await backfillCoupangAffiliateLinks({ limit, dryRun: false });
+  const result = await backfillCoupangAffiliateLinks({ limit, dryRun: false, timeBudgetMs });
   return {
     type: "affiliate_backfill",
     ...result,
     first_launch_confirmed: gate.firstLaunchConfirmed,
     launch_confirmation_id: gate.launchConfirmation?.id ?? null,
     limit,
+    time_budget_ms: timeBudgetMs,
     persistent_storage: hasSupabaseConfig()
   };
 }

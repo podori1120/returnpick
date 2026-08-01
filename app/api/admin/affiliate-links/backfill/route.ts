@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const limit = positiveInteger(body.limit, 20);
     const dryRun = body.dryRun === true;
-    const result = await backfillCoupangAffiliateLinks({ limit, dryRun });
+    const result = await backfillCoupangAffiliateLinks({ limit, dryRun, timeBudgetMs: 52_000 });
     return NextResponse.json(result);
   } catch (error) {
     return affiliateBackfillErrorResponse(error);
