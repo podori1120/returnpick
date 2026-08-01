@@ -3290,6 +3290,17 @@ if (fileExists("components/AdminOpsDashboard.tsx")) {
     "admin revenue dashboard separates acquisition-source conversion from CTA placement metrics",
     "required"
   );
+  check(
+    "admin: conversion recovery opportunities",
+    opsDashboard.includes("admin-revenue-opportunities") &&
+      opsDashboard.includes("conversionOpportunities") &&
+      opsDashboard.includes("상세 방문 후 멈춘 상품") &&
+      dataStore.includes("conversionOpportunities") &&
+      dataStore.includes("item.detail_views > 0") &&
+      dataStore.includes("item.affiliate_clicks === 0"),
+    "admin revenue dashboard exposes detail-without-click recovery candidates",
+    "required"
+  );
 }
 
 if (fileExists("components/AdminCandidateTable.tsx")) {

@@ -937,7 +937,7 @@ export async function getRevenueMetrics() {
     telegram_detail_click: events.filter((event) => event.event_type === "telegram_detail_click").length
   };
 
-  const productMetrics = publishedProducts
+  const allProductMetrics = publishedProducts
     .map((product) => {
       const productEvents = events.filter((event) => event.product_id === product.id);
       const impressions = productEvents.filter((event) => event.event_type === "impression").length;
@@ -959,8 +959,13 @@ export async function getRevenueMetrics() {
         cta_ready: getCustomerPublishReadiness(product).ready && product.is_published && product.sourcing_status === "published"
       };
     })
-    .sort((a, b) => b.affiliate_clicks - a.affiliate_clicks || b.detail_views - a.detail_views)
-    .slice(0, 30);
+    .sort((a, b) => b.affiliate_clicks - a.affiliate_clicks || b.detail_views - a.detail_views);
+
+  const productMetrics = allProductMetrics.slice(0, 30);
+  const conversionOpportunities = allProductMetrics
+    .filter((item) => item.cta_ready && item.detail_views > 0 && item.affiliate_clicks === 0)
+    .sort((a, b) => b.detail_views - a.detail_views || b.impressions - a.impressions)
+    .slice(0, 8);
 
   const categoryMetrics = Array.from(new Set(publishedProducts.map((product) => product.category))).map((category) => {
     const categoryProductIds = new Set(publishedProducts.filter((product) => product.category === category).map((product) => product.id));
@@ -1039,6 +1044,7 @@ export async function getRevenueMetrics() {
     channelMetrics,
     sourceMetrics,
     surfaceMetrics,
+    conversionOpportunities,
     knownProductEventCount: events.filter((event) => event.product_id && productMap.has(event.product_id)).length
   };
 }

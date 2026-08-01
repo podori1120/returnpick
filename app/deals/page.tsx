@@ -25,6 +25,7 @@ import { listProducts } from "@/lib/dataStore";
 import { approvalSampleProduct } from "@/lib/approvalSample";
 import { homeCategoryDetails } from "@/lib/homeDiscovery";
 import { isPublicDealReady } from "@/lib/publicDeal";
+import { matchesProductSearch } from "@/lib/productSearch";
 import { getDealQuality, type DealQualityStatus } from "@/lib/quality";
 import { getSiteUrl } from "@/lib/siteUrl";
 import type { Category, ConditionGrade, ProductWithScore } from "@/lib/types";
@@ -246,7 +247,7 @@ export default async function DealsPage({
   const filteredProducts = sortProducts(
     allPublished
       .filter((product) => (category ? product.category === category : true))
-      .filter((product) => (search ? product.title.toLowerCase().includes(search.toLowerCase()) : true))
+      .filter((product) => matchesProductSearch(product, search))
       .filter((product) => (selectedCondition ? product.condition_grade === selectedCondition : true))
       .filter((product) => (selectedQuality ? getDealQuality(product).status === selectedQuality : true))
       .filter((product) => (selectedUseCase ? matchesUseCase(product, selectedUseCase) : true))
@@ -353,7 +354,7 @@ export default async function DealsPage({
 
       <form className="grid gap-2 rounded-lg border border-line bg-white p-4 shadow-soft lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr]">
         <input type="hidden" name="page" value="1" />
-        <input className="focus-ring rounded-lg border border-line px-3 py-2 text-sm" name="search" defaultValue={search} placeholder="상품 검색" />
+        <input className="focus-ring rounded-lg border border-line px-3 py-2 text-sm" name="search" defaultValue={search} placeholder="상품명·브랜드·모델명·키워드 검색" />
         <select className="focus-ring rounded-lg border border-line px-3 py-2 text-sm" name="category" defaultValue={category ?? ""}>
           <option value="">전체 카테고리</option>
           {categoryOptions.map((option) => (

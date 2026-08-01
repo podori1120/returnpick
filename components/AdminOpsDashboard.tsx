@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AlertTriangle, ArrowRight, BarChart3, CheckCircle2, Clock3, Link2Off, MousePointerClick, PackageSearch, RefreshCw, Send, TrendingUp } from "lucide-react";
 import { openAdminCandidateQueue, scrollToAdminAnchor } from "@/lib/adminNavigation";
@@ -110,6 +111,16 @@ type RevenueMetrics = {
     telegram_clicks: number;
     detail_ctr: number;
     affiliate_ctr: number;
+  }>;
+  conversionOpportunities: Array<{
+    product_id: string;
+    title: string;
+    category: string;
+    score: number;
+    detail_views: number;
+    affiliate_clicks: number;
+    affiliate_ctr: number;
+    cta_ready: boolean;
   }>;
 };
 
@@ -294,6 +305,16 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
       icon: PackageSearch,
       tone: "text-pine",
       onClick: () => openAdminCandidateQueue("review")
+    },
+    {
+      key: "conversion",
+      count: revenueMetrics?.conversionOpportunities.length ?? 0,
+      title: "구매 클릭 전환 보강",
+      summary: "상세 페이지까지 방문했지만 쿠팡 구매 클릭으로 이어지지 않은 상품입니다. 가격 근거와 CTA 문구를 먼저 점검합니다.",
+      buttonLabel: "전환 후보 보기",
+      icon: MousePointerClick,
+      tone: "text-lemon",
+      onClick: () => scrollToAdminAnchor("admin-revenue-opportunities")
     },
     {
       key: "telegram",
@@ -513,6 +534,40 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
             </div>
           </div>
         </div>
+      ) : null}
+
+      {revenueMetrics?.conversionOpportunities.length ? (
+        <section id="admin-revenue-opportunities" className="scroll-mt-4 rounded-lg border border-lemon/60 bg-lemon/20 p-5 shadow-soft">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-black text-ink">Conversion Recovery</p>
+              <h2 className="mt-1 text-lg font-black">상세 방문 후 멈춘 상품</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-ink">
+                관심은 확인됐지만 구매 클릭이 없는 상품입니다. 상품별 가격 근거, 반품 확인 상태와 CTA를 점검해 전환을 회복하세요.
+              </p>
+            </div>
+            <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-black text-ink">우선 점검 {revenueMetrics.conversionOpportunities.length}건</span>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {revenueMetrics.conversionOpportunities.map((item) => (
+              <article key={item.product_id} className="rounded-lg border border-lemon/60 bg-white p-4">
+                <p className="text-xs font-black text-pine">{getCategoryLabel(item.category)}</p>
+                <p className="mt-1 line-clamp-2 text-sm font-black leading-5">{item.title}</p>
+                <p className="mt-3 text-xs font-bold leading-5 text-steel">
+                  상세 {item.detail_views}회 · 구매 클릭 {item.affiliate_clicks}회 · 전환 {item.affiliate_ctr}%
+                </p>
+                <Link
+                  className="focus-ring mt-3 inline-flex items-center gap-1 text-xs font-black text-pine hover:text-ink"
+                  href={`/deals/${item.product_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  공개 상세 점검 <ArrowRight size={13} aria-hidden />
+                </Link>
+              </article>
+            ))}
+          </div>
+        </section>
       ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[1fr_1.4fr]">
