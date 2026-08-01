@@ -1,30 +1,8 @@
-import type { JsonValue, SourcedProduct } from "@/lib/types";
-import { isPublicWebHostname } from "@/lib/publicWebUrlSafety";
-
-function getEvidence(raw: Record<string, JsonValue>) {
-  const info = raw.web_return_info;
-  if (!info || typeof info !== "object" || Array.isArray(info)) return null;
-  const evidence = Array.isArray(info.evidence) ? info.evidence.filter((item): item is string => typeof item === "string") : [];
-  const confidence = typeof info.confidence === "number" ? info.confidence : null;
-  const isReturnCandidate = Boolean(info.is_return_candidate);
-  const rawSourceUrl = typeof info.detail_page_url === "string" ? info.detail_page_url : typeof info.page_url === "string" ? info.page_url : null;
-  let sourceUrl: string | null = null;
-  if (rawSourceUrl) {
-    try {
-      const parsed = new URL(rawSourceUrl);
-      if (["http:", "https:"].includes(parsed.protocol) && !parsed.username && !parsed.password && isPublicWebHostname(parsed.hostname)) {
-        sourceUrl = parsed.toString();
-      }
-    } catch {
-      sourceUrl = null;
-    }
-  }
-  if (!isReturnCandidate && evidence.length === 0) return null;
-  return { evidence, confidence, isReturnCandidate, sourceUrl };
-}
+import type { SourcedProduct } from "@/lib/types";
+import { getPublicWebEvidence } from "@/lib/publicWebEvidence";
 
 export default function ReturnEvidence({ product }: { product: SourcedProduct }) {
-  const data = getEvidence(product.raw_json);
+  const data = getPublicWebEvidence(product.raw_json);
   if (!data) return null;
 
   return (

@@ -2148,14 +2148,16 @@ if (fileExists("app/picks/page.tsx") && fileExists("app/sitemap.ts") && fileExis
   );
 }
 
-if (fileExists("components/ReturnEvidence.tsx") && fileExists("lib/providers/publicWebProvider.ts")) {
+if (fileExists("components/ReturnEvidence.tsx") && fileExists("lib/publicWebEvidence.ts") && fileExists("lib/providers/publicWebProvider.ts")) {
   const returnEvidence = readText("components/ReturnEvidence.tsx");
+  const publicWebEvidence = readText("lib/publicWebEvidence.ts");
   const publicWebProvider = readText("lib/providers/publicWebProvider.ts");
   check(
     "public web evidence: customer provenance link",
-    returnEvidence.includes("detail_page_url") &&
-      returnEvidence.includes("page_url") &&
-      returnEvidence.includes("isPublicWebHostname") &&
+    returnEvidence.includes("getPublicWebEvidence") &&
+      publicWebEvidence.includes("detail_page_url") &&
+      publicWebEvidence.includes("page_url") &&
+      publicWebEvidence.includes("isPublicWebHostname") &&
       returnEvidence.includes("근거 페이지 확인") &&
       returnEvidence.includes('rel="nofollow noopener noreferrer"') &&
       publicWebProvider.includes("detail_page_url") &&

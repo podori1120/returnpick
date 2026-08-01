@@ -7,6 +7,7 @@ import { toNumberOrNull } from "@/lib/format";
 import { isUsableProductImageUrl } from "@/lib/productImageUrl";
 import { getCustomerPublishReadiness } from "@/lib/quality";
 import { getNaverPriceTrust, mergeManualNaverPriceEvidence } from "@/lib/naverPriceTrust";
+import { getPublicWebEvidence } from "@/lib/publicWebEvidence";
 import type { ConditionGrade, ProductWithScore } from "@/lib/types";
 
 function headers(password: string) {
@@ -70,6 +71,7 @@ export default function AdminProductEditor({
         }
       : projectedBase;
   const publishReadiness = projectedProduct ? getCustomerPublishReadiness(projectedProduct) : null;
+  const publicWebEvidence = getPublicWebEvidence(product?.raw_json ?? {});
   const publishReady = publishReadiness?.ready === true;
   const saving = savingAction !== null;
 
@@ -135,6 +137,34 @@ export default function AdminProductEditor({
     <section className="rounded-lg border border-line bg-white p-5 shadow-soft">
       <h2 className="text-lg font-black">후보 빠른 수정</h2>
       <p className="mt-1 line-clamp-2 text-sm font-bold text-steel">{product.title}</p>
+
+      {publicWebEvidence ? (
+        <div className="mt-4 border-y border-line py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-black text-pine">공개 웹 참고 근거</p>
+              <p className="mt-1 text-sm font-black text-ink">반품 단서가 자동 수집되었습니다</p>
+            </div>
+            {publicWebEvidence.confidence != null ? <span className="rounded-md bg-mist px-2 py-1 text-xs font-black text-steel">신뢰도 {publicWebEvidence.confidence}</span> : null}
+          </div>
+          {publicWebEvidence.sourceTitle ? <p className="mt-2 line-clamp-2 text-xs font-bold text-steel">{publicWebEvidence.sourceTitle}</p> : null}
+          {publicWebEvidence.evidence.length ? (
+            <ul className="mt-2 space-y-1 text-xs font-semibold leading-5 text-steel">
+              {publicWebEvidence.evidence.slice(0, 3).map((item) => <li key={item}>• {item}</li>)}
+            </ul>
+          ) : null}
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <span className="text-xs font-black text-amber-700">보조 단서 · 최종 조건은 쿠팡에서 확인</span>
+            {publicWebEvidence.sourceUrl ? (
+              <a className="focus-ring text-xs font-black text-pine underline underline-offset-2" href={publicWebEvidence.sourceUrl} target="_blank" rel="nofollow noopener noreferrer">
+                근거 페이지 확인
+              </a>
+            ) : null}
+          </div>
+        </div>
+      ) : (
+        <p className="mt-4 border-y border-line py-3 text-xs font-semibold leading-5 text-steel">공개 웹 반품 근거 없음 · 반품등급과 반품가는 확인된 자료가 있을 때만 보완하세요.</p>
+      )}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="text-sm font-bold text-steel">

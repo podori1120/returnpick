@@ -199,6 +199,7 @@ npm run public-web-detail:check
 - 검색 결과에서 발견한 allowlist 상품 링크 중 최대 3개의 상세 페이지를 추가로 확인해 상세에만 있는 반품등급·반품가·재고 문구를 보강
 - 상세 페이지를 읽을 때도 같은 `robots.txt`, allowlist, Crawl-delay, 수동 리다이렉트 차단, 750KB 본문 제한을 다시 적용
 - 상세 페이지에서 반품 근거를 찾지 못하면 기존 값이나 `확인필요`를 유지하고 숫자를 추정하지 않으며, 보강 근거는 `raw_json.web_return_info.detail_page`에 남김
+- 고객 화면과 관리자 검토 화면의 `근거 페이지 확인` 링크는 공개 웹 참고 문구의 출처를 보여주는 보조 단서이며, 반품등급·반품가의 최종 기준은 쿠팡 상품 페이지입니다
 - HTML에서 발견한 상품 후보 링크도 `http://` 또는 `https://` 공개 호스트 URL만 저장하고, `javascript:`, `mailto:`, 인증정보가 들어간 URL, localhost/private 형태의 URL은 후보에서 제외
 - 반품등급과 반품가는 근거가 있을 때만 저장
 - robots.txt가 막으면 `ROBOTS_DISALLOWED`로 기록하고 건너뜀

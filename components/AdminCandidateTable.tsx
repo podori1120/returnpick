@@ -12,6 +12,7 @@ import { isApprovalSampleAffiliateUrl, isUsableAffiliateUrl } from "@/lib/coupan
 import { formatDate, formatPercent, formatPrice } from "@/lib/format";
 import { getAppliedDiscountRate } from "@/lib/priceReference";
 import { getCustomerPublishReadiness, getDealQuality } from "@/lib/quality";
+import { getPublicWebEvidence } from "@/lib/publicWebEvidence";
 import type { Category, ProductWithScore, SourcingStatus } from "@/lib/types";
 
 function headers(password: string) {
@@ -579,6 +580,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
                         <span className="rounded-md bg-pine/10 px-2 py-1 text-xs font-bold text-pine">
                           {quality.label} {quality.confidence}
                         </span>
+                        {getPublicWebEvidence(product.raw_json) ? <span className="rounded-md bg-lemon/30 px-2 py-1 text-xs font-bold text-amber-800">웹 근거</span> : null}
                       </div>
                       {[...quality.blockers, ...quality.warnings].slice(0, 2).length ? (
                         <p className="mt-2 line-clamp-1 text-xs font-semibold text-steel">
