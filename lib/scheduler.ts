@@ -67,6 +67,17 @@ export function getSchedulerBlockingItems(readiness: ApiReadinessSummary, itemId
 }
 
 export function getSchedulerOperatorAction(skippedReason: string | null, readiness: ApiReadinessSummary): SchedulerOperatorAction | null {
+  if (skippedReason === "COUPANG_API_NOT_READY") {
+    const coupang = readiness.items.find((item) => item.id === "coupang");
+    return {
+      code: "CONFIGURE_COUPANG_API",
+      label: "쿠팡 API 자동 수집 연동",
+      target_anchor: "admin-api-readiness",
+      message: coupang?.message ?? "쿠팡 API 권한이 아직 준비되지 않았습니다.",
+      next_action: coupang?.nextAction ?? "상품별 파트너스 링크는 수동으로 운영하고, API 권한이 열리면 쿠팡 API 키를 등록하세요."
+    };
+  }
+
   if (skippedReason === "TELEGRAM_NOT_READY") {
     const telegram = readiness.items.find((item) => item.id === "telegram");
     return {
@@ -167,6 +178,33 @@ export async function runScheduledSourcing() {
     };
   }
 
+  if (!gate.readiness.apiKeysReady) {
+    return {
+      type: "sourcing",
+      status: "waiting_for_api",
+      skipped_reason: "COUPANG_API_NOT_READY",
+      readiness_mode: gate.readiness.mode,
+      blocking_item_ids: [],
+      blocking_items: [],
+      blocking_env: [],
+      operator_action: getSchedulerOperatorAction("COUPANG_API_NOT_READY", gate.readiness),
+      first_launch_confirmed: gate.firstLaunchConfirmed,
+      launch_confirmation_id: gate.launchConfirmation?.id ?? null,
+      use_mock_fallback: false,
+      keyword_limit: keywordLimit,
+      keyword_offset: null,
+      next_keyword_offset: null,
+      time_budget_ms: timeBudgetMs,
+      persistent_storage: hasSupabaseConfig(),
+      run_id: null,
+      keyword_count: 0,
+      found_count: 0,
+      inserted_count: 0,
+      updated_count: 0,
+      error_count: 0
+    };
+  }
+
   const keywordOffset = await getNextSourcingKeywordOffset();
   const run = await runSourcing({ useMockFallback, keywordLimit, keywordOffset, timeBudgetMs });
 
@@ -204,6 +242,30 @@ export async function runScheduledAffiliateBackfill() {
       blocking_items: getSchedulerBlockingItems(gate.readiness),
       blocking_env: gate.readiness.blockingEnv,
       operator_action: getSchedulerOperatorAction(gate.skippedReason, gate.readiness),
+      first_launch_confirmed: gate.firstLaunchConfirmed,
+      launch_confirmation_id: gate.launchConfirmation?.id ?? null,
+      limit,
+      persistent_storage: hasSupabaseConfig(),
+      scanned_count: 0,
+      updated_count: 0,
+      skipped_count: 0,
+      error_count: 0,
+      dry_run: false,
+      time_budget_ms: timeBudgetMs,
+      items: []
+    };
+  }
+
+  if (!gate.readiness.apiKeysReady) {
+    return {
+      type: "affiliate_backfill",
+      status: "waiting_for_api",
+      skipped_reason: "COUPANG_API_NOT_READY",
+      readiness_mode: gate.readiness.mode,
+      blocking_item_ids: [],
+      blocking_items: [],
+      blocking_env: [],
+      operator_action: getSchedulerOperatorAction("COUPANG_API_NOT_READY", gate.readiness),
       first_launch_confirmed: gate.firstLaunchConfirmed,
       launch_confirmation_id: gate.launchConfirmation?.id ?? null,
       limit,

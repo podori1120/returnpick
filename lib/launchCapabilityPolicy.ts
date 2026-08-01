@@ -12,16 +12,29 @@ export const CORE_RUNTIME_ITEM_IDS = ["supabase", "site", "approval_link", "admi
 export const OPTIONAL_CAPABILITY_ITEM_IDS = ["naver", "telegram"] as const;
 export const OPTIONAL_CONNECTION_CHECK_IDS = ["naver", "telegram"] as const;
 
+export function getOptionalConnectionCheckIds(apiKeysReady = true) {
+  return [
+    ...(apiKeysReady ? [] : ["coupang"]),
+    ...OPTIONAL_CONNECTION_CHECK_IDS
+  ];
+}
+
 export function getRequiredReadinessItemIds(publicWebEnabled: boolean) {
   return [
-    "coupang",
     ...CORE_RUNTIME_ITEM_IDS,
     ...(publicWebEnabled ? ["public_web"] : [])
   ];
 }
 
-export function getRequiredConnectionCheckIds(publicWebEnabled: boolean) {
-  return ["coupang", "supabase", "data_quality", "site_live", "cron", ...(publicWebEnabled ? ["public_web"] : [])];
+export function getRequiredConnectionCheckIds(publicWebEnabled: boolean, apiKeysReady = true) {
+  return [
+    ...(apiKeysReady ? ["coupang"] : []),
+    "supabase",
+    "data_quality",
+    "site_live",
+    "cron",
+    ...(publicWebEnabled ? ["public_web"] : [])
+  ];
 }
 
 export function getLaunchBlockingItemIds(items: CapabilityReadinessItem[], publicWebEnabled: boolean) {
@@ -44,7 +57,9 @@ export function evaluateLaunchReadiness(items: CapabilityReadinessItem[], public
   return {
     apiKeysReady,
     runtimeReady,
-    launchReady: apiKeysReady && runtimeReady && blockingItemIds.length === 0,
+    // Manual product-level Partners links can operate before the separate Coupang API permission is issued.
+    // The API remains an automation capability, not a prerequisite for publishing verified manual links.
+    launchReady: runtimeReady && blockingItemIds.length === 0,
     blockingItemIds,
     optionalMissingItemIds
   };

@@ -18,7 +18,7 @@ type ApiReadinessItem = {
 
 type ApiReadinessSummary = {
   checkedAt: string;
-  mode: "pre_approval" | "api_ready" | "launch_ready";
+  mode: "pre_approval" | "manual_launch_ready" | "api_ready" | "launch_ready";
   items: ApiReadinessItem[];
   requiredForApiLaunch: string[];
   apiKeysReady: boolean;
@@ -42,9 +42,9 @@ type ApiConnectionCheck = {
 };
 
 const vercelEnvRows = [
-  { group: "쿠팡 파트너스 API", name: "COUPANG_ACCESS_KEY", value: "", note: "최종승인 후 파트너스 API 메뉴에서 발급" },
-  { group: "쿠팡 파트너스 API", name: "COUPANG_SECRET_KEY", value: "", note: "최종승인 후 파트너스 API 메뉴에서 발급" },
-  { group: "쿠팡 파트너스 API", name: "COUPANG_PARTNER_ID", value: "", note: "파트너스 계정 ID" },
+  { group: "쿠팡 파트너스 API 자동화", name: "COUPANG_ACCESS_KEY", value: "", note: "API 권한 발급 후 자동 후보 수집에 사용" },
+  { group: "쿠팡 파트너스 API 자동화", name: "COUPANG_SECRET_KEY", value: "", note: "API 권한 발급 후 딥링크 자동 보강에 사용" },
+  { group: "쿠팡 파트너스 API 자동화", name: "COUPANG_PARTNER_ID", value: "", note: "API 권한 발급 후 사용하는 파트너스 계정 ID" },
   { group: "네이버 쇼핑 API", name: "NAVER_CLIENT_ID", value: "", note: "네이버 개발자 센터 애플리케이션 값" },
   { group: "네이버 쇼핑 API", name: "NAVER_CLIENT_SECRET", value: "", note: "네이버 개발자 센터 애플리케이션 값" },
   { group: "Supabase 운영 DB", name: "NEXT_PUBLIC_SUPABASE_URL", value: "", note: "Supabase Project URL" },
@@ -305,6 +305,7 @@ function stepMeta(done: boolean) {
 }
 
 function modeLabel(readiness: ApiReadinessSummary) {
+  if (readiness.mode === "manual_launch_ready") return "수동 출시 가능";
   if (readiness.launchReady) return "운영 준비 완료";
   if (readiness.apiKeysReady) return "API 키 입력됨";
   return "승인 대기";
@@ -315,11 +316,20 @@ function nextLaunchAction(readiness: ApiReadinessSummary, checks: ApiConnectionC
     .filter((check) => readiness.requiredConnectionCheckIds.includes(check.id) && check.status === "error")
     .map((check) => check.label);
 
+  if (readiness.mode === "manual_launch_ready") {
+    return {
+      stage: "수동 링크 출시",
+      title: "상품별 쿠팡 파트너스 링크를 검수해 바로 게시하세요.",
+      body: "쿠팡 API 권한은 자동 후보 수집 기능에만 필요합니다. 실제 상품 URL과 상품별 파트너스 링크를 관리자에서 확인한 뒤 승인·게시하고, API 권한이 열리면 자동 수집을 추가합니다.",
+      bullets: ["상품별 파트너스 링크 수동 등록", "반품가·등급·재고 검수", "API 권한 발급 후 자동화 전환"]
+    };
+  }
+
   if (!readiness.apiKeysReady) {
     return {
       stage: "승인 대기",
       title: "지금은 승인용 페이지와 수동 파트너스 링크를 유지하세요.",
-      body: "쿠팡 최종승인 전에는 Partners API 키가 나오지 않으므로 자동 API 수집은 대기합니다. 승인 후 쿠팡 API 키를 넣으면 이 카드가 다음 단계로 바뀝니다.",
+      body: "쿠팡 최종승인 전에는 Partners API 키가 나오지 않으므로 자동 API 수집은 대기합니다. 공개 승인 페이지와 수동 링크 운영을 먼저 준비하세요.",
       bullets: ["승인용 페이지 캡처 유지", "상품별 수동 파트너스 링크만 게시", "Supabase·Cron은 미리 준비"]
     };
   }
@@ -457,7 +467,7 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
       "2. 파일 전체 내용을 복사합니다.",
       "3. Supabase Dashboard > SQL Editor > New query에 붙여넣고 실행합니다.",
       "4. 실행이 끝나면 Vercel을 재배포합니다.",
-      "5. ReturnPick /admin > 승인 후 API 즉시 가동 준비 > 실제 연결 테스트를 다시 누릅니다.",
+      "5. ReturnPick /admin > 승인 후 운영 즉시 가동 준비 > 실제 연결 테스트를 다시 누릅니다.",
       "",
       `기대 schema_version: ${supabaseSchemaIssue?.expected ?? "2026-07-31-product-observation-time"}`,
       "확인 항목: returnpick_schema_meta, is_strict_coupang_partners_url, product_snapshots, RLS 정책, affiliate_events"
@@ -549,7 +559,7 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
         <div className="flex items-start gap-3">
           <AlertTriangle className={loadError ? "mt-0.5 shrink-0 text-coral" : "mt-0.5 shrink-0 text-steel"} size={18} aria-hidden />
           <div>
-            <h2 className="text-lg font-black">승인 후 API 즉시 가동 준비</h2>
+            <h2 className="text-lg font-black">승인 후 운영 즉시 가동 준비</h2>
             <p className="mt-2 text-sm font-bold text-steel">
               {loadError || "API 준비 상태를 확인하는 중입니다."}
             </p>
@@ -583,19 +593,23 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
       description: "관리자 비밀번호, Supabase, 공개 URL, Cron 보호값, 승인용 링크가 먼저 준비되어야 합니다."
     },
     {
-      title: "쿠팡 API 키 입력",
+      title: "쿠팡 API 자동화 연결",
       done: apiEnvReady,
-      description: "쿠팡 검색과 딥링크 생성에 필요한 공식 API 키가 있어야 실데이터 소싱 모드가 됩니다."
+      description: "선택 단계입니다. API 권한이 없을 때는 상품별 파트너스 링크를 수동 검수하고, 권한 발급 후 자동 후보 수집과 딥링크 보강을 켭니다."
     },
     {
       title: "핵심 연결 테스트 통과",
       done: connectionChecksPassed,
-      description: "쿠팡 딥링크, Supabase 읽기·쓰기, 공개 상품 데이터 품질, 공개 승인 페이지, Cron 인증과 공개 웹 참고 수집 사용 시 robots.txt 경로를 확인합니다."
+      description: apiEnvReady
+        ? "쿠팡 딥링크, Supabase 읽기·쓰기, 공개 상품 데이터 품질, 공개 승인 페이지, Cron 인증과 공개 웹 참고 수집 사용 시 robots.txt 경로를 확인합니다."
+        : "Supabase 읽기·쓰기, 공개 상품 데이터 품질, 공개 승인 페이지와 Cron 인증을 확인합니다. 쿠팡 API 연결은 권한 발급 후 추가합니다."
     },
     {
-      title: "목업 끄고 첫 후보 수집",
+      title: apiEnvReady ? "목업 끄고 첫 후보 수집" : "상품별 링크 수동 등록·검수",
       done: false,
-      description: "자동 후보 수집에서 목업 대체 허용을 끄고 실행해 실제 API/허용 소스만 들어오는지 확인합니다."
+      description: apiEnvReady
+        ? "자동 후보 수집에서 목업 대체 허용을 끄고 실행해 실제 API/허용 소스만 들어오는지 확인합니다."
+        : "자동 후보 수집 대신 실제 상품 URL, 상품별 파트너스 링크, 반품 정보와 재고를 관리자에서 확인한 뒤 게시합니다."
     },
     {
       title: "선택 가격 보강과 후보 검수",
@@ -617,9 +631,9 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
             <PlugZap className="text-pine" size={20} aria-hidden />
             <p className="text-xs font-black text-pine">API Launch Readiness</p>
           </div>
-          <h2 className="mt-1 text-xl font-black">승인 후 API 즉시 가동 준비</h2>
+          <h2 className="mt-1 text-xl font-black">승인 후 운영 즉시 가동 준비</h2>
           <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-steel">
-            지금은 승인 대기 모드로 운영하고, 쿠팡 파트너스 최종승인 후 핵심 키만 넣으면 자동 수집과 사이트 게시를 시작하도록 점검합니다. 네이버 가격 비교와 텔레그램은 준비되는 즉시 기능별로 활성화됩니다.
+            쿠팡 API 권한 전에는 상품별 수동 파트너스 링크로 운영하고, API 권한이 열리면 자동 후보 수집과 딥링크 보강으로 확장합니다. 네이버 가격 비교와 텔레그램은 준비되는 즉시 기능별로 활성화됩니다.
           </p>
           {message ? <p className="mt-2 text-sm font-bold text-pine">{message}</p> : null}
           {readiness.apiKeysReady && !readiness.launchReady ? (
@@ -912,7 +926,7 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
 
       <div className="grid gap-3 lg:grid-cols-2">
         {readiness.items.map((item) => {
-          const isOptional = optionalItemIdSet.has(item.id);
+          const isOptional = optionalItemIdSet.has(item.id) || (item.id === "coupang" && !readiness.apiKeysReady);
           const meta = isOptional && item.state !== "ready"
             ? { label: "선택 대기", className: "bg-lemon/30 text-ink", icon: AlertTriangle }
             : stateMeta(item.state);

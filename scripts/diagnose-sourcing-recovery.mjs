@@ -342,9 +342,9 @@ async function main() {
   const coupangReady = hasEnv("COUPANG_ACCESS_KEY") && hasEnv("COUPANG_SECRET_KEY") && hasEnv("COUPANG_PARTNER_ID");
   const naverReady = hasEnv("NAVER_CLIENT_ID") && hasEnv("NAVER_CLIENT_SECRET");
 
-  add(coupangReady ? "PASS" : "WARN", "Coupang API env", coupangReady ? "all three env names have values" : "missing one or more required values");
+  add(coupangReady ? "PASS" : "WARN", "Coupang API env", coupangReady ? "all three env names have values" : "optional automation values are missing");
   add(naverReady ? "PASS" : "WARN", "Naver API env", naverReady ? "client id and secret have values" : "optional price-comparison values are missing");
-  if (!coupangReady) action("Before live sourcing, fill the Coupang API values in Vercel Production and redeploy.");
+  if (!coupangReady) action("Manual product-level Partners links can operate now; add the Coupang API values after final approval to enable automatic sourcing.");
   if (!naverReady) action("Add the Naver API values when you want verified lowest-price comparison; they do not block Coupang sourcing or site publishing.");
 
   const keywordLimit = envValue("SOURCING_KEYWORD_LIMIT");

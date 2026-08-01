@@ -12,7 +12,7 @@ type ApiReadinessItem = {
 };
 
 type ApiReadinessSummary = {
-  mode: "pre_approval" | "api_ready" | "launch_ready";
+  mode: "pre_approval" | "manual_launch_ready" | "api_ready" | "launch_ready";
   items: ApiReadinessItem[];
   apiKeysReady: boolean;
   runtimeReady: boolean;
@@ -42,10 +42,20 @@ function statusCopy(readiness: ApiReadinessSummary | null) {
     };
   }
 
+  if (readiness.mode === "manual_launch_ready") {
+    return {
+      label: "수동 출시 가능",
+      title: "상품별 파트너스 링크를 검수해 바로 운영할 수 있습니다.",
+      body: "쿠팡 API 권한은 자동 후보 수집 기능에만 필요합니다. 관리자에서 실제 상품별 링크를 확인한 후보를 승인·게시하고, API 권한이 열리면 자동 소싱을 추가하세요.",
+      tone: "border-pine/30 bg-pine/5 text-pine",
+      icon: CheckCircle2
+    };
+  }
+
   if (readiness.launchReady) {
     return {
       label: "첫 가동 가능",
-      title: "API 키와 운영 필수 설정이 준비됐습니다.",
+      title: "API 자동 소싱과 운영 필수 설정이 준비됐습니다.",
       body: "핵심 연결 테스트를 통과시킨 뒤 첫 후보 수집과 파트너스 링크 보강을 시작하세요. 네이버 가격 비교와 텔레그램은 연결된 기능만 동작합니다.",
       tone: "border-pine/30 bg-pine/5 text-pine",
       icon: CheckCircle2
@@ -55,7 +65,7 @@ function statusCopy(readiness: ApiReadinessSummary | null) {
   if (readiness.apiKeysReady) {
     return {
       label: "설정 보강",
-      title: "API 키는 들어갔고 운영 필수 설정이 남았습니다.",
+      title: "API 자동화 키는 들어갔고 운영 필수 설정이 남았습니다.",
       body: "누락된 Vercel 환경변수를 채우고 재배포하면 실제 연결 테스트와 첫 가동으로 넘어갑니다.",
       tone: "border-lemon/40 bg-lemon/10 text-ink",
       icon: AlertTriangle
@@ -65,7 +75,7 @@ function statusCopy(readiness: ApiReadinessSummary | null) {
   return {
     label: "승인 대기",
     title: "승인 전에는 수동 파트너스 링크와 공개 심사용 페이지를 유지하세요.",
-    body: "쿠팡 최종승인 후 API 키를 넣으면 자동 후보 수집과 딥링크 보강이 바로 이어집니다. 네이버 최저가와 텔레그램은 선택 연동입니다.",
+    body: "수동 파트너스 링크로 승인용 페이지와 기본 운영을 유지할 수 있습니다. 쿠팡 API 권한이 열리면 자동 후보 수집과 딥링크 보강이 이어집니다. 네이버 최저가와 텔레그램은 선택 연동입니다.",
     tone: "border-line bg-white text-ink",
     icon: ShieldCheck
   };
@@ -172,9 +182,9 @@ export default function AdminLaunchStatusBar({ password }: { password: string })
           <p className="mt-1 text-base font-black">{totalCount ? `${readyCount}/${totalCount}개 준비` : "확인 중"}</p>
         </div>
         <div className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-ink">
-          <p className="font-black text-steel">쿠팡 API 키</p>
-          <p className={readiness?.apiKeysReady ? "mt-1 text-base font-black text-pine" : "mt-1 text-base font-black text-coral"}>
-            {readiness?.apiKeysReady ? "입력됨" : "승인 후 입력"}
+          <p className="font-black text-steel">쿠팡 API 자동화</p>
+          <p className={readiness?.apiKeysReady || readiness?.mode === "manual_launch_ready" ? "mt-1 text-base font-black text-pine" : "mt-1 text-base font-black text-coral"}>
+            {readiness?.apiKeysReady ? "준비됨" : readiness?.mode === "manual_launch_ready" ? "수동 링크 운영" : "API 권한 대기"}
           </p>
         </div>
         <div className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-ink">

@@ -10,7 +10,7 @@ import type { SourcingRun } from "@/lib/types";
 const firstRunTimeBudgetMs = 52000;
 
 type ApiReadinessSummary = {
-  mode: "pre_approval" | "api_ready" | "launch_ready";
+  mode: "pre_approval" | "manual_launch_ready" | "api_ready" | "launch_ready";
   apiKeysReady: boolean;
   runtimeReady: boolean;
   launchReady: boolean;
@@ -135,7 +135,7 @@ function diagnosisQuickActions(diagnosis: SourcingDiagnosis) {
     actions.push({
       label: "API 준비도 확인",
       anchor: "admin-api-readiness",
-      helper: "쿠팡·Supabase 핵심 연결과 선택 기능 테스트로 이동합니다."
+      helper: "Supabase 핵심 연결과 선택 기능 테스트로 이동합니다. 쿠팡 API는 자동화 권한이 있을 때만 필수 연결로 확인합니다."
     });
   }
 
@@ -216,6 +216,13 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
   }, [password]);
 
   async function runSourcing() {
+    if (readiness?.mode === "manual_launch_ready" && process.env.NODE_ENV === "production") {
+      setNotice({
+        type: "warning",
+        message: "쿠팡 API 권한이 없어 자동 후보 수집은 대기 중입니다. 상품별 파트너스 링크는 수동 등록·검수 큐에서 처리하세요."
+      });
+      return;
+    }
     setRunning(true);
     setNotice({
       type: "info",
@@ -257,6 +264,8 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
 
   const latestDiagnosis = diagnoseSourcingRun(runs[0]);
   const mockFallbackLocked = Boolean(readiness?.apiKeysReady);
+  const manualLaunchMode = readiness?.mode === "manual_launch_ready";
+  const automatedSourcingUnavailable = manualLaunchMode && process.env.NODE_ENV === "production";
   const latestDiagnosisQuickActions = latestDiagnosis ? diagnosisQuickActions(latestDiagnosis) : [];
 
   return (
@@ -265,14 +274,23 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
         <div>
           <h2 className="text-lg font-black">자동 후보 수집</h2>
           <p className="mt-1 text-sm font-semibold leading-6 text-steel">
-            승인 전에는 목업 포함으로 화면과 검토 흐름을 확인하고, API 키 입력 후에는 목업을 끄고 실제 소스만 테스트할 수 있습니다.
+            승인 전에는 목업 포함으로 화면과 검토 흐름을 확인하고, 운영에서는 상품별 제휴 링크를 검수합니다. API 권한이 열리면 목업 없이 실제 소스를 자동 수집합니다.
           </p>
           <p className="mt-1 text-xs font-bold text-steel">
             운영 함수 시간 제한을 피하기 위해 52초 안에 가능한 만큼 처리하고, 필요하면 다음 실행에서 이어갑니다.
           </p>
-          <p className={`mt-1 text-xs font-black ${readiness?.apiKeysReady ? "text-pine" : "text-steel"}`}>
-            {readiness?.apiKeysReady ? "API 키 감지됨 · 목업 대체 기본 꺼짐" : "승인 대기 · 목업 대체 기본 켜짐"}
+          <p className={`mt-1 text-xs font-black ${readiness?.apiKeysReady || manualLaunchMode ? "text-pine" : "text-steel"}`}>
+            {readiness?.apiKeysReady
+              ? "API 키 감지됨 · 목업 대체 기본 꺼짐"
+              : manualLaunchMode
+                ? "수동 링크 운영 가능 · API 자동 수집 대기"
+                : "승인 대기 · 목업 대체 기본 켜짐"}
           </p>
+          {manualLaunchMode ? (
+            <p className="mt-2 rounded-lg border border-lemon/70 bg-lemon/20 px-3 py-2 text-xs font-black text-ink">
+              쿠팡 API 권한 전에는 이 버튼으로 자동 수집하지 않습니다. 관리자 수동 후보 등록에서 실제 상품별 링크를 넣어 검수·게시하세요.
+            </p>
+          ) : null}
           {readiness?.apiKeysReady && useMockFallback ? (
             <p className="mt-2 rounded-lg border border-coral/30 bg-coral/10 px-3 py-2 text-xs font-black text-coral">
               실데이터 검증 중입니다. 목업 대체를 켜면 테스트 상품이 섞일 수 있으니, 운영 첫 수집은 목업을 끈 상태로 실행하세요.
@@ -318,10 +336,10 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
           <button
             className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-4 py-2 text-sm font-black text-white hover:bg-ink disabled:opacity-60"
             onClick={runSourcing}
-            disabled={running}
+            disabled={running || automatedSourcingUnavailable}
             type="button"
           >
-            <Play size={16} aria-hidden /> 후보 수집 실행
+            <Play size={16} aria-hidden /> {automatedSourcingUnavailable ? "API 권한 대기" : "후보 수집 실행"}
           </button>
         </div>
       </div>

@@ -130,7 +130,7 @@ COUPANG_PARTNER_ID=
 
 값이 없으면 `searchCoupangProducts`는 오류를 던지지 않고 `API_NOT_CONFIGURED`를 반환하며, 소싱 실행은 mock provider로 대체할 수 있습니다.
 
-승인 대기 중에는 쿠팡 파트너스 웹에서 직접 만든 상품 링크를 `affiliate_url`에 수동 입력해 운영합니다. 관리자 수동 후보 등록 화면에서도 실제 상품 상세 URL과 파트너스 단축 링크를 함께 입력할 수 있으며, 링크를 함께 저장해도 목적지 상품번호 확인 전에는 게시되지 않습니다. 쿠팡 파트너스 최종승인 후에는 위 3개 값을 Vercel Environment Variables에 넣고 재배포하면 쿠팡 API 검색이 자동 후보 수집의 1순위 소스로 작동합니다.
+승인 대기 중에는 쿠팡 파트너스 웹에서 직접 만든 상품 링크를 `affiliate_url`에 수동 입력해 운영할 수 있습니다. 관리자 수동 후보 등록 화면에서도 실제 상품 상세 URL과 파트너스 단축 링크를 함께 입력할 수 있으며, 링크를 함께 저장해도 목적지 상품번호 확인 전에는 게시되지 않습니다. 초기 출시에는 상품별로 확인된 수동 링크와 Supabase 등 운영 필수 환경이면 충분하고, 쿠팡 파트너스 최종승인 후 위 3개 값을 Vercel Environment Variables에 넣으면 쿠팡 API 검색과 딥링크 보강을 자동화할 수 있습니다.
 
 쿠팡 API 호출은 공식 HMAC 방식으로 서명합니다. 쿼리스트링이 있는 검색 요청도 서명 메시지는 `signed-date + METHOD + path + query` 형식으로 만들며, `?` 문자는 포함하지 않습니다. 인증 실패가 나면 `/admin`의 실제 연결 테스트에서 Coupang 오류 메시지와 함께 드러나도록 했습니다.
 
@@ -144,7 +144,7 @@ Vercel에 쿠팡 키를 붙여넣을 때 생길 수 있는 앞뒤 공백은 Prov
 
 1. Vercel에 `COUPANG_ACCESS_KEY`, `COUPANG_SECRET_KEY`, `COUPANG_PARTNER_ID`를 등록합니다.
 2. Supabase 3개 값을 운영 환경에 등록합니다. `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`은 가격 비교를 바로 켤 때 함께 등록하는 선택 연동입니다.
-3. 재배포 후 `/admin`의 `승인 후 API 즉시 가동 준비` 패널에서 `실제 연결 테스트`를 실행합니다.
+3. 재배포 후 `/admin`의 `승인 후 운영 즉시 가동 준비` 패널에서 `실제 연결 테스트`를 실행합니다.
 4. 쿠팡 연결 테스트는 상품 검색뿐 아니라 검색 결과 URL을 파트너스 딥링크로 바꿀 수 있는지도 함께 확인합니다.
 5. Supabase 연결 테스트는 `sourcing_keywords`, `sourced_products`, `deal_scores`, `sourcing_runs`, `telegram_logs`, `affiliate_events`, `product_snapshots` 전체 테이블 접근과 최신 필수 컬럼 적용 여부를 확인합니다.
 6. `자동 후보 수집`에서 `목업 대체 허용`을 끄고 실행하면 실제 API/허용 소스만으로 후보가 들어오는지 확인할 수 있습니다.
@@ -316,7 +316,7 @@ npm run env:vercel
 npm run env:check:launch
 ```
 
-`env:pull:production`은 Vercel Production 값을 `.env.production`으로 내려받습니다. 이 파일은 Git과 Vercel 업로드에서 제외되어 있으며, 점검용으로만 사용합니다. `env:vercel`은 Vercel Production의 핵심 출시 변수 이름과 권장 선택 기능 이름을 분리해서 확인합니다. Vercel CLI가 값은 `Encrypted` 또는 `[SENSITIVE]`로 숨기므로 실제 비밀값은 출력하지 않습니다. `env:check`는 마스킹된 값을 형식 오류로 오판하지 않고 "Vercel env pull masks this secret locally" 경고로 표시하므로, 실제 운영 준비 여부는 배포된 `/admin`의 API readiness 또는 `doctor:production` 라이브 점검으로 확인합니다. `.env.production`, `.env.local`, `.env`를 읽어 비밀값을 출력하지 않고 누락·빈 값·형식 오류만 보여줍니다. 승인 전에는 쿠팡·네이버·Supabase·텔레그램 키 누락이 경고로 남을 수 있고, `env:vercel:launch` 또는 `env:check:launch`는 Supabase·쿠팡 등 핵심 출시 값이 없거나 형식이 틀리면 실패합니다. 네이버와 텔레그램 누락은 경고로 남지만 핵심 출시 검사를 실패시키지 않습니다.
+`env:pull:production`은 Vercel Production 값을 `.env.production`으로 내려받습니다. 이 파일은 Git과 Vercel 업로드에서 제외되어 있으며, 점검용으로만 사용합니다. `env:vercel`은 Vercel Production의 핵심 출시 변수 이름과 권장 선택 기능 이름을 분리해서 확인합니다. Vercel CLI가 값은 `Encrypted` 또는 `[SENSITIVE]`로 숨기므로 실제 비밀값은 출력하지 않습니다. `env:check`는 마스킹된 값을 형식 오류로 오판하지 않고 "Vercel env pull masks this secret locally" 경고로 표시하므로, 실제 운영 준비 여부는 배포된 `/admin`의 API readiness 또는 `doctor:production` 라이브 점검으로 확인합니다. `.env.production`, `.env.local`, `.env`를 읽어 비밀값을 출력하지 않고 누락·빈 값·형식 오류만 보여줍니다. 승인 전에는 쿠팡·네이버·Supabase·텔레그램 키 누락이 경고로 남을 수 있고, `env:vercel:launch` 또는 `env:check:launch`는 승인용 링크·Supabase·관리자·Cron 같은 핵심 출시 값이 없거나 형식이 틀리면 실패합니다. 쿠팡 API 키는 자동화 선택 기능으로 별도 경고를 남기며, 네이버와 텔레그램 누락도 핵심 출시 검사를 실패시키지 않습니다.
 
 `env:check:launch`가 실패하면 `Next action checklist`가 함께 출력됩니다. 이 목록은 Vercel Production에 채워야 할 핵심 변수와 네이버·텔레그램 선택 기능을 분리해서 보여주며, 값 자체는 출력하지 않습니다. 핵심 목록을 채운 뒤 재배포하고 `npm run env:vercel:launch`와 `npm run doctor:production:launch` 순서로 다시 확인하세요. Vercel에 값을 막 넣은 직후라면 로컬 `.env.production`이 낡았을 수 있으므로 `npm run doctor:production:launch:fresh`를 쓰면 Production 값을 다시 내려받은 뒤 같은 점검을 이어서 실행합니다.
 
@@ -358,7 +358,7 @@ Vercel Production 환경변수를 수정한 직후에는 아래 명령을 쓰면
 npm run doctor:production:fresh
 ```
 
-Supabase SQL을 적용하고 쿠팡 API 키를 넣은 뒤에는 launch 모드로 환경값 형식, 공개 웹 설정, DB 스키마, 운영 readiness, 첫 가동 예비 점검, 소싱 복구 진단을 한 번에 확인합니다. 네이버와 텔레그램은 설정된 경우 같은 진단에서 확인하지만 누락만으로 핵심 출시를 막지 않습니다. 이 명령은 실제 소싱이나 발송을 시작하지 않으며, 통과 후 `npm run launch:production -- standard confirm`을 따로 실행해야 첫 가동이 시작됩니다. launch 모드에서 핵심 환경값 프리플라이트가 실패하면 DB/API 라이브 점검은 시작하지 않고 뒤 단계는 `SKIP`으로 남깁니다.
+Supabase SQL을 적용하고 승인용 상품별 파트너스 링크를 준비한 뒤에는 launch 모드로 환경값 형식, 공개 웹 설정, DB 스키마, 운영 readiness, 첫 가동 예비 점검, 소싱 복구 진단을 한 번에 확인합니다. 쿠팡 API 키는 자동 후보 수집과 딥링크 보강을 위한 선택 기능이며, 네이버와 텔레그램도 설정된 경우 같은 진단에서 확인하지만 누락만으로 수동 링크 기반 핵심 출시를 막지 않습니다. 이 명령은 실제 소싱이나 발송을 시작하지 않으며, 통과 후 `npm run launch:production -- standard confirm`을 따로 실행해야 첫 가동이 시작됩니다. launch 모드에서 핵심 환경값 프리플라이트가 실패하면 DB/API 라이브 점검은 시작하지 않고 뒤 단계는 `SKIP`으로 남깁니다.
 
 ```powershell
 $env:RETURNPICK_ADMIN_PASSWORD="운영관리자비밀번호"
@@ -387,9 +387,9 @@ npm run deploy:production:go-live
 npm run deploy:production:go-live -- confirm
 ```
 
-같은 순서는 `/admin`의 `승인 후 API 즉시 가동 준비` 패널에서도 `운영 전환 명령 복사` 버튼으로 복사할 수 있습니다. 승인 후 현장에서 해야 할 일은 Vercel Production 환경변수를 채우고, 패널의 실제 연결 테스트를 통과시킨 뒤, 복사한 배포 가드 명령을 순서대로 실행하는 것입니다.
+같은 순서는 `/admin`의 `승인 후 운영 즉시 가동 준비` 패널에서도 `운영 전환 명령 복사` 버튼으로 복사할 수 있습니다. 승인 후 현장에서 해야 할 일은 Vercel Production 환경변수를 채우고, 패널의 실제 연결 테스트를 통과시킨 뒤, 복사한 배포 가드 명령을 순서대로 실행하는 것입니다. 쿠팡 API 키가 아직 없으면 수동 링크 운영으로 시작하고 API 자동화 단계만 보류됩니다.
 
-`check:production`은 운영 `/products/approval-sample`, `/disclosure`, `/robots.txt`, `/sitemap.xml`, `/`, `/admin`, `/api/admin/api-readiness`, 실제 연결 테스트, 비인증 `/api/admin/launch` POST 보호 확인, `/api/admin/scheduler-health`를 호출해 현재 상태를 보고합니다. 승인용 페이지뿐 아니라 공개 제휴 안내 페이지가 200으로 열리고, 쿠팡 파트너스 고지·수수료 안내·가격/재고 변동 안내가 들어 있는지, `robots.txt`가 공개 화면을 허용하면서 `/admin`과 `/api`를 막는지, 사이트맵에 메인·딜 목록·가이드·제휴 안내·승인용 상품 페이지가 포함되는지도 함께 확인합니다. 또한 공개 페이지의 referrer/보안 헤더와 `/admin`, `/api`의 `noindex`·`no-store` 헤더가 운영 배포에 실제 반영됐는지도 확인합니다. 특히 `/api/admin/launch`는 관리자 비밀번호 없이 POST했을 때 실제 데이터 작업을 시작하지 않고 `UNAUTHORIZED`, `ADMIN_PASSWORD_NOT_CONFIGURED`, `ADMIN_PASSWORD_WEAK_CONFIGURATION` 중 하나로 닫히는지 확인합니다. `/admin`에서는 Next.js 정적 JS 청크까지 읽어 `상품별 링크 보강`, `품질 보강 대기`, `링크 보강 큐로 이동`, `품질 보강 후보로 이동` 문구가 실제 배포 번들에 들어 있는지 확인하므로, 관리자 보강 화면을 고쳤지만 Vercel alias가 예전 배포를 보고 있는 상황도 잡을 수 있습니다. 운영 CLI인 `check:production`, `doctor:production`, `schema:production`, `launch:production`은 `RETURNPICK_ADMIN_PASSWORD`/`ADMIN_PASSWORD` 환경변수뿐 아니라 `vercel env pull .env.production --environment=production`으로 내려받은 `.env.production`, `.env.local`, `.env`도 순서대로 읽습니다. 값이 비어 있으면 비밀값을 출력하지 않고 어느 파일의 어떤 키가 빈 값인지 알려줍니다. report 모드의 `check:production`은 관리자 비밀번호가 없으면 관리자 API 실시간 점검만 경고로 건너뛰고 공개 승인 페이지·제휴 안내·robots·sitemap·배포 헤더 검증 결과를 계속 보여줍니다. `check:production:launch`는 관리자 비밀번호와 API 키, 운영 필수 연결이 모두 준비되지 않았으면 실패로 끝납니다. 첫 가동 확인 전이라 `FIRST_LAUNCH_NOT_CONFIRMED`가 나오면 환경변수는 준비된 상태일 수 있으므로 `/admin#admin-first-launch`에서 첫 가동 실행을 완료하세요. 자동 스케줄러까지 완전 가동 중인지 엄격히 보려면 `node scripts/verify-production-readiness.mjs --launch --strict-scheduler`를 사용할 수 있습니다.
+`check:production`은 운영 `/products/approval-sample`, `/disclosure`, `/robots.txt`, `/sitemap.xml`, `/`, `/admin`, `/api/admin/api-readiness`, 실제 연결 테스트, 비인증 `/api/admin/launch` POST 보호 확인, `/api/admin/scheduler-health`를 호출해 현재 상태를 보고합니다. 승인용 페이지뿐 아니라 공개 제휴 안내 페이지가 200으로 열리고, 쿠팡 파트너스 고지·수수료 안내·가격/재고 변동 안내가 들어 있는지, `robots.txt`가 공개 화면을 허용하면서 `/admin`과 `/api`를 막는지, 사이트맵에 메인·딜 목록·가이드·제휴 안내·승인용 상품 페이지가 포함되는지도 함께 확인합니다. 또한 공개 페이지의 referrer/보안 헤더와 `/admin`, `/api`의 `noindex`·`no-store` 헤더가 운영 배포에 실제 반영됐는지도 확인합니다. 특히 `/api/admin/launch`는 관리자 비밀번호 없이 POST했을 때 실제 데이터 작업을 시작하지 않고 `UNAUTHORIZED`, `ADMIN_PASSWORD_NOT_CONFIGURED`, `ADMIN_PASSWORD_WEAK_CONFIGURATION` 중 하나로 닫히는지 확인합니다. `/admin`에서는 Next.js 정적 JS 청크까지 읽어 `상품별 링크 보강`, `품질 보강 대기`, `링크 보강 큐로 이동`, `품질 보강 후보로 이동` 문구가 실제 배포 번들에 들어 있는지 확인하므로, 관리자 보강 화면을 고쳤지만 Vercel alias가 예전 배포를 보고 있는 상황도 잡을 수 있습니다. 운영 CLI인 `check:production`, `doctor:production`, `schema:production`, `launch:production`은 `RETURNPICK_ADMIN_PASSWORD`/`ADMIN_PASSWORD` 환경변수뿐 아니라 `vercel env pull .env.production --environment=production`으로 내려받은 `.env.production`, `.env.local`, `.env`도 순서대로 읽습니다. 값이 비어 있으면 비밀값을 출력하지 않고 어느 파일의 어떤 키가 빈 값인지 알려줍니다. report 모드의 `check:production`은 관리자 비밀번호가 없으면 관리자 API 실시간 점검만 경고로 건너뛰고 공개 승인 페이지·제휴 안내·robots·sitemap·배포 헤더 검증 결과를 계속 보여줍니다. `check:production:launch`는 관리자 비밀번호와 운영 필수 연결이 모두 준비되지 않았으면 실패로 끝나며, 쿠팡 API 키가 없으면 자동화 선택 기능 경고만 남깁니다. 첫 가동 확인 전이라 `FIRST_LAUNCH_NOT_CONFIRMED`가 나오면 환경변수는 준비된 상태일 수 있으므로 `/admin#admin-first-launch`에서 첫 가동 실행을 완료하세요. 자동 스케줄러까지 완전 가동 중인지 엄격히 보려면 `node scripts/verify-production-readiness.mjs --launch --strict-scheduler`를 사용할 수 있습니다.
 
 `check:production`은 `/picks` 검수 추천 허브도 함께 확인합니다. 허브는 공개 딜이 없는 승인 전에도 직접 검수 콘텐츠를 제공하고, 실제 상품이 추가되면 고객공개 품질 기준을 통과한 상품만 자동으로 합칩니다. 그래서 빈 목록을 억지로 채우지 않으면서도 검색·블로그·텔레그램 유입이 구매 전 확인 페이지로 이어집니다.
 
@@ -410,15 +410,15 @@ npm run launch:production -- standard confirm
 
 프리셋은 `quick`, `standard`, `wide` 중 하나입니다. 직접 Node로 실행할 때는 `node scripts/run-production-launch.mjs --preset standard --confirm`처럼 옵션형 인자도 사용할 수 있습니다. 실수 방지를 위해 `confirm` 또는 `--confirm`이 없으면 `/api/admin/launch`를 호출하지 않으며, 준비가 덜 된 상태에서는 `LAUNCH_NOT_READY` 원인을 출력하고 종료합니다. 이때 CLI는 막힌 readiness 항목, 누락 또는 형식 오류가 있는 환경변수, 다음 조치를 함께 출력하므로 API 키를 넣은 직후 어느 Vercel 값이나 Supabase SQL 적용을 고쳐야 하는지 바로 확인할 수 있습니다.
 
-`check:launch`는 `COUPANG_ACCESS_KEY`, `COUPANG_SECRET_KEY`, `COUPANG_PARTNER_ID`, Supabase 키, `ADMIN_PASSWORD`, `CRON_SECRET`, `NEXT_PUBLIC_SITE_URL`이 모두 있어야 통과합니다. 네이버와 텔레그램은 선택 기능으로 별도 상태를 표시합니다.
+`check:launch`는 승인용 파트너스 링크, Supabase 키, `ADMIN_PASSWORD`, `CRON_SECRET`, `NEXT_PUBLIC_SITE_URL`이 있어야 통과합니다. `COUPANG_ACCESS_KEY`, `COUPANG_SECRET_KEY`, `COUPANG_PARTNER_ID`는 최종승인 후 자동 후보 수집을 켤 때 추가하는 선택 기능이며, 네이버와 텔레그램도 별도 상태로 표시합니다.
 
-값이 있어도 형식이 틀리면 통과하지 않습니다. `NEXT_PUBLIC_SITE_URL`과 `NEXT_PUBLIC_SUPABASE_URL`은 외부 접속 가능한 `https://...` 주소여야 하고, `NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL`은 `https://link.coupang.com/a/짧은코드` 형태의 파트너스 링크여야 하며, `CRON_SECRET`은 16자 이상이어야 합니다. `ADMIN_PASSWORD`는 12자 이상 랜덤 문자열이어야 하고 공백, 예시값, `password/test/admin` 같은 쉬운 값은 운영 준비로 보지 않습니다. 필수 쿠팡 API 키는 공백이나 예시 문구 없이 복사된 값이어야 합니다. 선택 네이버 키나 텔레그램 값을 입력했다면 동일하게 형식을 검증하며, 텔레그램 Bot token은 `숫자:토큰`, chat ID는 숫자 또는 `@채널명` 형태여야 합니다. Supabase anon key와 service role key는 각각 완전한 키여야 하고 서로 달라야 합니다.
+값이 있어도 형식이 틀리면 통과하지 않습니다. `NEXT_PUBLIC_SITE_URL`과 `NEXT_PUBLIC_SUPABASE_URL`은 외부 접속 가능한 `https://...` 주소여야 하고, `NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL`은 `https://link.coupang.com/a/짧은코드` 형태의 파트너스 링크여야 하며, `CRON_SECRET`은 16자 이상이어야 합니다. `ADMIN_PASSWORD`는 12자 이상 랜덤 문자열이어야 하고 공백, 예시값, `password/test/admin` 같은 쉬운 값은 운영 준비로 보지 않습니다. 쿠팡 API 키를 입력했다면 공백이나 예시 문구 없이 복사된 값이어야 합니다. 선택 네이버 키나 텔레그램 값을 입력했다면 동일하게 형식을 검증하며, 텔레그램 Bot token은 `숫자:토큰`, chat ID는 숫자 또는 `@채널명` 형태여야 합니다. Supabase anon key와 service role key는 각각 완전한 키여야 하고 서로 달라야 합니다.
 
 `env:check:launch`는 `.env.production`, `.env.local`, `.env`와 현재 프로세스 환경변수의 원본값도 확인해 앞뒤 공백이 섞인 값은 비밀값을 출력하지 않고 실패로 표시합니다.
 
-`/admin`의 `승인 후 API 즉시 가동 준비` 패널에는 `Vercel 환경변수 입력표`가 있습니다. 최종승인 후에는 `누락 키만 복사`로 필요한 변수명을 바로 복사한 뒤 Vercel Environment Variables에 값을 채우고 재배포하세요. `전체 필수 키 복사`에는 운영 기본값인 `CRON_USE_MOCK_FALLBACK=false`, `SOURCING_TIME_BUDGET_MS=52000`, 공개 웹 참고 수집 기본값도 포함됩니다. 공개 URL 값 외의 민감한 키 값은 관리자 화면에 표시하거나 복사하지 않습니다.
+`/admin`의 `승인 후 운영 즉시 가동 준비` 패널에는 `Vercel 환경변수 입력표`가 있습니다. `누락 키만 복사`로 승인용 링크·운영 필수 변수명을 바로 복사한 뒤 Vercel Environment Variables에 값을 채우고 재배포하세요. 쿠팡 API 키 3개는 최종승인 후 자동화를 추가할 때 선택적으로 입력합니다. `전체 필수 키 복사`에는 운영 기본값인 `CRON_USE_MOCK_FALLBACK=false`, `SOURCING_TIME_BUDGET_MS=52000`, 공개 웹 참고 수집 기본값도 포함됩니다. 공개 URL 값 외의 민감한 키 값은 관리자 화면에 표시하거나 복사하지 않습니다.
 
-관리자 첫 화면의 `Launch Command Center`는 현재 상태를 `승인 대기`, `설정 보강`, `첫 가동 가능`으로 요약하고 `준비도 점검`, `첫 가동`, `운영 지표`, `승인용 페이지`로 바로 이동시킵니다. 승인 후에는 이 상단 요약에서 누락 환경변수를 먼저 확인한 뒤 아래 준비도 패널의 복사 버튼과 실제 연결 테스트를 이어가면 됩니다.
+관리자 첫 화면의 `Launch Command Center`는 현재 상태를 `승인 대기`, `수동 출시 가능`, `설정 보강`, `첫 가동 가능`으로 요약하고 `준비도 점검`, `첫 가동`, `운영 지표`, `승인용 페이지`로 바로 이동시킵니다. 승인 후에는 이 상단 요약에서 누락 환경변수를 먼저 확인한 뒤 아래 준비도 패널의 복사 버튼과 실제 연결 테스트를 이어가면 됩니다.
 
 같은 입력표에서 `보안값 생성`을 누르면 브라우저 안에서 `ADMIN_PASSWORD`와 `CRON_SECRET`용 강한 랜덤 값을 만듭니다. 이 값은 서버나 DB에 저장하지 않고 현재 화면과 복사 템플릿에만 들어가므로, Vercel에 붙여넣은 뒤 재배포하고 새 `ADMIN_PASSWORD`로 다시 로그인하면 됩니다.
 
@@ -428,7 +428,7 @@ npm run launch:production -- standard confirm
 
 실제 연결 테스트가 모두 통과하면 `첫 가동 실행으로 이동` 버튼이 나타나 바로 첫 가동 패널로 내려갑니다. 반대로 첫 가동 실행이 환경변수 누락이나 연결 테스트 실패로 막히면 결과 카드의 `준비도 패널로 이동` 버튼으로 다시 올라가 실패 항목을 고칠 수 있습니다. 이런 패널 이동 버튼은 도착한 패널을 잠깐 강조해 긴 관리자 화면에서도 방금 어디로 이동했는지 바로 알 수 있게 합니다. `/admin#admin-api-readiness`, `/admin#admin-first-launch`처럼 해시가 붙은 주소로 직접 들어와도 로그인 후 해당 패널로 이동하고 같은 강조가 적용됩니다. 첫 가동 결과에는 막힌 준비 항목별 메시지, 누락 환경변수, 다음 조치가 같이 표시되므로 `coupang`, `supabase` 같은 내부 ID만 보고 추측하지 않아도 됩니다.
 
-운영 필수 환경변수가 모두 준비된 뒤에는 `/admin`의 `승인 후 첫 가동 실행` 버튼을 누릅니다. 이 버튼은 먼저 쿠팡, Supabase, 공개 상품 데이터 품질, 공개 승인 페이지, Cron 인증, 공개 웹 참고 수집 사용 시 robots.txt 경로 같은 핵심 연결을 확인합니다. 핵심 연결이 하나라도 실패하면 데이터 작업을 시작하지 않고 누락·오류 항목을 보여줍니다. 네이버와 텔레그램 연결 결과도 함께 표시하지만 선택 기능 오류는 핵심 첫 가동을 막지 않습니다. 핵심 검사가 통과하면 목업 없이 첫 소싱을 실행하고 기존 후보의 쿠팡 파트너스 링크를 자동 보강합니다. 네이버 키가 있으면 최저가 보강도 이어서 실행하며, 실패해도 세부 결과를 남기고 첫 가동 확인은 계속할 수 있습니다. 첫 실행 범위는 `빠른 점검`, `표준 런칭`, `넉넉한 런칭` 중에서 고를 수 있으며 기본값은 키워드 6개, 링크 8개, 가격 5개를 처리하는 `표준 런칭`입니다. 후보가 너무 적으면 `넉넉한 런칭`으로 키워드 10개와 링크 12개까지 한 번에 넓혀 시작할 수 있습니다.
+운영 필수 환경변수가 모두 준비된 뒤에는 `/admin`의 `승인 후 첫 가동 실행` 버튼을 누릅니다. 이 버튼은 먼저 Supabase, 공개 상품 데이터 품질, 공개 승인 페이지, Cron 인증, 공개 웹 참고 수집 사용 시 robots.txt 경로 같은 핵심 연결을 확인합니다. 쿠팡 API 키가 있으면 쿠팡 연결도 필수 검사에 포함하고, 없으면 자동 소싱만 대기하는 선택 연결로 표시합니다. 핵심 연결이 하나라도 실패하면 데이터 작업을 시작하지 않고 누락·오류 항목을 보여줍니다. 네이버와 텔레그램 연결 결과도 함께 표시하지만 선택 기능 오류는 핵심 첫 가동을 막지 않습니다. API 권한이 있으면 목업 없이 첫 소싱과 기존 후보의 쿠팡 파트너스 링크 자동 보강을 실행하고, API 권한 전에는 관리자에서 검수한 상품별 링크를 수동 등록·게시합니다. 네이버 키가 있으면 최저가 보강도 이어서 실행하며, 실패해도 세부 결과를 남기고 첫 가동 확인은 계속할 수 있습니다. 첫 실행 범위는 `빠른 점검`, `표준 런칭`, `넉넉한 런칭` 중에서 고를 수 있으며 기본값은 키워드 6개, 링크 8개, 가격 5개를 처리하는 `표준 런칭`입니다. 후보가 너무 적으면 `넉넉한 런칭`으로 키워드 10개와 링크 12개까지 한 번에 넓혀 시작할 수 있습니다.
 
 첫 가동 API는 필수 연결 테스트 카드가 응답에서 아예 빠진 경우도 실패로 처리합니다. 따라서 `public_web`처럼 설정에 따라 필수가 되는 검사나 `data_quality`처럼 Supabase 검사 뒤에 이어지는 카드가 누락되어도 조용히 첫 가동을 통과하지 않고, `MISSING_REQUIRED_CONNECTION_CHECK` 진단으로 어떤 카드가 비었는지 보여줍니다. 연결 테스트가 실패한 경우에는 각 실패 카드의 안전한 메시지와 `operator_next_action`을 첫 가동 응답에도 복사해, 운영자가 같은 문제를 준비도 패널과 첫 가동 패널 양쪽에서 확인할 수 있습니다.
 
@@ -620,7 +620,7 @@ API 승인 전 첫 매출 유입은 `/admin`의 `채널별 첫 매출 배포 키
 3. Environment Variables에 `.env.local`과 같은 값을 등록합니다.
 4. Supabase SQL이 적용되어 있는지 확인합니다.
 5. 배포 후 `NEXT_PUBLIC_SITE_URL`을 실제 도메인으로 바꿉니다.
-6. `/admin` 접속 후 `승인 후 API 즉시 가동 준비` 패널에서 누락된 환경변수와 연결 테스트 결과를 확인합니다.
+6. `/admin` 접속 후 `승인 후 운영 즉시 가동 준비` 패널에서 누락된 환경변수와 연결 테스트 결과를 확인합니다.
 
 ## 14. 운영 체크리스트
 
@@ -673,7 +673,7 @@ GitHub Actions 1시간 스케줄러 설정:
 
 관리자 페이지의 `자동 운영 센터`에서도 `GitHub Actions 설정 복사` 버튼으로 같은 설정값과 점검 절차를 복사할 수 있습니다.
 
-`승인 후 API 즉시 가동 준비` 패널에도 `GitHub 스케줄러 체크 복사` 버튼이 있습니다. GitHub Repository secret 값은 Vercel 앱에서 직접 읽을 수 없으므로, 이 체크리스트를 복사해 `RETURNPICK_CRON_SECRET`이 Vercel의 `CRON_SECRET`과 같은지, `RETURNPICK_SITE_URL`이 운영 주소인지, `ReturnPick Hourly Scheduler` 수동 실행이 200 응답인지 확인하세요.
+`승인 후 운영 즉시 가동 준비` 패널에도 `GitHub 스케줄러 체크 복사` 버튼이 있습니다. GitHub Repository secret 값은 Vercel 앱에서 직접 읽을 수 없으므로, 이 체크리스트를 복사해 `RETURNPICK_CRON_SECRET`이 Vercel의 `CRON_SECRET`과 같은지, `RETURNPICK_SITE_URL`이 운영 주소인지, `ReturnPick Hourly Scheduler` 수동 실행이 200 응답인지 확인하세요.
 
 이 방식도 숨은 리다이렉트나 비공식 수집이 아니라, 이미 보호된 ReturnPick Cron API를 정해진 주기로 호출하는 구조입니다. 운영 준비가 끝나기 전에는 API가 `LAUNCH_NOT_READY` 또는 `FIRST_LAUNCH_NOT_CONFIRMED`로 안전하게 대기합니다.
 
@@ -701,13 +701,13 @@ Cron 라우트는 `?probe=1`을 붙이면 인증만 확인하고 실제 소싱·
 
 운영 배포의 Cron 소싱은 기본적으로 실제 API/허용 소스만 사용합니다. 승인 전 테스트 목적으로만 목업 후보를 자동 수집에 섞고 싶다면 `CRON_USE_MOCK_FALLBACK=true`를 명시하고, 최종승인 후에는 `false`로 돌리세요. 관리자 페이지의 `자동 운영 센터`에서 현재 Cron이 `실제 소스만 사용` 상태인지 바로 확인할 수 있습니다.
 
-운영 배포의 Cron 소싱은 쿠팡·Supabase·공개 URL 등 핵심 설정이 준비되기 전에는 `LAUNCH_NOT_READY`로 데이터 작업을 하지 않습니다. 핵심 환경이 준비된 뒤에도 `/admin`의 `승인 후 첫 가동 실행`이 성공해 `launch_confirmed` 기록이 생기기 전에는 `FIRST_LAUNCH_NOT_CONFIRMED`로 대기합니다. 텔레그램 다이제스트는 이 공통 게이트를 통과한 뒤 Bot 설정이 없으면 `TELEGRAM_NOT_READY`로 발송 작업만 대기하며 예약 소싱은 계속 동작합니다. 자동 운영 센터와 수동 실행 응답은 항목명, 누락 환경변수, 다음 조치를 함께 보여주고 해결 패널로 이동시킵니다. 승인 전 화면 확인은 `자동 후보 수집` 섹션의 목업 실행으로 진행하고, 실제 반복 운영은 첫 가동 준비가 끝난 뒤 켜세요.
+운영 배포의 Cron 소싱은 승인용 상품별 링크·Supabase·공개 URL 등 핵심 설정이 준비되기 전에는 `LAUNCH_NOT_READY`로 데이터 작업을 하지 않습니다. 쿠팡 API 키가 없는 동안에는 `COUPANG_API_NOT_READY`로 자동 소싱만 대기하고 수동 링크 운영은 계속할 수 있습니다. 핵심 환경이 준비된 뒤에도 `/admin`의 `승인 후 첫 가동 실행`이 성공해 `launch_confirmed` 기록이 생기기 전에는 `FIRST_LAUNCH_NOT_CONFIRMED`로 대기합니다. 텔레그램 다이제스트는 이 공통 게이트를 통과한 뒤 Bot 설정이 없으면 `TELEGRAM_NOT_READY`로 발송 작업만 대기하며 예약 소싱은 계속 동작합니다. 자동 운영 센터와 수동 실행 응답은 항목명, 누락 환경변수, 다음 조치를 함께 보여주고 해결 패널로 이동시킵니다. 승인 전 화면 확인은 `자동 후보 수집` 섹션의 목업 실행으로 진행하고, 실제 반복 운영은 첫 가동 준비가 끝난 뒤 켜세요.
 
 소싱은 서버리스 함수 시간 제한을 피하기 위해 기본 52초 예산 안에서 가능한 만큼 처리하고 `completed_partial` 상태로 안전하게 끝날 수 있습니다. 실행 로그에는 `next_keyword_offset`이 저장되며, 다음 Cron 또는 관리자 실행은 이 위치부터 이어서 돌기 때문에 앞쪽 키워드만 반복 수집되는 일을 줄입니다. 운영 초기에 API 응답이 느리면 `SOURCING_KEYWORD_LIMIT=8`처럼 키워드 수를 제한한 뒤 점차 늘릴 수 있습니다.
 
 운영 DB 환경변수(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`)가 없으면 Vercel 서버리스 환경에서는 실행 기록과 후보 저장이 장기 유지되지 않습니다. 승인 전 화면 확인은 가능하지만, 1시간 반복 소싱을 실제 운영하려면 Supabase 연결이 먼저 필요합니다. 관리자 `자동 운영 센터`는 이 상태를 `운영 DB 미연결` 경고로 표시합니다.
 
-관리자 `승인 후 API 즉시 가동 준비` 패널은 상태를 세 단계로 나눕니다. `승인 대기`는 쿠팡 키가 아직 없는 상태이고, `API 키 입력됨`은 쿠팡 키는 있지만 Supabase·관리자·Cron·사이트 URL 같은 운영 필수 설정이 남은 상태입니다. `운영 준비 완료`는 쿠팡 API와 운영 필수 환경변수가 모두 채워진 상태입니다. 네이버와 텔레그램은 별도의 `선택 연동 대기`로 표시되어 핵심 차단 항목과 섞이지 않습니다. 실제 연결 테스트는 Supabase 테이블/컬럼 조회뿐 아니라 `is_strict_coupang_partners_url` DB 함수가 정상 단축 링크만 통과시키는지, `sourcing_runs` 실행 로그와 `affiliate_events` 클릭 이벤트에 짧은 테스트 레코드를 쓸 수 있는지 확인한 뒤 바로 정리합니다. 또한 anon key로 공개 상품·점수·가격 스냅샷이 읽히는지, 비공개로 돌린 뒤에는 다시 숨겨지는지 확인해 실제 사용자 권한 기준 RLS도 검증합니다. 공개 상품 중 제휴 링크가 없거나 `https://link.coupang.com/a/짧은코드` 기준을 만족하지 않는 링크, 승인용 샘플 링크를 재사용한 상품이 있으면 첫 가동을 막아 수익 추적이 깨진 상태로 운영되는 일을 방지합니다. 같은 검사에서 테스트 문자열이 들어간 가짜 파트너스 단축 링크를 공개 상품으로 짧게 저장해 보고 DB 제약이 거부하는지도 확인하므로, `schema.sql`을 최신으로 적용하지 않은 상태도 바로 드러납니다. 마지막으로 공개 Cron 엔드포인트가 `CRON_SECRET`으로 인증되는지 probe 모드로 확인해, Vercel 배포 주소와 예약 실행 인증이 어긋난 상태도 첫 가동 전에 잡습니다. 각 연결 테스트 카드에는 HTTP 상태, 실패 단계, 조회 건수, RLS smoke 결과처럼 비밀키를 제외한 안전한 진단 세부정보가 표시되어 API 키를 넣은 직후 어떤 설정을 고쳐야 하는지 바로 확인할 수 있습니다.
+관리자 `승인 후 운영 즉시 가동 준비` 패널은 상태를 `승인 대기`, `수동 출시 가능`, `API 키 입력됨`, `운영 준비 완료`로 구분합니다. `수동 출시 가능`은 승인용 링크와 Supabase·관리자·Cron·사이트 URL 같은 운영 필수 설정이 갖춰져 상품별 파트너스 링크를 검수·게시할 수 있는 상태입니다. `API 키 입력됨`은 쿠팡 API 자동화 키는 있지만 운영 필수 설정이 남은 상태이고, `운영 준비 완료`는 자동화까지 포함한 운영 필수 환경변수가 모두 채워진 상태입니다. 네이버와 텔레그램은 별도의 `선택 연동 대기`로 표시되어 핵심 차단 항목과 섞이지 않습니다. 실제 연결 테스트는 Supabase 테이블/컬럼 조회뿐 아니라 `is_strict_coupang_partners_url` DB 함수가 정상 단축 링크만 통과시키는지, `sourcing_runs` 실행 로그와 `affiliate_events` 클릭 이벤트에 짧은 테스트 레코드를 쓸 수 있는지 확인한 뒤 바로 정리합니다. 또한 anon key로 공개 상품·점수·가격 스냅샷이 읽히는지, 비공개로 돌린 뒤에는 다시 숨겨지는지 확인해 실제 사용자 권한 기준 RLS도 검증합니다. 공개 상품 중 제휴 링크가 없거나 `https://link.coupang.com/a/짧은코드` 기준을 만족하지 않는 링크, 승인용 샘플 링크를 재사용한 상품이 있으면 첫 가동을 막아 수익 추적이 깨진 상태로 운영되는 일을 방지합니다. 같은 검사에서 테스트 문자열이 들어간 가짜 파트너스 단축 링크를 공개 상품으로 짧게 저장해 보고 DB 제약이 거부되는지도 확인하므로, `schema.sql`을 최신으로 적용하지 않은 상태도 바로 드러납니다. 마지막으로 공개 Cron 엔드포인트가 `CRON_SECRET`으로 인증되는지 probe 모드로 확인해, Vercel 배포 주소와 예약 실행 인증이 어긋난 상태도 첫 가동 전에 잡습니다. 각 연결 테스트 카드에는 HTTP 상태, 실패 단계, 조회 건수, RLS smoke 결과처럼 비밀키를 제외한 안전한 진단 세부정보가 표시되어 API 키를 넣은 직후 어떤 설정을 고쳐야 하는지 바로 확인할 수 있습니다.
 
 Supabase schema version이 맞지 않으면 관리자 패널에 `Supabase 최신 SQL 적용 필요` 카드가 따로 표시됩니다. 이 카드에는 기대 버전과 현재 DB 버전이 같이 나오므로, Supabase SQL Editor에서 `sql/schema.sql` 전체를 다시 실행하고 Vercel을 재배포한 뒤 실제 연결 테스트를 다시 누르면 됩니다. 카드의 `SQL 적용 체크리스트 복사`를 누르면 로컬 `C:\projects\returnpick\sql\schema.sql` 파일 전체를 실행해야 한다는 안내와 확인 항목을 바로 복사할 수 있습니다.
 
@@ -764,7 +764,7 @@ curl http://localhost:3000/api/cron/telegram-digest
 - 제휴 URL 누락, 반품가/등급 확인, 오래된 게시 상품 재검수 큐
 - 관리자가 수동으로 `지금 소싱` 또는 `텔레그램 후보 발송`을 실행하는 버튼
 
-수동 실행 또는 상태 조회가 실패하면 화면에 `LAUNCH_NOT_READY`, `FIRST_LAUNCH_NOT_CONFIRMED`, `TELEGRAM_NOT_READY`, `SCHEDULER_RUN_FAILED`처럼 비밀키를 제외한 안전한 사유가 바로 표시됩니다. `LAUNCH_NOT_READY`일 때는 `COUPANG_ACCESS_KEY`, `SUPABASE_SERVICE_ROLE_KEY`처럼 핵심 출시에 필요한 누락 환경변수와 다음 조치가 같이 나오고 `준비도 패널로 이동` 버튼이 나타납니다. `FIRST_LAUNCH_NOT_CONFIRMED`일 때는 `승인 후 첫 가동 실행으로 이동` 버튼이 나타나며, `TELEGRAM_NOT_READY`는 사이트 운영을 막지 않고 텔레그램 작업만 대기시킵니다. 버튼은 이동 후 대상 패널을 짧게 강조하므로 어떤 준비가 막혔는지 추측하지 않아도 됩니다. 네트워크 문제와 서버 예외도 브라우저 알림에 의존하지 않고 같은 패널 안에 남깁니다.
+수동 실행 또는 상태 조회가 실패하면 화면에 `LAUNCH_NOT_READY`, `COUPANG_API_NOT_READY`, `FIRST_LAUNCH_NOT_CONFIRMED`, `TELEGRAM_NOT_READY`, `SCHEDULER_RUN_FAILED`처럼 비밀키를 제외한 안전한 사유가 바로 표시됩니다. `LAUNCH_NOT_READY`일 때는 `SUPABASE_SERVICE_ROLE_KEY`처럼 핵심 출시에 필요한 누락 환경변수와 다음 조치가 같이 나오고 `준비도 패널로 이동` 버튼이 나타납니다. `COUPANG_API_NOT_READY`는 수동 상품별 링크 운영을 유지하면서 자동 후보 수집만 대기하는 상태입니다. `FIRST_LAUNCH_NOT_CONFIRMED`일 때는 `승인 후 첫 가동 실행으로 이동` 버튼이 나타나며, `TELEGRAM_NOT_READY`는 사이트 운영을 막지 않고 텔레그램 작업만 대기시킵니다. 버튼은 이동 후 대상 패널을 짧게 강조하므로 어떤 준비가 막혔는지 추측하지 않아도 됩니다. 네트워크 문제와 서버 예외도 브라우저 알림에 의존하지 않고 같은 패널 안에 남깁니다.
 
 `/admin`의 실제 연결 테스트 중 `공개 상품 데이터 품질` 카드는 고객공개 기준을 막는 blocker를 집계해 `public_quality_blocker_summary`로 보여줍니다. 예를 들어 상품별 파트너스 링크 누락, 반품가 확인 필요, 상품 이미지 누락 중 무엇이 가장 많은지 바로 알 수 있고, `operator_next_action`에는 최다 blocker부터 보강하라는 다음 조치가 표시됩니다.
 

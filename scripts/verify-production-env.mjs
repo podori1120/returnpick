@@ -121,15 +121,15 @@ function isPublicWebTemplate(template, allowedHosts) {
 
 const checks = [
   { name: "NEXT_PUBLIC_SITE_URL", required: true, validate: validatePublicHttpsUrl, hint: "external HTTPS URL" },
-  { name: "NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL", required: false, validate: validateCoupangPartnersUrl, hint: "Coupang Partners short URL" },
+  { name: "NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL", required: true, validate: validateCoupangPartnersUrl, hint: "Coupang Partners short URL" },
   { name: "ADMIN_PASSWORD", required: true, validate: validateAdminPassword, hint: "12+ chars, non-placeholder, no whitespace" },
   { name: "CRON_SECRET", required: true, validate: (value) => validateProviderSecret(value, 16), hint: "16+ chars, non-placeholder" },
   { name: "NEXT_PUBLIC_SUPABASE_URL", required: true, validate: validatePublicHttpsUrl, hint: "Supabase project HTTPS URL" },
   { name: "NEXT_PUBLIC_SUPABASE_ANON_KEY", required: true, validate: validateSupabaseKey, hint: "complete anon key" },
   { name: "SUPABASE_SERVICE_ROLE_KEY", required: true, validate: validateSupabaseKey, hint: "complete service role key" },
-  { name: "COUPANG_ACCESS_KEY", required: true, validate: (value) => validateProviderSecret(value, 8), hint: "official API key" },
-  { name: "COUPANG_SECRET_KEY", required: true, validate: (value) => validateProviderSecret(value, 8), hint: "official API secret" },
-  { name: "COUPANG_PARTNER_ID", required: true, validate: (value) => validateProviderSecret(value, 2), hint: "partner ID" },
+  { name: "COUPANG_ACCESS_KEY", required: false, validate: (value) => validateProviderSecret(value, 8), hint: "optional official API key for automated sourcing" },
+  { name: "COUPANG_SECRET_KEY", required: false, validate: (value) => validateProviderSecret(value, 8), hint: "optional official API secret for automated sourcing" },
+  { name: "COUPANG_PARTNER_ID", required: false, validate: (value) => validateProviderSecret(value, 2), hint: "optional partner ID for automated sourcing" },
   { name: "NAVER_CLIENT_ID", required: false, validate: (value) => validateProviderSecret(value, 5), hint: "optional Naver client ID for price comparison" },
   { name: "NAVER_CLIENT_SECRET", required: false, validate: (value) => validateProviderSecret(value, 5), hint: "optional Naver client secret for price comparison" },
   { name: "TELEGRAM_BOT_TOKEN", required: false, validate: validateTelegramBotToken, hint: "optional 123456:bot-token for Telegram delivery" },
@@ -290,7 +290,7 @@ function printNextActions() {
 printNextActions();
 
 if (launchMode && warnings.length) {
-  console.log("launch mode: core required values must be present before first launch; optional Naver and Telegram gaps remain warnings.");
+  console.log("launch mode: site, manual partner link, Supabase, admin, and scheduler values are required; Coupang API, Naver, and Telegram gaps remain warnings.");
 } else {
   console.log("report mode: missing post-approval provider keys are warnings; invalid present values are failures.");
 }

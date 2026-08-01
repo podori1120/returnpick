@@ -171,7 +171,7 @@ function getLaunchNextAction(result: LaunchResult): LaunchNextAction {
   if (errorStepIds.has("connection_checks")) {
     return {
       title: "다음 조치: 실제 연결 테스트 실패 카드를 먼저 고치세요.",
-      description: "쿠팡, Supabase, 공개 사이트, Cron 중 실패한 핵심 카드의 메시지를 보고 Vercel 환경변수나 SQL 적용 상태를 수정한 뒤 다시 실행하세요.",
+      description: "Supabase, 공개 사이트, Cron 중 실패한 핵심 카드의 메시지를 보고 Vercel 환경변수나 SQL 적용 상태를 수정한 뒤 다시 실행하세요. 쿠팡 API는 자동화 권한이 있는 경우에만 핵심 연결로 확인합니다.",
       tone: "error"
     };
   }
@@ -220,7 +220,7 @@ function getLaunchNextAction(result: LaunchResult): LaunchNextAction {
     const missing = result.readiness?.blockingEnv?.join(", ");
     return {
       title: "다음 조치: 준비도 패널에서 누락 환경변수를 채우세요.",
-      description: missing ? `먼저 Vercel에 ${missing} 값을 넣고 재배포한 뒤 실제 연결 테스트를 다시 실행하세요.` : "승인 후 API 즉시 가동 준비 패널에서 누락 항목과 실패한 연결 테스트를 확인하세요.",
+      description: missing ? `먼저 Vercel에 ${missing} 값을 넣고 재배포한 뒤 실제 연결 테스트를 다시 실행하세요.` : "승인 후 운영 즉시 가동 준비 패널에서 누락 항목과 실패한 연결 테스트를 확인하세요.",
       tone: "warning"
     };
   }
@@ -300,7 +300,7 @@ export default function AdminLaunchRunner({ password, onCompleted }: { password:
           <p className="text-sm font-black text-pine">Post Approval Launch</p>
           <h2 className="text-xl font-black">승인 후 첫 가동 실행</h2>
           <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-steel">
-            쿠팡 API와 Supabase 등 핵심 환경이 준비된 뒤 누릅니다. 목업 없이 작은 단위로 첫 소싱과 파트너스 링크 보강을 실행하며, 네이버 최저가는 API가 연결된 경우에만 보강합니다.
+            Supabase·사이트·관리자·Cron 등 출시 필수 환경이 준비된 뒤 누릅니다. API 권한 전에는 수동으로 검수한 상품별 파트너스 링크 운영을 확인하고, API 권한이 열리면 목업 없이 작은 단위로 자동 후보 수집과 링크 보강을 실행합니다. 네이버 최저가는 API가 연결된 경우에만 보강합니다.
           </p>
           {notice ? <p className="mt-2 text-sm font-black text-pine" role="status">{notice}</p> : null}
         </div>

@@ -16,7 +16,6 @@ const transpiled = ts.transpileModule(source, {
 const policy = await import(`data:text/javascript;base64,${Buffer.from(transpiled).toString("base64")}`);
 
 const readyCoreItems = [
-  "coupang",
   "supabase",
   "site",
   "approval_link",
@@ -25,6 +24,7 @@ const readyCoreItems = [
 ].map((id) => ({ id, state: "ready" }));
 const optionalMissingItems = [
   ...readyCoreItems,
+  { id: "coupang", state: "missing" },
   { id: "naver", state: "missing" },
   { id: "telegram", state: "missing" },
   { id: "public_web", state: "disabled" }
@@ -33,18 +33,18 @@ const optionalMissingItems = [
 assert.deepEqual(
   policy.getLaunchBlockingItemIds(optionalMissingItems, false),
   [],
-  "Naver and Telegram must not block core sourcing and publishing"
+  "Coupang API, Naver, and Telegram must not block manual-link publishing"
 );
 assert.deepEqual(
   policy.evaluateLaunchReadiness(optionalMissingItems, false),
   {
-    apiKeysReady: true,
+    apiKeysReady: false,
     runtimeReady: true,
     launchReady: true,
     blockingItemIds: [],
     optionalMissingItemIds: ["naver", "telegram"]
   },
-  "core readiness must become launch-ready while optional capabilities remain visible"
+  "manual-link readiness must become launch-ready while automation capabilities remain visible"
 );
 assert.deepEqual(
   policy.getOptionalMissingItemIds(optionalMissingItems),
@@ -63,7 +63,17 @@ assert.deepEqual(
 assert.deepEqual(
   policy.getRequiredConnectionCheckIds(false),
   ["coupang", "supabase", "data_quality", "site_live", "cron"],
-  "core first-launch checks must exclude optional providers"
+  "API-ready first-launch checks must include Coupang while excluding optional providers"
+);
+assert.deepEqual(
+  policy.getRequiredConnectionCheckIds(false, false),
+  ["supabase", "data_quality", "site_live", "cron"],
+  "manual-link first-launch checks must wait for Coupang API without blocking"
+);
+assert.deepEqual(
+  policy.getOptionalConnectionCheckIds(false),
+  ["coupang", "naver", "telegram"],
+  "manual-link mode must expose Coupang API as a non-blocking optional connection"
 );
 assert.equal(
   policy.hasBlockingLaunchError([{ status: "error", blocking: false }]),

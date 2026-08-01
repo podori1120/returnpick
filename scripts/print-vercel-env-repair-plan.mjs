@@ -20,11 +20,6 @@ const requiredGroups = [
     names: ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"],
     action: "Copy the project URL, anon key, and service role key from Supabase. The two keys must be different."
   },
-  {
-    label: "Coupang Partners API",
-    names: ["COUPANG_ACCESS_KEY", "COUPANG_SECRET_KEY", "COUPANG_PARTNER_ID"],
-    action: "After final approval, copy the official Partners API values from Coupang Partners."
-  }
 ];
 
 const optionalGroups = [
@@ -37,6 +32,11 @@ const optionalGroups = [
     label: "Telegram",
     names: ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"],
     action: "Add the BotFather token and target chat ID to activate delivery; missing values gate only the Telegram job."
+  },
+  {
+    label: "Coupang Partners API automation",
+    names: ["COUPANG_ACCESS_KEY", "COUPANG_SECRET_KEY", "COUPANG_PARTNER_ID"],
+    action: "After final approval, add the official Partners API values to activate automatic sourcing and deeplink repair; manual product-level links remain usable without them."
   }
 ];
 

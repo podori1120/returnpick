@@ -497,10 +497,11 @@ if (
       policy.includes('CORE_RUNTIME_ITEM_IDS = ["supabase", "site", "approval_link", "admin_password", "cron_secret"]') &&
       policy.includes("getLaunchBlockingItemIds") &&
       policy.includes("getRequiredConnectionCheckIds") &&
-      policyCheck.includes("Naver and Telegram must not block core sourcing and publishing") &&
+      policyCheck.includes("Coupang API, Naver, and Telegram must not block manual-link publishing") &&
+      policy.includes("launchReady: runtimeReady && blockingItemIds.length === 0") &&
       policy.includes("evaluateLaunchReadiness") &&
       readiness.includes("evaluateLaunchReadiness(items, publicWebEnabled)"),
-    "core launch requires durable storage, Coupang, public/admin/cron safety, while Naver and Telegram stay visible as optional capabilities",
+    "manual-link launch requires durable storage and public/admin/cron safety, while Coupang API, Naver, and Telegram stay visible as optional capabilities",
     "required"
   );
   check(
@@ -1132,7 +1133,7 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-env.mjs"
       vercelEnvVerifier.indexOf('"NAVER_CLIENT_ID"') > vercelEnvVerifier.indexOf("const recommendedNames") &&
       envRepairPlan.includes("Optional capabilities (do not block core launch)") &&
       envRepairPlan.includes("missing values gate only the Telegram job"),
-    "launch-mode env checks require Coupang and Supabase but report Naver and Telegram as optional capability setup",
+    "launch-mode env checks require the manual approval link and Supabase while reporting Coupang API, Naver, and Telegram as optional capability setup",
     "required"
   );
   check(
@@ -3676,7 +3677,7 @@ if (fileExists("app/api/admin/launch/route.ts")) {
     launchRoute.includes("hasBlockingLaunchError") &&
       launchRoute.includes("blocking: false") &&
       launchRoute.includes("optionalConnectionCheckIds") &&
-      launchRoute.includes("텔레그램 다이제스트는 텔레그램 연동이 준비된 경우에만 발송합니다"),
+      launchRoute.includes("네이버와 텔레그램은 설정된 경우 별도 기능으로 동작합니다."),
     "first launch can confirm after core checks even when Naver backfill or Telegram delivery is not configured",
     "required"
   );
@@ -4621,13 +4622,13 @@ if (fileExists("app/admin/page.tsx")) {
   );
 }
 
-checkEnvGroup("env: approval page", ["NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL"], "warning");
+checkEnvGroup("env: approval page", ["NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL"], mode === "launch" ? "required" : "warning");
 checkEnvGroup("env: site/admin", ["NEXT_PUBLIC_SITE_URL", "ADMIN_PASSWORD"], mode === "launch" ? "required" : "warning");
 checkEnvGroup("env: cron", ["CRON_SECRET"], mode === "launch" ? "required" : "warning");
 checkEnvGroup("env: supabase", ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"], mode === "launch" ? "required" : "warning");
-checkEnvGroup("env: coupang partners api", ["COUPANG_ACCESS_KEY", "COUPANG_SECRET_KEY", "COUPANG_PARTNER_ID"], mode === "launch" ? "required" : "warning");
-checkEnvGroup("env: naver shopping api", ["NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET"], mode === "launch" ? "required" : "warning");
-checkEnvGroup("env: telegram", ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"], mode === "launch" ? "required" : "warning");
+checkEnvGroup("env: coupang partners api", ["COUPANG_ACCESS_KEY", "COUPANG_SECRET_KEY", "COUPANG_PARTNER_ID"], "warning");
+checkEnvGroup("env: naver shopping api", ["NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET"], "warning");
+checkEnvGroup("env: telegram", ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"], "warning");
 if (envValue("PUBLIC_WEB_CRAWL_ENABLED") === "true") {
   checkEnvGroup("env: public web crawl", ["PUBLIC_WEB_ALLOWED_HOSTS", "PUBLIC_WEB_SEARCH_TEMPLATES"], "required");
 }
@@ -4798,7 +4799,7 @@ console.log(`summary: ${results.length - failedRequired.length - warnings.length
 if (mode === "preapproval") {
   console.log("preapproval mode: missing API keys are warnings so the site can run with manual links and mock fallback.");
 } else {
-  console.log("launch mode: API, Supabase, admin, and cron environment variables must be set.");
+  console.log("launch mode: approval link, Supabase, admin, and scheduler values are required; Coupang API, Naver, and Telegram are optional capabilities.");
 }
 
 if (failedRequired.length) {

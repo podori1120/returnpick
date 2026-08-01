@@ -195,7 +195,12 @@ function launchRecoveryNextAction(actions: LaunchRecoveryAction[]) {
   return actions.map((action, index) => `${index + 1}. ${action.next_action}`).join(" ");
 }
 
-function getLaunchDataSignal(before: ProductSummary, after: ProductSummary, progress: LaunchProgressSignal) {
+function getLaunchDataSignal(
+  before: ProductSummary,
+  after: ProductSummary,
+  progress: LaunchProgressSignal,
+  options: { manualMode?: boolean; approvalLinkReady?: boolean } = {}
+) {
   const delta = deltaSummary(before, after);
   const recoveryActions = getLaunchRecoveryActions(before, after, progress);
   const currentLaunchProgress =
@@ -211,11 +216,13 @@ function getLaunchDataSignal(before: ProductSummary, after: ProductSummary, prog
     delta.missing_affiliate_reduced > 0 ||
     delta.naver_missing_reduced > 0;
   const existingPublicReadyInventory = after.published_public_ready > 0;
+  const manualLaunchSurface = Boolean(options.manualMode && options.approvalLinkReady);
   return {
-    ok: currentLaunchProgress || existingPublicReadyInventory,
+    ok: currentLaunchProgress || existingPublicReadyInventory || manualLaunchSurface,
     current_launch_progress: currentLaunchProgress,
     existing_public_affiliate_ready: existingPublicReadyInventory,
     existing_public_customer_ready: existingPublicReadyInventory,
+    manual_launch_surface: manualLaunchSurface,
     progress,
     delta,
     recovery_actions: recoveryActions,
@@ -237,6 +244,8 @@ export async function POST(request: Request) {
   const steps: LaunchStep[] = [];
   const readiness = getApiReadinessSummary();
   const beforeSummary = await productSummary();
+  const manualMode = !readiness.apiKeysReady;
+  const approvalLinkReady = readiness.items.some((item) => item.id === "approval_link" && item.state === "ready");
   const progressSignal: LaunchProgressSignal = {
     sourcing_found_count: 0,
     sourcing_inserted_count: 0,
@@ -276,7 +285,9 @@ export async function POST(request: Request) {
     id: "preflight",
     label: "운영 준비 확인",
     status: "ok",
-    message: "운영 필수 환경변수가 모두 입력되어 첫 가동을 시작합니다.",
+    message: manualMode
+      ? "수동 제휴 링크 출시 필수 설정이 준비되어 첫 가동을 시작합니다. 쿠팡 API 자동 수집은 권한이 열릴 때까지 대기합니다."
+      : "운영 필수 환경변수가 모두 입력되어 첫 가동을 시작합니다.",
     detail: { mode: readiness.mode }
   });
 
@@ -324,7 +335,7 @@ export async function POST(request: Request) {
     id: "connection_checks",
     label: "실제 연결 테스트",
     status: "ok",
-    message: "쿠팡, Supabase, 공개 승인 페이지와 Cron 연결이 확인되었습니다. 네이버와 텔레그램은 설정된 경우 별도 기능으로 동작합니다. 텔레그램 다이제스트는 텔레그램 연동이 준비된 경우에만 발송합니다.",
+    message: `${manualMode ? "Supabase, 공개 승인 페이지와 Cron" : "쿠팡, Supabase, 공개 승인 페이지와 Cron"} 연결이 확인되었습니다. ${manualMode ? "상품별 파트너스 링크는 관리자 수동 등록으로 운영하고 쿠팡 API는 대기합니다." : "쿠팡 API 자동 수집과 링크 보강을 실행할 수 있습니다."} 네이버와 텔레그램은 설정된 경우 별도 기능으로 동작합니다.`,
     detail: {
       required_check_ids: requiredConnectionCheckIds,
       optional_check_ids: readiness.optionalConnectionCheckIds,
@@ -332,43 +343,59 @@ export async function POST(request: Request) {
     }
   });
 
-  try {
-    const keywordOffset = await getNextSourcingKeywordOffset();
-    const run = await runSourcing({
-      useMockFallback: false,
-      keywordLimit: sourcingKeywordLimit,
-      keywordOffset,
-      timeBudgetMs: sourcingTimeBudgetMs
-    });
-    progressSignal.sourcing_found_count = run.found_count;
-    progressSignal.sourcing_inserted_count = run.inserted_count;
-    progressSignal.sourcing_updated_count = run.updated_count;
+  if (manualMode) {
     steps.push({
       id: "sourcing",
-      label: "목업 없는 첫 후보 수집",
-      status: run.status === "error" ? "error" : "ok",
-      message: `키워드 ${run.keyword_count}개 처리, 후보 ${run.found_count}개 발견, 추가 ${run.inserted_count}개, 갱신 ${run.updated_count}개`,
-      detail: run
+      label: "쿠팡 API 자동 후보 수집",
+      status: "skipped",
+      message: "쿠팡 API 권한이 없어 자동 후보 수집은 대기합니다. 관리자에서 상품별 파트너스 링크를 확인한 후보만 수동으로 게시할 수 있습니다.",
+      detail: {
+        skipped_reason: "COUPANG_API_NOT_READY",
+        operator_next_action: "최종승인 후 쿠팡 API 키를 등록하면 자동 후보 수집과 딥링크 보강을 시작할 수 있습니다."
+      },
+      blocking: false
     });
-  } catch (error) {
-    steps.push({
-      id: "sourcing",
-      label: "목업 없는 첫 후보 수집",
-      status: "error",
-      message: error instanceof Error ? error.message : "SOURCING_LAUNCH_FAILED"
-    });
+  } else {
+    try {
+      const keywordOffset = await getNextSourcingKeywordOffset();
+      const run = await runSourcing({
+        useMockFallback: false,
+        keywordLimit: sourcingKeywordLimit,
+        keywordOffset,
+        timeBudgetMs: sourcingTimeBudgetMs
+      });
+      progressSignal.sourcing_found_count = run.found_count;
+      progressSignal.sourcing_inserted_count = run.inserted_count;
+      progressSignal.sourcing_updated_count = run.updated_count;
+      steps.push({
+        id: "sourcing",
+        label: "목업 없는 첫 후보 수집",
+        status: run.status === "error" ? "error" : "ok",
+        message: `키워드 ${run.keyword_count}개 처리, 후보 ${run.found_count}개 발견, 추가 ${run.inserted_count}개, 갱신 ${run.updated_count}개`,
+        detail: run
+      });
+    } catch (error) {
+      steps.push({
+        id: "sourcing",
+        label: "목업 없는 첫 후보 수집",
+        status: "error",
+        message: error instanceof Error ? error.message : "SOURCING_LAUNCH_FAILED"
+      });
+    }
   }
 
   let summary = await productSummary();
   let launchDelta = deltaSummary(beforeSummary, summary);
-  let launchDataSignal = getLaunchDataSignal(beforeSummary, summary, progressSignal);
+  let launchDataSignal = getLaunchDataSignal(beforeSummary, summary, progressSignal, { manualMode, approvalLinkReady });
   let launchConfirmation = null;
   if (!hasBlockingLaunchError(steps) && !launchDataSignal.ok) {
     steps.push({
       id: "launch_data_signal",
       label: "첫 가동 데이터 신호 확인",
       status: "error",
-      message: "실제 연결은 통과했지만 새 후보, 검토 대기, 파트너스 링크, 네이버 가격 보강, 고객공개 가능 상품 변화가 없습니다. 키워드 조건이나 API 검색 결과를 확인한 뒤 다시 실행하세요.",
+      message: manualMode
+        ? "수동 출시 화면은 준비됐지만 실제 공개 상품이 없습니다. 관리자에서 상품별 쿠팡 파트너스 링크를 등록하고 검수 후 게시하세요."
+        : "실제 연결은 통과했지만 새 후보, 검토 대기, 파트너스 링크, 네이버 가격 보강, 고객공개 가능 상품 변화가 없습니다. 키워드 조건이나 API 검색 결과를 확인한 뒤 다시 실행하세요.",
       detail: {
         reason: "NO_LAUNCH_DATA_SIGNAL",
         current_launch_progress: launchDataSignal.current_launch_progress,
@@ -408,7 +435,9 @@ export async function POST(request: Request) {
       id: "launch_confirmed",
       label: "자동 운영 시작 확인",
       status: "ok",
-      message: "핵심 후보 신호와 연결 테스트를 먼저 기록했습니다. 예약 소싱은 즉시 실행할 수 있고, 링크·가격 보강은 남은 시간 안에서 이어집니다.",
+      message: manualMode
+        ? "수동 제휴 링크 출시 상태를 기록했습니다. 상품별 링크를 검수해 게시하고, 쿠팡 API 권한이 열리면 자동 소싱을 켜세요."
+        : "핵심 후보 신호와 연결 테스트를 먼저 기록했습니다. 예약 소싱은 즉시 실행할 수 있고, 링크·가격 보강은 남은 시간 안에서 이어집니다.",
       detail: { run_id: launchConfirmation.id, confirmed_at: launchConfirmation.finished_at }
     });
   } catch (error) {
@@ -436,13 +465,15 @@ export async function POST(request: Request) {
     });
   }
 
-  const affiliateTimeBudgetMs = enrichmentBudget(launchStartedAt, 10_000, 4_000);
+  const affiliateTimeBudgetMs = manualMode ? 0 : enrichmentBudget(launchStartedAt, 10_000, 4_000);
   if (!affiliateTimeBudgetMs) {
     steps.push({
       id: "affiliate_backfill",
       label: "쿠팡 파트너스 링크 자동 보강",
       status: "skipped",
-      message: "자동 운영 시작 확인을 먼저 저장했습니다. 남은 실행 시간이 짧아 링크 보강은 다음 예약 작업으로 넘겼습니다.",
+      message: manualMode
+        ? "쿠팡 API 권한이 없어 링크 자동 보강은 대기합니다. 관리자 링크 검수 큐에서 상품별 파트너스 링크를 등록하세요."
+        : "자동 운영 시작 확인을 먼저 저장했습니다. 남은 실행 시간이 짧아 링크 보강은 다음 예약 작업으로 넘겼습니다.",
       detail: { deferred: true, operator_next_action: "다음 예약 링크 보강 또는 관리자 링크 검수 큐에서 처리하세요." },
       blocking: false
     });
@@ -504,7 +535,7 @@ export async function POST(request: Request) {
 
   summary = await productSummary();
   launchDelta = deltaSummary(beforeSummary, summary);
-  launchDataSignal = getLaunchDataSignal(beforeSummary, summary, progressSignal);
+  launchDataSignal = getLaunchDataSignal(beforeSummary, summary, progressSignal, { manualMode, approvalLinkReady });
   const finalHasError = hasBlockingLaunchError(steps);
 
   return NextResponse.json({

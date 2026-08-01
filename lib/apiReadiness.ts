@@ -10,8 +10,8 @@ import {
 import { getCustomerPublishReadiness } from "@/lib/quality";
 import {
   OPTIONAL_CAPABILITY_ITEM_IDS,
-  OPTIONAL_CONNECTION_CHECK_IDS,
   evaluateLaunchReadiness,
+  getOptionalConnectionCheckIds,
   getRequiredConnectionCheckIds
 } from "@/lib/launchCapabilityPolicy";
 import { getSupabaseAnonClient, getSupabaseServiceClient, hasSupabaseConfig } from "@/lib/supabase";
@@ -19,7 +19,7 @@ import type { JsonValue, ProductWithScore } from "@/lib/types";
 import { isStrongAdminPassword } from "@/lib/validators";
 
 type ReadinessState = "ready" | "missing" | "partial" | "disabled";
-type ReadinessMode = "pre_approval" | "api_ready" | "launch_ready";
+type ReadinessMode = "pre_approval" | "manual_launch_ready" | "api_ready" | "launch_ready";
 
 const EXPECTED_SCHEMA_VERSION = "2026-07-31-product-observation-time";
 
@@ -674,11 +674,11 @@ function buildCoupangItem(): ApiReadinessItem {
     requiredEnv,
     missingEnv: ready ? [] : issueEnv,
     message: ready
-      ? "쿠팡 검색과 딥링크 생성에 필요한 키가 모두 입력되어 있습니다."
+      ? "쿠팡 API 검색과 딥링크 자동 보강에 필요한 키가 모두 입력되어 있습니다."
       : missingEnv.length
-        ? "최종승인 전에는 정상입니다. 승인 후 쿠팡 API 키 3개를 모두 넣어야 쿠팡 API 소싱이 켜집니다."
-        : "쿠팡 API 값에 공백, 너무 짧은 값, 또는 예시/placeholder 값이 포함된 것 같습니다.",
-    nextAction: "최종승인 후 COUPANG_ACCESS_KEY, COUPANG_SECRET_KEY, COUPANG_PARTNER_ID를 쿠팡 파트너스 API 메뉴에서 다시 복사해 Vercel에 등록하세요."
+        ? "API 권한이 아직 없어도 상품별로 확인한 쿠팡 파트너스 링크를 수동 등록해 사이트를 운영할 수 있습니다."
+        : "쿠팡 API 값에 공백, 너무 짧은 값, 또는 예시/placeholder 값이 포함된 것 같습니다. 수동 링크 운영은 계속할 수 있습니다.",
+    nextAction: "자동 후보 수집과 딥링크 보강이 필요해지면 최종승인 후 쿠팡 파트너스 API 메뉴에서 COUPANG_ACCESS_KEY, COUPANG_SECRET_KEY, COUPANG_PARTNER_ID를 발급해 Vercel에 등록하세요."
   };
 }
 
@@ -690,12 +690,12 @@ function readableCoupangReadinessItem(item: ApiReadinessItem): ApiReadinessItem 
     ...item,
     label: "쿠팡 파트너스 API",
     message: ready
-      ? "쿠팡 검색과 파트너스 딥링크 생성에 필요한 키 3개가 모두 입력되어 있습니다."
+      ? "쿠팡 API 검색과 파트너스 딥링크 자동 보강에 필요한 키 3개가 모두 입력되어 있습니다."
       : allMissing
-        ? "최종승인 전에는 정상 대기 상태입니다. 승인 후 쿠팡 파트너스 API 메뉴에서 키 3개를 모두 발급받아 넣으면 API 소싱이 켜집니다."
-        : "쿠팡 API 값에 공백, 너무 짧은 값, 예시/placeholder 값이 포함된 것 같습니다.",
+        ? "API 권한 대기 중입니다. 상품별로 확인한 쿠팡 파트너스 링크를 수동 등록하면 사이트 출시는 가능합니다."
+        : "쿠팡 API 값에 공백, 너무 짧은 값, 예시/placeholder 값이 포함된 것 같습니다. 수동 링크 운영은 계속할 수 있습니다.",
     nextAction:
-      "최종승인 후 COUPANG_ACCESS_KEY, COUPANG_SECRET_KEY, COUPANG_PARTNER_ID를 쿠팡 파트너스 API 메뉴에서 다시 복사해 Vercel에 등록하세요."
+      "자동 후보 수집과 딥링크 보강이 필요해지면 최종승인 후 쿠팡 파트너스 API 메뉴에서 키 3개를 발급해 Vercel에 등록하세요."
   };
 }
 
@@ -1523,7 +1523,7 @@ export function getApiReadinessSummary(): ApiReadinessSummary {
   const { apiKeysReady, runtimeReady, launchReady, blockingItemIds, optionalMissingItemIds } = evaluateLaunchReadiness(items, publicWebEnabled);
   const blockingEnv = blockingItemIds.flatMap((id) => itemById.get(id)?.missingEnv ?? []);
   const optionalMissingEnv = optionalMissingItemIds.flatMap((id) => itemById.get(id)?.missingEnv ?? []);
-  const mode: ReadinessMode = launchReady ? "launch_ready" : apiKeysReady ? "api_ready" : "pre_approval";
+  const mode: ReadinessMode = launchReady ? (apiKeysReady ? "launch_ready" : "manual_launch_ready") : apiKeysReady ? "api_ready" : "pre_approval";
 
   return {
     checkedAt: new Date().toISOString(),
@@ -1545,8 +1545,8 @@ export function getApiReadinessSummary(): ApiReadinessSummary {
     optionalItemIds,
     optionalMissingItemIds,
     optionalMissingEnv,
-    requiredConnectionCheckIds: getRequiredConnectionCheckIds(publicWebEnabled),
-    optionalConnectionCheckIds: [...OPTIONAL_CONNECTION_CHECK_IDS]
+    requiredConnectionCheckIds: getRequiredConnectionCheckIds(publicWebEnabled, apiKeysReady),
+    optionalConnectionCheckIds: getOptionalConnectionCheckIds(apiKeysReady)
   };
 }
 

@@ -195,7 +195,7 @@ function printSummary() {
     }
   } else {
     console.log("1. Report mode does not require all post-approval envs and does not start data work.");
-    console.log("2. After Coupang approval and Vercel env entry, run `npm run doctor:production:launch:fresh`.");
+    console.log("2. After the core launch envs and Supabase schema are ready, run `npm run doctor:production:launch:fresh`; Coupang API keys can be added later for automation.");
     console.log("3. If launch doctor passes, run `npm run deploy:production:launch -- confirm`.");
     console.log("4. To deploy and immediately run the first live collection, run `npm run deploy:production:go-live -- confirm`.");
     console.log("5. To see grouped missing env names only, run `npm run env:repair`.");
