@@ -311,6 +311,19 @@ export default function AdminAffiliateLinkQueue({
       !getCustomerPublishReadiness(product).ready
   ).length;
   const visibleProducts = missingProducts.slice(0, 24);
+  const verifiedVisibleProducts = useMemo(
+    () =>
+      visibleProducts.filter((product) => {
+        const affiliateUrl = inputs[product.id]?.trim() ?? "";
+        const verification = linkVerifications[product.id];
+        return (
+          isCoupangPartnersLink(affiliateUrl) &&
+          verification?.checked_url === affiliateUrl &&
+          (verification.identity_status === "MATCH" || verification.identity_status === "MANUAL_CONFIRMED")
+        );
+      }),
+    [inputs, linkVerifications, visibleProducts]
+  );
 
   useEffect(() => {
     if (!targetProductId || handledTargetRef.current === targetProductId) return;
@@ -420,6 +433,40 @@ export default function AdminAffiliateLinkQueue({
       setNotice({ type: "error", message: "네트워크 문제로 일괄 링크 확인을 끝내지 못했습니다. 남은 링크를 다시 실행하세요." });
     } finally {
       setBulkVerificationRunning(false);
+    }
+  }
+
+  async function publishVerifiedVisibleLinks() {
+    if (!verifiedVisibleProducts.length) {
+      setNotice({ type: "info", message: "상품번호 일치 확인이 끝난 링크가 현재 화면에 없습니다." });
+      return;
+    }
+
+    const entries = verifiedVisibleProducts
+      .map((product) => `${product.id}\t${inputs[product.id]?.trim() ?? ""}`)
+      .join("\n");
+    setBulkImportRunning(true);
+    setBulkImportResult(null);
+    setNotice({ type: "info", message: `상품번호 확인이 끝난 링크 ${verifiedVisibleProducts.length}건을 품질 게이트와 함께 게시하는 중입니다.` });
+    try {
+      const response = await fetch("/api/admin/affiliate-links/import", {
+        method: "POST",
+        headers: headers(password),
+        body: JSON.stringify({ entries, dryRun: false, publish: true })
+      });
+      const data = (await response.json().catch(() => ({}))) as BulkImportResponse;
+      if (!response.ok) {
+        setNotice({ type: "error", message: data.message ?? data.error ?? "확인된 링크 일괄 게시에 실패했습니다." });
+        return;
+      }
+      setBulkImportResult(data);
+      setNotice({ type: bulkImportNoticeType(data), message: bulkImportMessage(data) });
+      await loadProducts();
+      onCompleted();
+    } catch {
+      setNotice({ type: "error", message: "네트워크 문제로 확인된 링크 일괄 게시를 실행하지 못했습니다." });
+    } finally {
+      setBulkImportRunning(false);
     }
   }
 
@@ -595,6 +642,15 @@ export default function AdminAffiliateLinkQueue({
             {bulkVerificationRunning
               ? "링크 확인 중"
               : `보이는 링크 ${Math.min(MAX_BULK_LINK_CHECKS, visibleProducts.filter((product) => isCoupangPartnersLink(inputs[product.id]?.trim() ?? "")).length)}건 확인`}
+          </button>
+          <button
+            className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-3 py-2 text-sm font-black text-white hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() => void publishVerifiedVisibleLinks()}
+            disabled={bulkImportRunning || bulkVerificationRunning || checkingLinkId !== null || !verifiedVisibleProducts.length}
+            title="상품번호 일치 확인이 끝난 링크만 품질 게이트를 거쳐 게시합니다."
+            type="button"
+          >
+            <Upload size={15} aria-hidden /> {bulkImportRunning ? "일괄 게시 중" : `확인된 링크 ${verifiedVisibleProducts.length}건 게시`}
           </button>
           <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-black hover:bg-mist disabled:opacity-60" onClick={loadProducts} disabled={loading} type="button">
             <RefreshCw size={15} aria-hidden /> {loading ? "불러오는 중" : "새로고침"}

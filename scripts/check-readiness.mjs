@@ -3614,6 +3614,17 @@ if (fileExists("components/AdminAffiliateLinkQueue.tsx")) {
     "required"
   );
   check(
+    "admin: verified affiliate bulk publish handoff",
+    linkQueue.includes("verifiedVisibleProducts") &&
+      linkQueue.includes("publishVerifiedVisibleLinks") &&
+      linkQueue.includes("확인된 링크") &&
+      linkQueue.includes("품질 게이트와 함께 게시하는 중입니다") &&
+      linkQueue.includes("identity_status === \"MATCH\"") &&
+      linkQueue.includes("MANUAL_CONFIRMED"),
+    "admin can explicitly publish only links whose product identity was already matched or manually confirmed, while reusing the public quality gate",
+    "required"
+  );
+  check(
     "admin: affiliate backfill manual retry links",
     linkQueue.includes("backfillResultLinks") &&
       linkQueue.includes("manual_search_url") &&
