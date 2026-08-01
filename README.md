@@ -71,7 +71,7 @@ npm run env:production -- https://returnpick.vercel.app https://link.coupang.com
 
 직접 Node로 실행할 때는 `node scripts/print-production-env-template.mjs --site https://returnpick.vercel.app --approval-url https://link.coupang.com/a/승인용코드`처럼 옵션형 인자도 사용할 수 있습니다. 출력된 `ADMIN_PASSWORD`와 `CRON_SECRET`은 Vercel에 붙여넣은 뒤 따로 보관하세요. 같은 출력의 `RETURNPICK_CRON_SECRET`과 `RETURNPICK_SITE_URL`은 GitHub Actions 1시간 스케줄러용 값입니다. 실제 API 키 값은 공식 대시보드에서 복사해 Vercel에 직접 넣고, 파일에 커밋하지 마세요.
 
-API 키가 없어도 로컬에서는 330개 안팎의 검수 샘플 카탈로그, mock provider, 로컬 JSON 저장소로 UI를 확인할 수 있습니다. 개발 서버(`npm run dev`)에서는 `RETURNPICK_DEMO_MODE`를 비워도 데모 모드가 켜지며, `RETURNPICK_DEMO_MODE=false`로 비활성화할 수 있습니다. 데모 상품에는 실제 쿠팡 가격·재고·반품등급·파트너스 링크가 없고 구매 버튼도 비활성화됩니다. Production에서는 환경변수 값을 `true`로 넣어도 데모가 강제로 숨겨집니다. Supabase가 없을 때 생성·수정한 mock 데이터는 `.returnpick/local-db.json`에 저장됩니다.
+API 키가 없어도 로컬에서는 31개의 검수 샘플 카탈로그, mock provider, 로컬 JSON 저장소로 UI를 확인할 수 있습니다. 이 샘플은 개발용 화면 확인용이며 실제 공개 상품이나 수익 상품 수를 뜻하지 않습니다. 개발 서버(`npm run dev`)에서는 `RETURNPICK_DEMO_MODE`를 비워도 데모 모드가 켜지며, `RETURNPICK_DEMO_MODE=false`로 비활성화할 수 있습니다. 데모 상품에는 실제 쿠팡 가격·재고·반품등급·파트너스 링크가 없고 구매 버튼도 비활성화됩니다. Production에서는 환경변수 값을 `true`로 넣어도 데모가 강제로 숨겨집니다. Supabase가 없을 때 생성·수정한 mock 데이터는 `.returnpick/local-db.json`에 저장됩니다.
 
 주의: 로컬 개발에서는 `ADMIN_PASSWORD`를 비워도 mock UI 확인이 가능하지만, Vercel 배포 환경에서는 `ADMIN_PASSWORD`가 없으면 관리자 API가 `ADMIN_PASSWORD_NOT_CONFIGURED`로 닫힙니다. 운영 배포 전 반드시 관리자 비밀번호를 등록하세요.
 
