@@ -1,4 +1,5 @@
 import type { JsonValue, SourcedProduct } from "@/lib/types";
+import { isPublicWebHostname } from "@/lib/publicWebUrlSafety";
 
 function getEvidence(raw: Record<string, JsonValue>) {
   const info = raw.web_return_info;
@@ -6,8 +7,20 @@ function getEvidence(raw: Record<string, JsonValue>) {
   const evidence = Array.isArray(info.evidence) ? info.evidence.filter((item): item is string => typeof item === "string") : [];
   const confidence = typeof info.confidence === "number" ? info.confidence : null;
   const isReturnCandidate = Boolean(info.is_return_candidate);
+  const rawSourceUrl = typeof info.detail_page_url === "string" ? info.detail_page_url : typeof info.page_url === "string" ? info.page_url : null;
+  let sourceUrl: string | null = null;
+  if (rawSourceUrl) {
+    try {
+      const parsed = new URL(rawSourceUrl);
+      if (["http:", "https:"].includes(parsed.protocol) && !parsed.username && !parsed.password && isPublicWebHostname(parsed.hostname)) {
+        sourceUrl = parsed.toString();
+      }
+    } catch {
+      sourceUrl = null;
+    }
+  }
   if (!isReturnCandidate && evidence.length === 0) return null;
-  return { evidence, confidence, isReturnCandidate };
+  return { evidence, confidence, isReturnCandidate, sourceUrl };
 }
 
 export default function ReturnEvidence({ product }: { product: SourcedProduct }) {
@@ -28,6 +41,14 @@ export default function ReturnEvidence({ product }: { product: SourcedProduct })
           <li key={item}>• {item}</li>
         ))}
       </ul>
+      {data.sourceUrl ? (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
+          <p className="text-xs font-semibold leading-5 text-steel">공개 웹 참고 페이지의 문구를 바탕으로 한 보조 단서입니다. 최종 조건은 쿠팡에서 확인하세요.</p>
+          <a className="focus-ring shrink-0 rounded-md border border-line px-3 py-2 text-xs font-black text-pine hover:bg-mist" href={data.sourceUrl} target="_blank" rel="nofollow noopener noreferrer">
+            근거 페이지 확인
+          </a>
+        </div>
+      ) : null}
     </section>
   );
 }

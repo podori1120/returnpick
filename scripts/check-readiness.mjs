@@ -2148,6 +2148,23 @@ if (fileExists("app/picks/page.tsx") && fileExists("app/sitemap.ts") && fileExis
   );
 }
 
+if (fileExists("components/ReturnEvidence.tsx") && fileExists("lib/providers/publicWebProvider.ts")) {
+  const returnEvidence = readText("components/ReturnEvidence.tsx");
+  const publicWebProvider = readText("lib/providers/publicWebProvider.ts");
+  check(
+    "public web evidence: customer provenance link",
+    returnEvidence.includes("detail_page_url") &&
+      returnEvidence.includes("page_url") &&
+      returnEvidence.includes("isPublicWebHostname") &&
+      returnEvidence.includes("근거 페이지 확인") &&
+      returnEvidence.includes('rel="nofollow noopener noreferrer"') &&
+      publicWebProvider.includes("detail_page_url") &&
+      publicWebProvider.includes("page_url"),
+    "customer pages expose only validated public-web evidence URLs while keeping return values as evidence-backed hints",
+    "required"
+  );
+}
+
 if (
   fileExists("components/GuideEditorialLink.tsx") &&
   fileExists("app/guide/return-checklist/page.tsx") &&
