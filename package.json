@@ -40,6 +40,7 @@
     "schema:setup": "node scripts/print-supabase-setup-runbook.mjs",
     "schema:production": "node scripts/verify-supabase-schema.mjs",
     "sourcing:diagnose": "node scripts/diagnose-sourcing-recovery.mjs",
+    "sourcing:throughput:check": "node scripts/verify-sourcing-throughput.mjs",
     "doctor:production": "node scripts/run-production-doctor.mjs",
     "doctor:production:launch": "node scripts/run-production-doctor.mjs --launch",
     "doctor:production:fresh": "npm run env:pull:production && npm run env:vercel && npm run doctor:production",

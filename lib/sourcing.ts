@@ -53,6 +53,10 @@ type NaverPriceEnrichment = {
   priceLog: Record<string, JsonValue>;
 };
 
+type ProductEnrichmentResult =
+  | { candidate: ProviderProduct; saved: Awaited<ReturnType<typeof enrichAndSaveProduct>> }
+  | { candidate: ProviderProduct; error: string };
+
 export type RunSourcingOptions = {
   useMockFallback?: boolean;
   keywordLimit?: number | null;
@@ -63,6 +67,25 @@ export type RunSourcingOptions = {
 const defaultSourcingTimeBudgetMs = 52000;
 const minSourcingTimeBudgetMs = 5000;
 const maxSourcingTimeBudgetMs = 55000;
+const productEnrichmentConcurrency = 2;
+
+async function mapWithConcurrency<T, R>(items: T[], concurrency: number, mapper: (item: T) => Promise<R>) {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, Math.floor(concurrency)), items.length);
+
+  async function worker() {
+    while (true) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= items.length) return;
+      results[index] = await mapper(items[index]);
+    }
+  }
+
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
 
 function normalizePositiveInteger(value: number | null | undefined) {
   if (value == null) return null;
@@ -468,28 +491,39 @@ export async function runSourcing(options?: RunSourcingOptions) {
         const candidates = result.products.filter((product) => isWithinKeywordPrice(product, keyword));
         foundCount += candidates.length;
 
-        for (const candidate of candidates) {
+        const enrichedResults = await mapWithConcurrency<ProviderProduct, ProductEnrichmentResult>(candidates, productEnrichmentConcurrency, async (candidate) => {
           try {
-            const saved = await enrichAndSaveProduct(candidate, keyword);
-            if (saved.inserted) insertedCount += 1;
-            else updatedCount += 1;
-            if (saved.scoreError) {
-              errorCount += 1;
-              logs.push({
-                keyword: keyword.keyword,
-                category: keyword.category,
-                title: candidate.title,
-                status: "product_score_error",
-                error: saved.scoreError
-              });
-            }
+            return { candidate, saved: await enrichAndSaveProduct(candidate, keyword) };
           } catch (error) {
+            return {
+              candidate,
+              error: error instanceof Error ? error.message : "UNKNOWN_PRODUCT_ERROR"
+            };
+          }
+        });
+
+        for (const enriched of enrichedResults) {
+          if ("error" in enriched) {
             errorCount += 1;
             logs.push({
               keyword: keyword.keyword,
-              title: candidate.title,
+              title: enriched.candidate.title,
               status: "product_error",
-              error: error instanceof Error ? error.message : "UNKNOWN_PRODUCT_ERROR"
+              error: enriched.error
+            });
+            continue;
+          }
+
+          if (enriched.saved.inserted) insertedCount += 1;
+          else updatedCount += 1;
+          if (enriched.saved.scoreError) {
+            errorCount += 1;
+            logs.push({
+              keyword: keyword.keyword,
+              category: keyword.category,
+              title: enriched.candidate.title,
+              status: "product_score_error",
+              error: enriched.saved.scoreError
             });
           }
         }
@@ -534,6 +568,7 @@ export async function runSourcing(options?: RunSourcingOptions) {
         next_keyword_offset: nextKeywordOffset,
         stopped_by_time_budget: stoppedByTimeBudget,
         time_budget_ms: timeBudgetMs,
+        product_enrichment_concurrency: productEnrichmentConcurrency,
         elapsed_ms: Date.now() - startedAt,
         use_mock_fallback: useMockFallback
       }

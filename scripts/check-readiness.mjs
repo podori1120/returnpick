@@ -1438,8 +1438,8 @@ if (fileExists("lib/sourcing.ts")) {
     sourcing.includes("scoreError") &&
       sourcing.includes("product_score_error") &&
       sourcing.includes("SOURCING_SCORE_SAVE_FAILED") &&
-      sourcing.includes("if (saved.inserted) insertedCount += 1") &&
-      sourcing.includes("else updatedCount += 1"),
+      (sourcing.includes("if (saved.inserted) insertedCount += 1") || sourcing.includes("if (enriched.saved.inserted) insertedCount += 1")) &&
+      (sourcing.includes("else updatedCount += 1") || sourcing.includes("else updatedCount += 1;")),
     "a saved or updated candidate still counts as product progress even if later score creation fails",
     "required"
   );
