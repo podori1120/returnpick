@@ -4101,7 +4101,11 @@ if (fileExists("lib/quality.ts") && fileExists("components/DealDetail.tsx") && f
       quality.includes('return "현재 판매가"') &&
       dealDetail.includes("getDealPriceLabel(product)") &&
       dealDetail.includes("반품 정보가 확인되지 않은 항목은 쿠팡 상품 페이지에서 최종 확인하세요") &&
-      priceComparison.includes("getDealPriceLabel(product)"),
+      priceComparison.includes("getDealPriceLabel(product)") &&
+      priceComparison.includes("search.shopping.naver.com/search/all") &&
+      priceComparison.includes("네이버에서 동일 모델 가격 확인") &&
+      priceComparison.includes('target="_blank"') &&
+      priceComparison.includes('rel="noopener noreferrer"'),
     "products with a verified selling price but missing return evidence can be published with explicit customer-facing warnings; products without any price remain blocked",
     "required"
   );
