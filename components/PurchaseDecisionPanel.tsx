@@ -59,9 +59,9 @@ export default function PurchaseDecisionPanel({ product }: { product: ProductWit
             </p>
             <AffiliateButton
               productId={product.id}
-              href={demoProduct ? null : outboundLink.href}
-              label={demoProduct ? "데모 상품 · 구매 링크 없음" : outboundLink.isAffiliate ? "쿠팡에서 실시간 가격 확인" : outboundLink.label}
-              disabledLabel="데모 상품 · 구매 링크 없음"
+              href={demoProduct || !outboundLink.isAffiliate ? null : outboundLink.href}
+              label={demoProduct ? "데모 상품 · 구매 링크 없음" : outboundLink.isAffiliate ? "쿠팡에서 실시간 가격 확인" : "링크 확인필요"}
+              disabledLabel={demoProduct ? "데모 상품 · 구매 링크 없음" : "링크 확인필요"}
               placement="detail_decision"
               sponsored={outboundLink.isAffiliate}
               className="focus-ring inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink sm:w-auto sm:min-w-[220px]"
@@ -110,7 +110,7 @@ export default function PurchaseDecisionPanel({ product }: { product: ProductWit
                 ? "로컬 데모 상품은 구매 링크와 수익 이벤트를 연결하지 않습니다."
                 : outboundLink.isAffiliate
                 ? "구매 버튼은 사용자가 직접 누를 때만 새 탭으로 열리며, 링크 근처에 제휴 안내를 표시합니다."
-                : "상품별 파트너스 링크가 없으면 일반 쿠팡 검색으로 이동하고, 수익 링크로 기록하지 않습니다."}
+                : "상품별 파트너스 링크가 확인되기 전에는 구매 버튼을 비활성화합니다."}
             </span>
           </div>
         </div>

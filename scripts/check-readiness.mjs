@@ -2377,10 +2377,16 @@ if (fileExists("lib/clientTracking.ts") && fileExists("components/AffiliateEvent
   );
 }
 
-if (fileExists("components/AffiliateButton.tsx") && fileExists("components/DealDetail.tsx") && fileExists("components/PurchaseDecisionPanel.tsx")) {
+if (
+  fileExists("components/AffiliateButton.tsx") &&
+  fileExists("components/DealDetail.tsx") &&
+  fileExists("components/PurchaseDecisionPanel.tsx") &&
+  fileExists("components/CompareBoard.tsx")
+) {
   const affiliateButton = readText("components/AffiliateButton.tsx");
   const dealDetail = readText("components/DealDetail.tsx");
   const purchaseDecisionPanel = readText("components/PurchaseDecisionPanel.tsx");
+  const compareBoard = readText("components/CompareBoard.tsx");
   check(
     "client tracking: cta placement channels",
     affiliateButton.includes("cleanTrackingPlacement") &&
@@ -2393,6 +2399,21 @@ if (fileExists("components/AffiliateButton.tsx") && fileExists("components/DealD
       dealDetail.includes('placement="detail_mobile_sticky"') &&
       purchaseDecisionPanel.includes('placement="detail_decision"'),
     "purchase CTA clicks include a safe placement channel so admins can see which explicit button drives Coupang clicks",
+    "required"
+  );
+  check(
+    "public UX: missing affiliate CTA fails closed",
+    affiliateButton.includes("if (!affiliateLinkReady)") &&
+      dealDetail.includes("const affiliateReady") &&
+      dealDetail.includes('disabledLabel={demoProduct ? "데모 상품 · 구매 링크 없음" : "링크 확인필요"}') &&
+      dealDetail.includes("구매 버튼이 비활성화되어 있습니다") &&
+      purchaseDecisionPanel.includes("!outboundLink.isAffiliate ? null : outboundLink.href") &&
+      purchaseDecisionPanel.includes('"링크 확인필요"') &&
+      purchaseDecisionPanel.includes("구매 버튼을 비활성화합니다") &&
+      compareBoard.includes("링크 확인필요") &&
+      !dealDetail.includes("쿠팡 검색 결과로 이동") &&
+      !purchaseDecisionPanel.includes("일반 쿠팡 검색으로 이동"),
+    "missing or non-affiliate product URLs are shown as 확인필요 and never presented as a regular Coupang search CTA",
     "required"
   );
 }

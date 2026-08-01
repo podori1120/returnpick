@@ -30,8 +30,9 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
   const score = getLatestScore(product);
   const demoProduct = isDemoProduct(product);
   const outboundLink = getCoupangOutboundLink(product);
-  const buyUrl = demoProduct ? null : outboundLink.href;
-  const buyLabel = demoProduct ? "데모 상품 · 구매 링크 없음" : outboundLink.label;
+  const affiliateReady = !demoProduct && outboundLink.isAffiliate;
+  const buyUrl = affiliateReady ? outboundLink.href : null;
+  const buyLabel = demoProduct ? "데모 상품 · 구매 링크 없음" : affiliateReady ? outboundLink.label : "링크 확인필요";
   const useCases = getUseCaseMatches(product).slice(0, 4);
   const discount = getDiscountRate(product);
   const priceReference = getPriceReferenceInfo(product);
@@ -94,7 +95,7 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
                   productId={product.id}
                   href={buyUrl}
                   label={buyLabel}
-                  disabledLabel={buyLabel}
+                  disabledLabel={demoProduct ? "데모 상품 · 구매 링크 없음" : "링크 확인필요"}
                   placement="detail_hero"
                   sponsored={outboundLink.isAffiliate}
                   className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-pine px-4 py-2 text-sm font-black text-white hover:bg-ink"
@@ -118,17 +119,17 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
                       ? "가격과 재고는 쿠팡에서 다시 확인하세요. 버튼을 누르면 쿠팡 파트너스 링크가 새 탭으로 열립니다."
                       : demoProduct
                         ? "이 상품은 로컬 화면 확인용 샘플입니다. 실제 구매를 진행하려면 운영 데이터에 상품별 파트너스 링크를 연결해야 합니다."
-                        : "가격과 재고는 쿠팡에서 다시 확인하세요. 현재는 상품별 파트너스 링크 보강 전이라 쿠팡 검색 결과로 이동합니다."}
+                        : "가격과 재고는 쿠팡에서 다시 확인하세요. 상품별 파트너스 링크가 확인되면 구매 버튼이 활성화됩니다."}
                   </p>
                   {!outboundLink.isAffiliate && !demoProduct ? (
-                    <p className="mt-1 text-xs font-bold text-coral">{outboundLink.helperText}</p>
+                    <p className="mt-1 text-xs font-bold text-coral">상품별 쿠팡 파트너스 링크가 확인되면 구매 버튼이 활성화됩니다.</p>
                   ) : null}
                 </div>
                 <AffiliateButton
                   productId={product.id}
                   href={buyUrl}
                   label={buyLabel}
-                  disabledLabel={buyLabel}
+                  disabledLabel={demoProduct ? "데모 상품 · 구매 링크 없음" : "링크 확인필요"}
                   placement="detail_price"
                   sponsored={outboundLink.isAffiliate}
                   className="focus-ring inline-flex min-w-[180px] items-center justify-center gap-2 rounded-lg bg-ink px-4 py-3 text-sm font-black text-white hover:bg-pine"
@@ -205,13 +206,20 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
                 <span className="font-black">{product.brand ?? "확인필요"}</span>
               </div>
             </div>
-            <AffiliateButton productId={product.id} href={buyUrl} label={buyLabel} disabledLabel={buyLabel} placement="detail_sidebar" sponsored={outboundLink.isAffiliate} />
+            <AffiliateButton
+              productId={product.id}
+              href={buyUrl}
+              label={buyLabel}
+              disabledLabel={demoProduct ? "데모 상품 · 구매 링크 없음" : "링크 확인필요"}
+              placement="detail_sidebar"
+              sponsored={outboundLink.isAffiliate}
+            />
             <p className="mt-3 text-xs font-semibold leading-5 text-steel">
               {demoProduct
                 ? "로컬 데모 상품이라 실제 쿠팡 구매 링크가 연결되지 않았습니다."
                 : outboundLink.isAffiliate
                 ? "이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."
-                : "상품별 쿠팡 파트너스 링크가 아직 연결되지 않아 현재 버튼은 일반 쿠팡 검색으로 이동합니다."}
+                : "상품별 쿠팡 파트너스 링크가 아직 연결되지 않아 구매 버튼이 비활성화되어 있습니다."}
             </p>
           </div>
           <AffiliateNotice />
@@ -219,9 +227,16 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
       </div>
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-white/95 p-3 shadow-soft backdrop-blur lg:hidden">
         <div className="mx-auto max-w-7xl">
-          <AffiliateButton productId={product.id} href={buyUrl} label={buyLabel} disabledLabel={buyLabel} placement="detail_mobile_sticky" sponsored={outboundLink.isAffiliate} />
+          <AffiliateButton
+            productId={product.id}
+            href={buyUrl}
+            label={buyLabel}
+            disabledLabel={demoProduct ? "데모 상품 · 구매 링크 없음" : "링크 확인필요"}
+            placement="detail_mobile_sticky"
+            sponsored={outboundLink.isAffiliate}
+          />
           <p className="mt-1 text-center text-[11px] font-semibold text-steel">
-            {demoProduct ? "로컬 데모 상품 · 실제 구매 링크 없음" : outboundLink.isAffiliate ? "쿠팡 파트너스 활동의 일환으로 일정액의 수수료를 제공받습니다." : "현재 버튼은 쿠팡 검색 결과로 이동합니다."}
+            {demoProduct ? "로컬 데모 상품 · 실제 구매 링크 없음" : outboundLink.isAffiliate ? "쿠팡 파트너스 활동의 일환으로 일정액의 수수료를 제공받습니다." : "상품별 파트너스 링크 확인 전이라 구매 버튼이 비활성화되어 있습니다."}
           </p>
         </div>
       </div>

@@ -245,7 +245,7 @@ export default function CompareBoard() {
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 rounded-md bg-lemon/30 px-2.5 py-1 text-ink">
-                    <AlertTriangle size={14} aria-hidden /> 검색 이동
+                    <AlertTriangle size={14} aria-hidden /> 링크 확인필요
                   </span>
                 )}
                 <span className="rounded-md bg-mist px-2.5 py-1 text-steel">위험 {product.risk_flags.length}</span>
@@ -285,7 +285,7 @@ export default function CompareBoard() {
                 ["반품등급", (product: PublicDeal) => product.condition_grade],
                 ["검수", (product: PublicDeal) => `${product.quality.label} ${product.quality.confidence}`],
                 ["위험 플래그", (product: PublicDeal) => `${product.risk_flags.length}개`],
-                ["제휴 링크", (product: PublicDeal) => (getCoupangOutboundLink(product).isAffiliate ? "준비됨" : "검색 이동")]
+                ["제휴 링크", (product: PublicDeal) => (getCoupangOutboundLink(product).isAffiliate ? "준비됨" : "확인필요")]
               ].map(([label, getter]) => (
                 <tr key={String(label)}>
                   <th className="w-28 bg-mist/50 p-3 text-xs font-black text-steel">{String(label)}</th>
