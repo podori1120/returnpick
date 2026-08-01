@@ -809,7 +809,7 @@ if (
       adminProductsImportRoute.includes("existing_skipped_count") &&
       manualProductBulkForm.includes("/api/admin/products/import") &&
       manualProductBulkForm.includes("최대 40줄") &&
-      manualProductBulkForm.includes("수집가") &&
+      manualProductBulkForm.includes("수집 당시 가격") &&
       manualProductBulkForm.includes("반품가") &&
       manualProductBulkForm.includes("반품등급") &&
       manualProductBulkForm.includes("후보 일괄 추가") &&

@@ -140,7 +140,7 @@ export default function AdminManualProductBulkForm({ password, onCreated }: { pa
         aria-label="수동 후보 일괄 입력"
       />
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs font-semibold leading-5 text-steel">열 순서: 상품명 · 카테고리 · 상품 URL · 파트너스 링크 · 브랜드 · 모델명 · 이미지 · 수집가 · 반품가 · 새상품가 · 네이버 최저가 · 등급 · 재고 · 공개 메모. 뒤쪽 7개는 선택입니다. 최대 40줄입니다.</p>
+        <p className="text-xs font-semibold leading-5 text-steel">열 순서: 상품명 · 카테고리 · 상품 URL · 파트너스 링크 · 브랜드 · 모델명 · 이미지 · 수집 당시 가격 · 반품가 · 새상품가 · 네이버 최저가 · 등급 · 재고 · 공개 메모. 뒤쪽 7개는 선택입니다. 최대 40줄입니다.</p>
         <button className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-4 py-2.5 text-sm font-black text-white hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60" disabled={running || !entries.trim()} onClick={() => void importCandidates()} type="button">
           <Upload size={16} aria-hidden /> {running ? "검증·추가 중" : "후보 일괄 추가"}
         </button>
