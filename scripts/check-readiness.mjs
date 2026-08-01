@@ -717,7 +717,8 @@ if (fileExists("app/deals/page.tsx")) {
   );
   check(
     "public SEO: honest customer-ready deal ItemList JSON-LD",
-    dealsPage.includes("const allPublished = (await listProducts({ published: true })).filter(isPublicDealReady)") &&
+    dealsPage.includes("const allPublished = (await listProducts({ published: true })).filter(isPublicDealVisible)") &&
+      dealsPage.includes("isDemoProduct") &&
       dealsPage.includes("function buildDealListJsonLd(products: ProductWithScore[])") &&
       dealsPage.includes("products.slice(0, 60)") &&
       dealsPage.includes('"@type": "ItemList"') &&
@@ -885,7 +886,8 @@ if (
       categoryLandingPage.includes("dynamicParams = false") &&
       categoryLandingPage.includes("generateMetadata") &&
       categoryLandingPage.includes("alternates: { canonical: canonicalUrl }") &&
-      categoryLandingPage.includes("isPublicDealReady") &&
+      categoryLandingPage.includes("isPublicDealVisible") &&
+      categoryLandingPage.includes("isDemoProduct") &&
       categoryLandingPage.includes("product.category === category") &&
       categoryLandingPage.includes('"@type": "FAQPage"') &&
       categoryLandingPage.includes("AffiliateNotice") &&
@@ -1886,7 +1888,7 @@ if (fileExists("app/api/events/route.ts")) {
   check(
     "events api: public-ready product gate",
     eventsRoute.includes("getProductById") &&
-      eventsRoute.includes("isPublicDealReady") &&
+      eventsRoute.includes("isPublicDealVisible") &&
       eventsRoute.includes("PRODUCT_ID_REQUIRED") &&
       eventsRoute.includes("PRODUCT_NOT_PUBLIC_READY") &&
       eventsRoute.includes("product_id: productId"),
@@ -1914,7 +1916,7 @@ if (fileExists("app/api/products/compare/route.ts")) {
     compareRoute.includes("COMPARE_PRODUCTS_FAILED") &&
       compareRoute.includes("compareProductsErrorResponse") &&
       compareRoute.includes("products: []") &&
-      compareRoute.includes("isPublicDealReady"),
+      compareRoute.includes("isPublicDealVisible"),
     "public compare API returns an empty safe payload on lookup failures and exposes only public affiliate-ready deals",
     "required"
   );
@@ -2172,7 +2174,8 @@ if (fileExists("app/picks/page.tsx") && fileExists("app/sitemap.ts") && fileExis
     "public funnel: editorial pick hub",
     picksPage.includes('const canonicalUrl = `${siteUrl}/picks`') &&
       picksPage.includes('title: pageTitle') &&
-      picksPage.includes("isPublicDealReady") &&
+      picksPage.includes("isPublicDealVisible") &&
+      picksPage.includes("isDemoProduct") &&
       picksPage.includes("ProductImpressionTracker") &&
       picksPage.includes('<ApprovalSampleCard placement="picks" />') &&
       picksPage.includes("공식 API나 허용된 공개 근거") &&
@@ -3937,10 +3940,35 @@ if (fileExists("lib/publicDeal.ts")) {
   const publicDeal = readText("lib/publicDeal.ts");
   check(
     "public deals: customer-ready only",
-    publicDeal.includes("isPublicDealReady") &&
+    publicDeal.includes("isDemoProduct") &&
+      publicDeal.includes("isLocalDemoModeEnabled") &&
+      publicDeal.includes('process.env.NODE_ENV === "production"') &&
+      publicDeal.includes("!isDemoProduct(product)") &&
+      publicDeal.includes("isPublicDealReady") &&
       publicDeal.includes("getCustomerPublishReadiness(product).ready") &&
       publicDeal.includes('product.sourcing_status === "published"'),
-    "public deal surfaces require published customer-ready products with no quality blockers",
+    "production deal surfaces require published customer-ready products, while synthetic fixtures are local-only",
+    "required"
+  );
+}
+
+if (fileExists("lib/publicDeal.ts") && fileExists("components/DemoModeNotice.tsx") && fileExists(".env.example")) {
+  const publicDeal = readText("lib/publicDeal.ts");
+  const demoNotice = readText("components/DemoModeNotice.tsx");
+  const envExample = readText(".env.example");
+  const homePage = readText("app/page.tsx");
+  const dealsPage = readText("app/deals/page.tsx");
+  check(
+    "public UX: local demo catalog isolation",
+    publicDeal.includes("isPublicDealVisible") &&
+      publicDeal.includes("isDemoProduct") &&
+      publicDeal.includes("isLocalDemoModeEnabled") &&
+      publicDeal.includes('process.env.NODE_ENV === "production"') &&
+      demoNotice.includes("구매 버튼은 비활성화되어 있습니다") &&
+      envExample.includes("RETURNPICK_DEMO_MODE=") &&
+      homePage.includes("DemoModeNotice") &&
+      dealsPage.includes("DemoModeNotice"),
+    "local UI fixtures are labelled and production cannot expose demo products or their purchase links",
     "required"
   );
 }
@@ -4166,7 +4194,7 @@ if (fileExists("app/deals/[id]/page.tsx")) {
   const dealPage = readText("app/deals/[id]/page.tsx");
   check(
     "public detail: hides non-purchasable deals",
-    dealPage.includes("isPublicDealReady(product)") && dealPage.includes("notFound()"),
+    dealPage.includes("isPublicDealVisible(product)") && dealPage.includes("notFound()"),
     "deal detail 404s when the published product has no usable affiliate link",
     "required"
   );

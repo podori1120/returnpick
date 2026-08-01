@@ -17,6 +17,7 @@ import {
 import AffiliateNotice from "@/components/AffiliateNotice";
 import ApprovalSampleCard from "@/components/ApprovalSampleCard";
 import DealCard from "@/components/DealCard";
+import DemoModeNotice from "@/components/DemoModeNotice";
 import PurposeDealExplorer, { type PurposeExplorerItem } from "@/components/PurposeDealExplorer";
 import RecentDealsRail from "@/components/RecentDealsRail";
 import { categoryOptions, getCategoryLabel } from "@/lib/category";
@@ -24,7 +25,7 @@ import { listProducts } from "@/lib/dataStore";
 import { matchesUseCase } from "@/lib/dealIntelligence";
 import { approvalSampleProduct } from "@/lib/approvalSample";
 import { homeCategoryDetails, homePurposeOptions } from "@/lib/homeDiscovery";
-import { isPublicDealReady } from "@/lib/publicDeal";
+import { isDemoProduct, isPublicDealVisible } from "@/lib/publicDeal";
 import type { Category } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -42,9 +43,10 @@ const categoryIcons: Record<Category, LucideIcon> = {
 
 export default async function HomePage() {
   const products = (await listProducts({ published: true }))
-    .filter(isPublicDealReady)
+    .filter(isPublicDealVisible)
     .sort((a, b) => (b.latest_score?.total_score ?? 0) - (a.latest_score?.total_score ?? 0));
   const featured = products.slice(0, 6);
+  const demoCount = products.filter(isDemoProduct).length;
   const hasPublishedDeals = products.length > 0;
   const counts = categoryOptions.map((category) => ({
     ...category,
@@ -169,6 +171,12 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {demoCount ? (
+        <section className="mx-auto max-w-7xl px-4 pt-6 sm:px-6">
+          <DemoModeNotice count={demoCount} />
+        </section>
+      ) : null}
 
       <section className="border-b border-line bg-mist" aria-labelledby="category-heading">
         <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6">

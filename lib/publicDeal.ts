@@ -45,8 +45,46 @@ export type PublicDeal = {
   detail_url: string;
 };
 
+function isTruthyFlag(value: string | undefined) {
+  return ["1", "true", "yes", "on"].includes(value?.trim().toLowerCase() ?? "");
+}
+
+/** Synthetic catalog rows are useful for local UI checks, but never represent a publishable deal. */
+export function isDemoProduct(product: Pick<ProductWithScore, "source" | "source_product_id" | "raw_json">) {
+  const source = product.source.trim().toLowerCase();
+  const provider = typeof product.raw_json?.provider === "string" ? product.raw_json.provider.toLowerCase() : "";
+  const demoSeed = product.raw_json?.demo_seed;
+
+  return (
+    !source ||
+    source === "mock" ||
+    source.includes("mock") ||
+    source.includes("demo") ||
+    provider.includes("mock") ||
+    provider.includes("demo") ||
+    demoSeed === true ||
+    typeof demoSeed === "string" ||
+    product.source_product_id?.startsWith("seed-") === true
+  );
+}
+
+/** Defaults to on for `next dev`, while production is an unconditional no-demo surface. */
+export function isLocalDemoModeEnabled() {
+  if (process.env.NODE_ENV === "production") return false;
+  const configured = process.env.RETURNPICK_DEMO_MODE;
+  return configured ? isTruthyFlag(configured) : true;
+}
+
 export function isPublicDealReady(product: ProductWithScore) {
-  return product.is_published && product.sourcing_status === "published" && getCustomerPublishReadiness(product).ready;
+  return !isDemoProduct(product) && product.is_published && product.sourcing_status === "published" && getCustomerPublishReadiness(product).ready;
+}
+
+/** Public pages may show clearly labelled fixtures only in a local development session. */
+export function isPublicDealVisible(product: ProductWithScore) {
+  if (isDemoProduct(product)) {
+    return isLocalDemoModeEnabled() && product.is_published && product.sourcing_status === "published";
+  }
+  return isPublicDealReady(product);
 }
 
 export function toPublicDeal(product: ProductWithScore): PublicDeal {

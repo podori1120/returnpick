@@ -5,6 +5,7 @@ import DealRadar from "@/components/DealRadar";
 import DealCard from "@/components/DealCard";
 import AffiliateNotice from "@/components/AffiliateNotice";
 import ApprovalSampleCard from "@/components/ApprovalSampleCard";
+import DemoModeNotice from "@/components/DemoModeNotice";
 import { ProductImpressionTracker } from "@/components/AffiliateEventTracker";
 import RecentDealsRail from "@/components/RecentDealsRail";
 import SavedFilterBar from "@/components/SavedFilterBar";
@@ -24,7 +25,7 @@ import { formatPercent, formatPrice } from "@/lib/format";
 import { listProducts } from "@/lib/dataStore";
 import { approvalSampleProduct } from "@/lib/approvalSample";
 import { homeCategoryDetails } from "@/lib/homeDiscovery";
-import { isPublicDealReady } from "@/lib/publicDeal";
+import { isDemoProduct, isPublicDealVisible } from "@/lib/publicDeal";
 import { matchesProductSearch } from "@/lib/productSearch";
 import { getDealQuality, type DealQualityStatus } from "@/lib/quality";
 import { getSiteUrl } from "@/lib/siteUrl";
@@ -240,8 +241,9 @@ export default async function DealsPage({
   const selectedQuality = isQuality(quality) ? quality : undefined;
   const selectedUseCase = isUseCase(useCaseParam) ? useCaseParam : undefined;
   const selectedPriceBand = isPriceBand(priceBandParam) ? priceBandParam : undefined;
-  const allPublished = (await listProducts({ published: true })).filter(isPublicDealReady);
+  const allPublished = (await listProducts({ published: true })).filter(isPublicDealVisible);
   if (!allPublished.length) return <EmptyDealsCatalog />;
+  const demoCount = allPublished.filter(isDemoProduct).length;
   const dealListJsonLd = buildDealListJsonLd(sortProducts(allPublished, "score"));
 
   const filteredProducts = sortProducts(
@@ -336,6 +338,7 @@ export default async function DealsPage({
           조건에 맞는 공개 상품 {filteredProducts.length.toLocaleString("ko-KR")}개 중 {products.length.toLocaleString("ko-KR")}개를 보여주고 있습니다.
         </p>
       </div>
+      {demoCount ? <DemoModeNotice count={demoCount} /> : null}
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {[

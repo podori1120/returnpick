@@ -6,7 +6,7 @@ import { getRelatedProducts } from "@/lib/dealIntelligence";
 import { getCategoryLabel } from "@/lib/category";
 import { formatPrice } from "@/lib/format";
 import { isUsableProductImageUrl } from "@/lib/productImageUrl";
-import { isPublicDealReady } from "@/lib/publicDeal";
+import { isPublicDealVisible } from "@/lib/publicDeal";
 import { getPriceReferenceInfo } from "@/lib/priceReference";
 import { getDealPriceLabel, getReturnEvidenceLabel } from "@/lib/quality";
 import { getSiteUrl } from "@/lib/siteUrl";
@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const siteUrl = getSiteUrl();
   const canonicalUrl = `${siteUrl}/deals/${id}`;
   const product = await getProductById(id);
-  if (!product || !isPublicDealReady(product)) {
+  if (!product || !isPublicDealVisible(product)) {
     return {
       title: "딜을 찾을 수 없습니다 | 리턴픽",
       alternates: {
@@ -62,8 +62,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function DealDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const product = await getProductById(id);
-  if (!product || !isPublicDealReady(product)) notFound();
-  const publishedProducts = (await listProducts({ published: true })).filter(isPublicDealReady);
+  if (!product || !isPublicDealVisible(product)) notFound();
+  const publishedProducts = (await listProducts({ published: true })).filter(isPublicDealVisible);
   const relatedProducts = getRelatedProducts(product, publishedProducts, 4);
   const canonicalUrl = `${getSiteUrl()}/deals/${product.id}`;
   const productJsonLd = {

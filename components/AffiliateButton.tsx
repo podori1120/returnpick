@@ -24,6 +24,7 @@ export default function AffiliateButton({
   href,
   className,
   label = "쿠팡에서 가격 확인",
+  disabledLabel = "링크 확인필요",
   channel,
   placement,
   sponsored = true
@@ -32,6 +33,7 @@ export default function AffiliateButton({
   href: string | null | undefined;
   className?: string;
   label?: string;
+  disabledLabel?: string;
   channel?: string;
   placement?: string;
   sponsored?: boolean;
@@ -43,7 +45,7 @@ export default function AffiliateButton({
         disabled
         type="button"
       >
-        링크 확인필요
+        {disabledLabel}
       </button>
     );
   }

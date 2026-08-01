@@ -5,10 +5,11 @@ import { AlertTriangle, ArrowRight, CheckCircle2, ClipboardCheck, Search, Shield
 import AffiliateNotice from "@/components/AffiliateNotice";
 import { ProductImpressionTracker } from "@/components/AffiliateEventTracker";
 import DealCard from "@/components/DealCard";
+import DemoModeNotice from "@/components/DemoModeNotice";
 import { categoryOptions, getCategoryLabel, isKnownCategory } from "@/lib/category";
 import { getCategoryLandingContent } from "@/lib/categoryLanding";
 import { listProducts } from "@/lib/dataStore";
-import { isPublicDealReady } from "@/lib/publicDeal";
+import { isDemoProduct, isPublicDealVisible } from "@/lib/publicDeal";
 import { getSiteUrl } from "@/lib/siteUrl";
 
 export const dynamic = "force-dynamic";
@@ -60,10 +61,11 @@ export default async function CategoryDealPage({ params }: { params: Promise<{ c
   const label = getCategoryLabel(category);
   const content = getCategoryLandingContent(category);
   const categoryProducts = (await listProducts({ published: true, category }))
-    .filter(isPublicDealReady)
+    .filter(isPublicDealVisible)
     .filter((product) => product.category === category)
     .sort((a, b) => (b.latest_score?.total_score ?? 0) - (a.latest_score?.total_score ?? 0));
   const products = categoryProducts.slice(0, 12);
+  const demoCount = categoryProducts.filter(isDemoProduct).length;
   const otherCategories = categoryOptions.filter((item) => item.value !== category);
   const faqItems = [
     {
@@ -136,6 +138,12 @@ export default async function CategoryDealPage({ params }: { params: Promise<{ c
           </div>
         </div>
       </section>
+
+      {demoCount ? (
+        <section className="mx-auto max-w-7xl px-4 pt-6 sm:px-6">
+          <DemoModeNotice count={demoCount} />
+        </section>
+      ) : null}
 
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <div className="flex flex-wrap items-end justify-between gap-3">

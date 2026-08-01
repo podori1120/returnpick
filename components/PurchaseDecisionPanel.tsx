@@ -4,6 +4,7 @@ import PurchaseVerificationStrip from "@/components/PurchaseVerificationStrip";
 import { getCoupangOutboundLink } from "@/lib/coupangLink";
 import { getPurchaseDecision } from "@/lib/purchaseDecision";
 import { formatPercent, formatPrice } from "@/lib/format";
+import { isDemoProduct } from "@/lib/publicDeal";
 import type { ProductWithScore } from "@/lib/types";
 
 function toneClass(tone: string) {
@@ -14,6 +15,7 @@ function toneClass(tone: string) {
 
 export default function PurchaseDecisionPanel({ product }: { product: ProductWithScore }) {
   const decision = getPurchaseDecision(product);
+  const demoProduct = isDemoProduct(product);
   const outboundLink = getCoupangOutboundLink(product);
 
   return (
@@ -57,8 +59,9 @@ export default function PurchaseDecisionPanel({ product }: { product: ProductWit
             </p>
             <AffiliateButton
               productId={product.id}
-              href={outboundLink.href}
-              label={outboundLink.isAffiliate ? "쿠팡에서 실시간 가격 확인" : outboundLink.label}
+              href={demoProduct ? null : outboundLink.href}
+              label={demoProduct ? "데모 상품 · 구매 링크 없음" : outboundLink.isAffiliate ? "쿠팡에서 실시간 가격 확인" : outboundLink.label}
+              disabledLabel="데모 상품 · 구매 링크 없음"
               placement="detail_decision"
               sponsored={outboundLink.isAffiliate}
               className="focus-ring inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink sm:w-auto sm:min-w-[220px]"
@@ -103,7 +106,9 @@ export default function PurchaseDecisionPanel({ product }: { product: ProductWit
           <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line p-3 text-xs font-bold text-steel">
             <ShieldCheck size={16} className="text-pine" aria-hidden />
             <span>
-              {outboundLink.isAffiliate
+              {demoProduct
+                ? "로컬 데모 상품은 구매 링크와 수익 이벤트를 연결하지 않습니다."
+                : outboundLink.isAffiliate
                 ? "구매 버튼은 사용자가 직접 누를 때만 새 탭으로 열리며, 링크 근처에 제휴 안내를 표시합니다."
                 : "상품별 파트너스 링크가 없으면 일반 쿠팡 검색으로 이동하고, 수익 링크로 기록하지 않습니다."}
             </span>

@@ -9,7 +9,7 @@ import {
   isUsableCoupangProductUrl
 } from "@/lib/coupangLink";
 import { isUsableProductImageUrl } from "@/lib/productImageUrl";
-import { isPublicDealReady } from "@/lib/publicDeal";
+import { isDemoProduct, isPublicDealReady } from "@/lib/publicDeal";
 import { calculateDealScore } from "@/lib/scoring";
 import type {
   Category,
@@ -18,6 +18,8 @@ import type {
   ProductWithScore,
   SourcedProduct
 } from "@/lib/types";
+
+const isSyntheticSource = isDemoProduct;
 
 export const BOOTSTRAP_CATALOG_ENV = "RETURNPICK_BOOTSTRAP_CATALOG_JSON";
 export const BOOTSTRAP_CATALOG_VERSION = 1;
@@ -119,19 +121,6 @@ function compactRawJson(value: unknown) {
     if (value[key] !== undefined) compact[key] = value[key];
   }
   return compactJsonRecord(compact, 8_000);
-}
-
-function isSyntheticSource(product: Pick<SourcedProduct, "source" | "source_product_id" | "raw_json">) {
-  const source = product.source.trim().toLowerCase();
-  const provider = typeof product.raw_json?.provider === "string" ? product.raw_json.provider.toLowerCase() : "";
-  return (
-    !source ||
-    source === "mock" ||
-    source.includes("demo") ||
-    provider.includes("demo") ||
-    Boolean(product.raw_json?.demo_seed) ||
-    product.source_product_id?.startsWith("seed-") === true
-  );
 }
 
 function withCalculatedScore(product: SourcedProduct): ProductWithScore {

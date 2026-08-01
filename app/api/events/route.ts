@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAffiliateEvent, getProductById } from "@/lib/dataStore";
 import { isCoupangPartnersLink } from "@/lib/coupangLink";
-import { isPublicDealReady } from "@/lib/publicDeal";
+import { isPublicDealVisible } from "@/lib/publicDeal";
 import type { AffiliateEventType } from "@/lib/types";
 
 const eventTypes = new Set<AffiliateEventType>(["impression", "detail_view", "affiliate_click", "telegram_detail_click", "share_copy"]);
@@ -183,7 +183,7 @@ export async function POST(request: Request) {
     }
 
     const product = await getProductById(productId);
-    if (!product || !isPublicDealReady(product)) {
+    if (!product || !isPublicDealVisible(product)) {
       return NextResponse.json({ ok: false, skipped: "PRODUCT_NOT_PUBLIC_READY" }, { status: 202 });
     }
 

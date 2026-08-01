@@ -4,12 +4,13 @@ import { ArrowRight, BookOpenCheck, CheckCircle2, ShieldCheck, Sparkles } from "
 import AffiliateNotice from "@/components/AffiliateNotice";
 import ApprovalSampleCard from "@/components/ApprovalSampleCard";
 import DealCard from "@/components/DealCard";
+import DemoModeNotice from "@/components/DemoModeNotice";
 import { ProductImpressionTracker } from "@/components/AffiliateEventTracker";
 import { approvalSampleProduct } from "@/lib/approvalSample";
 import { categoryOptions } from "@/lib/category";
 import { listProducts } from "@/lib/dataStore";
 import { homeCategoryDetails } from "@/lib/homeDiscovery";
-import { isPublicDealReady } from "@/lib/publicDeal";
+import { isDemoProduct, isPublicDealVisible } from "@/lib/publicDeal";
 import { getSiteUrl } from "@/lib/siteUrl";
 import type { ProductWithScore } from "@/lib/types";
 
@@ -74,8 +75,9 @@ function sortProducts(products: ProductWithScore[]) {
 }
 
 export default async function PicksPage() {
-  const products = sortProducts((await listProducts({ published: true })).filter(isPublicDealReady));
+  const products = sortProducts((await listProducts({ published: true })).filter(isPublicDealVisible));
   const featuredProducts = products.slice(0, 6);
+  const demoCount = products.filter(isDemoProduct).length;
 
   return (
     <main className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6">
@@ -100,6 +102,7 @@ export default async function PicksPage() {
           </Link>
         </div>
       </header>
+      {demoCount ? <DemoModeNotice count={demoCount} /> : null}
 
       <section className="grid gap-4 lg:grid-cols-3" aria-label="검수 기준">
         <div className="rounded-lg border border-line bg-white p-5 shadow-soft">
