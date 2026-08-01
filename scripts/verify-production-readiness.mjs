@@ -100,6 +100,9 @@ const adminUiRequiredText = [
   "/api/admin/content-kit?product_id=",
   "링크 보강 큐로 이동",
   "품질 보강 후보로 이동",
+  "API 없이 수동 확인",
+  "확인 가격 저장",
+  "/api/admin/prices/manual",
   "/api/admin/session",
   "/api/admin/editorial-campaign",
   "/api/admin/bootstrap-catalog",
@@ -440,6 +443,20 @@ function checkAdminSessionProtection(response, json) {
   }
 }
 
+function checkManualPriceRouteProtection(response, json) {
+  const errorText = String(json?.error ?? json?.code ?? json?.message ?? json?.raw_text ?? "").trim();
+  const expectedBlocks = ["UNAUTHORIZED", "ADMIN_PASSWORD_NOT_CONFIGURED", "ADMIN_PASSWORD_WEAK_CONFIGURATION"];
+  if (response.status === 404 || response.status === 405) {
+    fail("manual Naver price route", `/api/admin/prices/manual returned ${response.status}; latest manual price route is not deployed`);
+  } else if (response.status < 400) {
+    fail("manual Naver price route", `/api/admin/prices/manual accepted an unauthenticated request (${response.status})`);
+  } else if (!expectedBlocks.some((code) => errorText.toUpperCase().includes(code))) {
+    fail("manual Naver price route", `/api/admin/prices/manual returned ${response.status} with an unexpected auth response: ${errorText || "empty body"}`);
+  } else {
+    pass("manual Naver price route", `unauthenticated manual price probe is blocked with ${response.status} (${errorText})`);
+  }
+}
+
 function staticScriptSourcesFromHtml(html) {
   return [
     ...new Set(
@@ -775,6 +792,21 @@ async function main() {
   } catch (error) {
     fail("admin launch api headers", error instanceof Error ? error.message : "fetch failed");
     fail("launch api protection", error instanceof Error ? error.message : "POST failed");
+  }
+
+  try {
+    const manualPriceApi = await readJson("/api/admin/prices/manual", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ entries: "" })
+    });
+    checkPrivateRouteHeaders("manual Naver price API headers", manualPriceApi.response);
+    checkManualPriceRouteProtection(manualPriceApi.response, manualPriceApi.json);
+  } catch (error) {
+    fail("manual Naver price API headers", error instanceof Error ? error.message : "POST failed");
+    fail("manual Naver price route", error instanceof Error ? error.message : "POST failed");
   }
 
   let readiness = null;

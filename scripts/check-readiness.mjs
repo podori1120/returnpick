@@ -657,6 +657,8 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-readines
       productionVerifier.includes("checkPrivateRouteHeaders") &&
       productionVerifier.includes("checkAdminLaunchApiProtection") &&
       productionVerifier.includes("checkAdminSessionProtection") &&
+      productionVerifier.includes("checkManualPriceRouteProtection") &&
+      productionVerifier.includes("/api/admin/prices/manual") &&
       productionVerifier.includes("/api/admin/session") &&
       productionVerifier.includes("public security headers") &&
       productionVerifier.includes("admin route headers") &&
@@ -669,6 +671,8 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-readines
       productionVerifier.includes("adminUiRequiredText") &&
       productionVerifier.includes("/_next/static/") &&
       productionVerifier.includes("상품별 링크 보강") &&
+      productionVerifier.includes("API 없이 수동 확인") &&
+      productionVerifier.includes("확인 가격 저장") &&
       productionVerifier.includes("품질 보강 후보로 이동") &&
       productionVerifier.includes("x-robots-tag") &&
       productionVerifier.includes("cache-control") &&
@@ -676,7 +680,7 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-readines
       productionVerifier.includes("requiredConnectionCheckIds") &&
       productionVerifier.includes("nofollow sponsored noopener noreferrer") &&
       productionVerifier.includes("--strict-scheduler"),
-    "production verifier checks approval-page evidence, disclosure evidence, robots/sitemap coverage, deployment headers, launch/session API protection, deployed admin repair UI chunks, admin live checks, required cards, scheduler health, and local production env files without embedding secrets",
+    "production verifier checks approval-page evidence, disclosure evidence, robots/sitemap coverage, deployment headers, launch/session/manual-price API protection, deployed admin repair UI chunks, admin live checks, required cards, scheduler health, and local production env files without embedding secrets",
     "required"
   );
   check(
