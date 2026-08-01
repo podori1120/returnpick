@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import AdminApiReadinessPanel from "@/components/AdminApiReadinessPanel";
 import AdminAffiliateLinkQueue from "@/components/AdminAffiliateLinkQueue";
+import AdminAffiliateLinkIntake from "@/components/AdminAffiliateLinkIntake";
 import AdminBootstrapCatalogPanel from "@/components/AdminBootstrapCatalogPanel";
 import AdminCandidateTable from "@/components/AdminCandidateTable";
 import AdminEditorialTelegramCampaign from "@/components/AdminEditorialTelegramCampaign";
@@ -107,6 +108,7 @@ export default function AdminPage() {
       <AdminSchedulerPanel password={password} refreshToken={refreshToken} onCompleted={() => setRefreshToken((value) => value + 1)} />
       <AdminPriceBackfillPanel password={password} onCompleted={() => setRefreshToken((value) => value + 1)} />
       <AdminAffiliateLinkQueue password={password} refreshToken={refreshToken} onCompleted={() => setRefreshToken((value) => value + 1)} />
+      <AdminAffiliateLinkIntake password={password} onCreated={() => setRefreshToken((value) => value + 1)} />
       <AdminManualProductForm password={password} onCreated={() => setRefreshToken((value) => value + 1)} />
       <AdminManualProductBulkForm password={password} onCreated={() => setRefreshToken((value) => value + 1)} />
       <AdminBootstrapCatalogPanel />

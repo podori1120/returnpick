@@ -177,6 +177,7 @@ const requiredFiles = [
   "app/api/admin/prices/manual/route.ts",
   "app/api/admin/products/route.ts",
   "app/api/admin/products/import/route.ts",
+  "app/api/admin/products/link-intake/route.ts",
   "app/api/admin/session/route.ts",
   "app/api/admin/telegram/route.ts",
   "app/api/cron/sourcing/route.ts",
@@ -192,6 +193,7 @@ const requiredFiles = [
   "components/ApprovalSampleCard.tsx",
   "components/AdminApiReadinessPanel.tsx",
   "components/AdminAffiliateLinkQueue.tsx",
+  "components/AdminAffiliateLinkIntake.tsx",
   "components/AdminBootstrapCatalogPanel.tsx",
   "components/AdminLaunchRunner.tsx",
   "components/AdminKeywordManager.tsx",
@@ -249,6 +251,7 @@ const requiredFiles = [
   "scripts/verify-github-hourly-scheduler.mjs",
   "scripts/verify-scheduled-affiliate-backfill.mjs",
   "scripts/verify-affiliate-identity.mjs",
+  "scripts/verify-affiliate-link-intake.mjs",
   "scripts/verify-bootstrap-catalog-runtime.mjs",
   "scripts/verify-demo-catalog-stability.mjs",
   "scripts/verify-supabase-config-guard.mjs",
@@ -408,6 +411,24 @@ if (fileExists("package.json") && fileExists("lib/manualImportIdentity.ts") && f
       manualImportCheck.includes("cross-source product IDs") &&
       manualImportCheck.includes("distinct categories"),
     "manual batch intake identifies existing product IDs across sources and normalized title/category collisions before any write",
+    "required"
+  );
+}
+
+if (fileExists("package.json") && fileExists("app/api/admin/products/link-intake/route.ts") && fileExists("scripts/verify-affiliate-link-intake.mjs")) {
+  const packageJson = readText("package.json");
+  const intakeRoute = readText("app/api/admin/products/link-intake/route.ts");
+  const intakeCheck = readText("scripts/verify-affiliate-link-intake.mjs");
+  check(
+    "scripts: affiliate link intake contract check",
+    packageJson.includes('"affiliate-link-intake:check": "node scripts/verify-affiliate-link-intake.mjs"') &&
+      intakeRoute.includes("requireAdmin(request)") &&
+      intakeRoute.includes("verifyCoupangAffiliateLinkResolution") &&
+      intakeRoute.includes('sourcing_status: "needs_review"') &&
+      intakeRoute.includes("is_published: false") &&
+      intakeCheck.includes("approval sample links") &&
+      intakeCheck.includes("duplicate conflicts"),
+    "manual Partners-link intake is authenticated, strict, identity-bound, duplicate-safe, score-persisted, and review-only without secrets or network checks",
     "required"
   );
 }
