@@ -65,7 +65,7 @@ const vercelEnvRows = [
     value: process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL ?? "",
     note: "승인용 쿠팡 파트너스 링크"
   },
-  { group: "공개 웹 참고 수집", name: "PUBLIC_WEB_CRAWL_ENABLED", value: "false", note: "공식 API 보조 수집을 허용할 때만 true" },
+  { group: "공개 웹 참고 수집", name: "PUBLIC_WEB_CRAWL_ENABLED", value: "false", note: "allowlist·robots.txt를 통과한 검수 후보 수집을 쓸 때만 true; API 전에도 사용 가능" },
   { group: "공개 웹 참고 수집", name: "PUBLIC_WEB_ALLOWED_HOSTS", value: "", note: "허용할 공개 호스트명만 쉼표로 입력" },
   { group: "공개 웹 참고 수집", name: "PUBLIC_WEB_SEARCH_TEMPLATES", value: "", note: "{keyword}를 포함한 허용 호스트 검색 URL" }
 ];
