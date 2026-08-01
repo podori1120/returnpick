@@ -2280,7 +2280,7 @@ if (
   check(
     "public funnel: zero inventory prioritizes the verified editorial pick",
     homePage.includes("const hasPublishedDeals = products.length > 0;") &&
-      homePage.includes("현재 공개된 직접 검수 추천 1건") &&
+      homePage.includes("현재 공개된 직접 검수 콘텐츠 1건") &&
       homePage.includes('href={hasPublishedDeals ? "/deals" : approvalSampleProduct.detailPath}') &&
       dealsPage.includes("function EmptyDealsCatalog()") &&
       dealsPage.includes("검수 기준을 통과한 상품만 공개합니다") &&
@@ -2480,7 +2480,10 @@ if (
       purchaseDecisionPanel.includes("30초 구매 판단") &&
       purchaseDecisionPanel.includes("구매 전 확인") &&
       purchaseDecisionPanel.includes("쿠팡에서 실시간 가격 확인") &&
-      compareBoard.includes("구매 전 최종 비교"),
+      compareBoard.includes("구매 전 최종 비교") &&
+      !coupangLink.includes('label: "쿠팡에서 상품 검색"') &&
+      !coupangLink.includes("일반 쿠팡 상품 페이지로 이동") &&
+      !coupangLink.includes("상품명 기반 쿠팡 검색 결과로 이동"),
     "customer-facing purchase, comparison, and affiliate disclosure copy stays readable Korean",
     "required"
   );

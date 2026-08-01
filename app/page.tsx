@@ -86,15 +86,15 @@ export default async function HomePage() {
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-4 sm:px-6 sm:py-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:py-4">
           <div className="flex flex-col justify-center">
             <p className="text-sm font-black text-pine">
-              {hasPublishedDeals ? "반품 노트북·디지털·소형가전 비교" : "쿠팡 이동 경로 확인 완료 추천"}
+              {hasPublishedDeals ? "반품 노트북·디지털·소형가전 비교" : "오늘의 직접 검수 추천"}
             </p>
             <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
-              {hasPublishedDeals ? "가격보다 먼저, 살 만한 근거를 확인합니다" : "직접 검수한 첫 추천부터 확인하세요"}
+              {hasPublishedDeals ? "가격보다 먼저, 살 만한 근거를 확인합니다" : "사기 전에, 확인할 것부터 정리했습니다"}
             </h1>
             <p className="mt-4 max-w-2xl text-base font-semibold leading-7 text-steel">
               {hasPublishedDeals
                 ? "상품명과 모델을 검색하면 가격 차이, 반품등급, 핵심 스펙과 주의점을 한 번에 비교합니다. 확인되지 않은 반품 정보는 추측하지 않고 확인필요로 표시합니다."
-                : `${approvalSampleProduct.name}의 확인된 사양과 구매 전 주의점을 먼저 정리했습니다. 가격과 재고는 고정해서 보여주지 않고 쿠팡의 현재 조건을 직접 확인합니다.`}
+                : `${approvalSampleProduct.name}의 핵심 사양과 구매 전 확인사항을 직접 정리했습니다. 가격·재고·배송 조건은 쿠팡에서 최종 확인하며, 확인되지 않은 반품 정보는 추측하지 않습니다.`}
             </p>
             {hasPublishedDeals ? (
               <>
@@ -127,9 +127,9 @@ export default async function HomePage() {
               </>
             ) : (
               <div className="mt-4 max-w-2xl border-y border-line py-3 sm:mt-6 sm:py-4">
-                <p className="text-xs font-black text-pine">현재 공개된 직접 검수 추천 1건</p>
+                <p className="text-xs font-black text-pine">현재 공개된 직접 검수 콘텐츠 1건</p>
                 <p className="mt-1 text-sm font-semibold leading-6 text-steel">
-                  빈 검색 결과를 보여주기보다 확인된 추천을 먼저 제공합니다. 자동 수집 딜은 관리자 검수와 상품별 파트너스 링크 확인을 마친 뒤 추가됩니다.
+                  실제 구매 경로와 검수 근거가 확인된 콘텐츠만 먼저 보여드립니다. 자동 수집 딜은 상품별 파트너스 링크와 검수를 마친 뒤 추가됩니다.
                 </p>
               </div>
             )}

@@ -131,10 +131,10 @@ export function getCoupangOutboundLink(product: CoupangLinkProduct): CoupangOutb
   if (sourceUrl) {
     return {
       href: sourceUrl,
-      label: "쿠팡 상품 보기",
+      label: "링크 확인필요",
       isAffiliate: false,
       status: "source",
-      helperText: "상품별 파트너스 링크 보강 전이라 일반 쿠팡 상품 페이지로 이동합니다."
+      helperText: "상품별 파트너스 링크가 확인되기 전에는 구매 버튼을 활성화하지 않습니다."
     };
   }
 
@@ -142,18 +142,18 @@ export function getCoupangOutboundLink(product: CoupangLinkProduct): CoupangOutb
   if (searchUrl) {
     return {
       href: searchUrl,
-      label: "쿠팡에서 상품 검색",
+      label: "링크 확인필요",
       isAffiliate: false,
       status: "search",
-      helperText: "상품별 파트너스 링크 보강 전이라 상품명 기반 쿠팡 검색 결과로 이동합니다."
+      helperText: "상품별 파트너스 링크가 확인되기 전에는 구매 버튼을 활성화하지 않습니다."
     };
   }
 
   return {
     href: buildCoupangSearchUrl(product),
-    label: "쿠팡에서 상품 검색",
+    label: "링크 확인필요",
     isAffiliate: false,
     status: "search",
-    helperText: "상품별 파트너스 링크 보강 전이라 상품명 기반 쿠팡 검색 결과로 이동합니다."
+    helperText: "상품별 파트너스 링크가 확인되기 전에는 구매 버튼을 활성화하지 않습니다."
   };
 }
