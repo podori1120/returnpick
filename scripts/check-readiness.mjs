@@ -1846,9 +1846,12 @@ if (fileExists("lib/providers/publicWebProvider.ts")) {
       webReturnInfo.includes("resolveConditionGrade") &&
       webReturnInfo.includes("resolveWebReturnEvidence") &&
       webReturnInfo.includes("weakConditionGrades") &&
+      webReturnInfo.includes("parseReturnPrice") &&
+      webReturnInfo.includes("moneyPattern") &&
       webReturnInfoVerifier.includes("no inferred return price") &&
+      webReturnInfoVerifier.includes("regularPriceOnly") &&
       webReturnInfoVerifier.includes('resolveConditionGrade("확인필요", "최상")'),
-    "web return evidence fills only weak condition grades and never treats a source price as an unverified return price",
+    "web return evidence fills only weak condition grades and accepts prices only when explicitly tied to a return label or grade",
     "required"
   );
   check(

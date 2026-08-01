@@ -31,6 +31,13 @@ assert.equal(noExplicitReturnPrice.isReturnCandidate, true);
 assert.equal(noExplicitReturnPrice.return_price, null);
 assert.equal(resolvedWithoutPrice.return_price, null);
 
+const regularPriceOnly = extractReturnInfoFromText("반품 후보 안내. 새상품 판매가 1,200,000원. 재고 2개");
+assert.equal(regularPriceOnly.return_price, null);
+assert.equal(regularPriceOnly.stock_count, 2);
+
+const gradeBoundPrice = extractReturnInfoFromText("노트북 반품-최상 800,000원 새상품 판매가 1,000,000원");
+assert.equal(gradeBoundPrice.return_price, 800000);
+
 const providerValuesWin = resolveWebReturnEvidence(
   { condition_grade: "상", return_price: 700000, stock_count: 2 },
   best

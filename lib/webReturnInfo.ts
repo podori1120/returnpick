@@ -49,9 +49,14 @@ function cleanText(text: string) {
   return text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function parsePrice(text: string) {
-  const candidates = [...text.matchAll(/(?:반품가|쿠팡가|판매가|가격)?\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{5,8})\s*원/g)]
-    .map((match) => Number(match[1].replace(/,/g, "")))
+function parseReturnPrice(text: string) {
+  const moneyPattern = String.raw`([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{5,8})\s*원`;
+  const patterns = [
+    new RegExp(String.raw`(?:반품\s*(?:상품\s*)?(?:가|가격)|리퍼\s*(?:상품\s*)?(?:가|가격)|재포장\s*(?:가|가격))\s*[:：]?\s*${moneyPattern}`, "gi"),
+    new RegExp(String.raw`(?:반품\s*[-: ]?\s*(?:미개봉|최상|상|중)|(?:미개봉|최상|상|중)\s*반품)[^\n.!?。！？]{0,100}?${moneyPattern}`, "gi")
+  ];
+  const candidates = patterns
+    .flatMap((pattern) => [...text.matchAll(pattern)].map((match) => Number(match[1].replace(/,/g, ""))))
     .filter((value) => Number.isFinite(value) && value >= 10_000);
   return candidates.length ? Math.min(...candidates) : null;
 }
@@ -79,8 +84,8 @@ export function extractReturnInfoFromText(...parts: Array<string | null | undefi
     }
   }
 
-  const returnPrice = isReturnCandidate ? parsePrice(text) : null;
-  if (returnPrice) evidence.push("웹 문구에서 가격 표현을 찾았습니다.");
+  const returnPrice = isReturnCandidate ? parseReturnPrice(text) : null;
+  if (returnPrice) evidence.push("웹 문구에서 반품가 또는 반품등급에 연결된 가격 표현을 찾았습니다.");
 
   const stock = parseStock(text);
   if (stock != null) evidence.push("웹 문구에서 재고 표현을 찾았습니다.");
