@@ -98,6 +98,7 @@ type AffiliateLinkVerificationResponse = {
 };
 
 const MAX_BULK_LINK_CHECKS = 8;
+const LINK_QUEUE_PAGE_SIZE = 24;
 
 type CheckedAffiliateLinkVerification = AffiliateLinkVerification & {
   checked_url: string;
@@ -231,6 +232,7 @@ export default function AdminAffiliateLinkQueue({
   const [products, setProducts] = useState<ProductWithScore[]>([]);
   const [query, setQuery] = useState("");
   const [publishedOnly, setPublishedOnly] = useState(false);
+  const [queuePage, setQueuePage] = useState(0);
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [bulkText, setBulkText] = useState("");
   const [bulkPublish, setBulkPublish] = useState(false);
@@ -310,7 +312,21 @@ export default function AdminAffiliateLinkQueue({
       (product.is_published || product.sourcing_status === "published") &&
       !getCustomerPublishReadiness(product).ready
   ).length;
-  const visibleProducts = missingProducts.slice(0, 24);
+  const totalQueuePages = Math.max(1, Math.ceil(missingProducts.length / LINK_QUEUE_PAGE_SIZE));
+  const currentQueuePage = Math.min(queuePage, totalQueuePages - 1);
+  const visibleProducts = missingProducts.slice(
+    currentQueuePage * LINK_QUEUE_PAGE_SIZE,
+    (currentQueuePage + 1) * LINK_QUEUE_PAGE_SIZE
+  );
+  const pendingVerificationVisibleProducts = useMemo(
+    () =>
+      visibleProducts.filter((product) => {
+        const affiliateUrl = inputs[product.id]?.trim() ?? "";
+        const verification = linkVerifications[product.id];
+        return isCoupangPartnersLink(affiliateUrl) && !isApprovalSampleAffiliateUrl(affiliateUrl) && verification?.checked_url !== affiliateUrl;
+      }),
+    [inputs, linkVerifications, visibleProducts]
+  );
   const verifiedVisibleProducts = useMemo(
     () =>
       visibleProducts.filter((product) => {
@@ -404,9 +420,7 @@ export default function AdminAffiliateLinkQueue({
   }
 
   async function verifyVisibleAffiliateLinks() {
-    const targets = visibleProducts
-      .filter((product) => isCoupangPartnersLink(inputs[product.id]?.trim() ?? ""))
-      .slice(0, MAX_BULK_LINK_CHECKS);
+    const targets = pendingVerificationVisibleProducts.slice(0, MAX_BULK_LINK_CHECKS);
     if (!targets.length) {
       setNotice({ type: "info", message: "현재 화면에 자동 확인할 상품별 파트너스 링크가 없습니다." });
       return;
@@ -471,8 +485,7 @@ export default function AdminAffiliateLinkQueue({
   }
 
   function buildBulkTemplate() {
-    return missingProducts
-      .slice(0, 24)
+    return visibleProducts
       .map((product) => `${product.id}\t${product.title}\t${buildCoupangSearchUrl(product)}`)
       .join("\n");
   }
@@ -635,13 +648,13 @@ export default function AdminAffiliateLinkQueue({
           <button
             className="focus-ring inline-flex items-center gap-2 rounded-lg border border-pine/30 bg-pine/5 px-3 py-2 text-sm font-black text-pine hover:bg-pine/10 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={verifyVisibleAffiliateLinks}
-            disabled={bulkVerificationRunning || checkingLinkId !== null || !visibleProducts.some((product) => isCoupangPartnersLink(inputs[product.id]?.trim() ?? ""))}
+            disabled={bulkVerificationRunning || checkingLinkId !== null || !pendingVerificationVisibleProducts.length}
             type="button"
           >
             <ShieldCheck className={bulkVerificationRunning ? "animate-pulse" : ""} size={15} aria-hidden />
             {bulkVerificationRunning
               ? "링크 확인 중"
-              : `보이는 링크 ${Math.min(MAX_BULK_LINK_CHECKS, visibleProducts.filter((product) => isCoupangPartnersLink(inputs[product.id]?.trim() ?? "")).length)}건 확인`}
+              : `미확인 링크 ${Math.min(MAX_BULK_LINK_CHECKS, pendingVerificationVisibleProducts.length)}건 확인`}
           </button>
           <button
             className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-3 py-2 text-sm font-black text-white hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60"
@@ -731,7 +744,7 @@ export default function AdminAffiliateLinkQueue({
           <button
             className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm font-black hover:bg-mist disabled:opacity-60"
             onClick={copyBulkTemplate}
-            disabled={!missingProducts.length}
+            disabled={!visibleProducts.length}
             type="button"
           >
             <Copy size={15} aria-hidden /> 템플릿 복사
@@ -818,15 +831,51 @@ export default function AdminAffiliateLinkQueue({
           <input
             className="focus-ring w-full rounded-lg border border-line py-2 pl-9 pr-3 text-sm"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+             onChange={(event) => {
+               setQuery(event.target.value);
+               setQueuePage(0);
+             }}
             placeholder="상품명으로 보강 대상 검색"
           />
         </label>
         <label className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-bold text-steel">
-          <input checked={publishedOnly} onChange={(event) => setPublishedOnly(event.target.checked)} type="checkbox" />
+           <input
+             checked={publishedOnly}
+             onChange={(event) => {
+               setPublishedOnly(event.target.checked);
+               setQueuePage(0);
+             }}
+             type="checkbox"
+           />
           기존 게시 상품 먼저
         </label>
       </div>
+
+      {missingProducts.length > LINK_QUEUE_PAGE_SIZE ? (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-mist px-3 py-2 text-xs font-bold text-steel">
+          <span>
+            링크 보강 대상 {missingProducts.length.toLocaleString("ko-KR")}개 · 현재 {currentQueuePage + 1}/{totalQueuePages}페이지
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              className="focus-ring rounded-md border border-line bg-white px-3 py-1.5 font-black text-ink hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => setQueuePage(Math.max(0, currentQueuePage - 1))}
+              disabled={currentQueuePage === 0}
+              type="button"
+            >
+              이전
+            </button>
+            <button
+              className="focus-ring rounded-md border border-line bg-white px-3 py-1.5 font-black text-ink hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => setQueuePage(Math.min(totalQueuePages - 1, currentQueuePage + 1))}
+              disabled={currentQueuePage >= totalQueuePages - 1}
+              type="button"
+            >
+              다음
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-4 space-y-3">
         {visibleProducts.map((product) => {

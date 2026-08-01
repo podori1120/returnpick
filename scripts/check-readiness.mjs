@@ -3679,6 +3679,25 @@ if (fileExists("components/AdminAffiliateLinkQueue.tsx")) {
     "required"
   );
   check(
+    "admin: affiliate link queue verifies pending links first",
+    linkQueue.includes("pendingVerificationVisibleProducts") &&
+      linkQueue.includes("verification?.checked_url !== affiliateUrl") &&
+      linkQueue.includes("pendingVerificationVisibleProducts.slice(0, MAX_BULK_LINK_CHECKS)") &&
+      linkQueue.includes("미확인 링크"),
+    "affiliate link queue advances through visible pasted links without rechecking already verified entries, while retaining per-row rechecks",
+    "required"
+  );
+  check(
+    "admin: affiliate link queue paginates large queues",
+    linkQueue.includes("LINK_QUEUE_PAGE_SIZE = 24") &&
+      linkQueue.includes("totalQueuePages") &&
+      linkQueue.includes("링크 보강 대상") &&
+      linkQueue.includes("onClick={() => setQueuePage(Math.max(0, currentQueuePage - 1))") &&
+      linkQueue.includes("onClick={() => setQueuePage(Math.min(totalQueuePages - 1, currentQueuePage + 1))"),
+    "affiliate-link queue exposes every pending product through explicit page navigation instead of silently hiding rows after the first 24",
+    "required"
+  );
+  check(
     "admin: affiliate backfill manual retry links",
     linkQueue.includes("backfillResultLinks") &&
       linkQueue.includes("manual_search_url") &&
