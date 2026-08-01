@@ -42,13 +42,13 @@ assert.deepEqual(
     runtimeReady: true,
     launchReady: true,
     blockingItemIds: [],
-    optionalMissingItemIds: ["naver", "telegram"]
+    optionalMissingItemIds: ["coupang", "naver", "telegram"]
   },
   "manual-link readiness must become launch-ready while automation capabilities remain visible"
 );
 assert.deepEqual(
   policy.getOptionalMissingItemIds(optionalMissingItems),
-  ["naver", "telegram"],
+  ["coupang", "naver", "telegram"],
   "missing optional capabilities must remain visible"
 );
 assert.equal(policy.isCapabilityReady(optionalMissingItems, "telegram"), false, "Telegram delivery must stay gated without its credentials");

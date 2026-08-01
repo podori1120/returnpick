@@ -9,7 +9,7 @@ export type CapabilityLaunchStep = {
 };
 
 export const CORE_RUNTIME_ITEM_IDS = ["supabase", "site", "approval_link", "admin_password", "cron_secret"] as const;
-export const OPTIONAL_CAPABILITY_ITEM_IDS = ["naver", "telegram"] as const;
+export const OPTIONAL_CAPABILITY_ITEM_IDS = ["coupang", "naver", "telegram"] as const;
 export const OPTIONAL_CONNECTION_CHECK_IDS = ["naver", "telegram"] as const;
 
 export function getOptionalConnectionCheckIds(apiKeysReady = true) {

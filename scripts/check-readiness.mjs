@@ -493,7 +493,7 @@ if (
   );
   check(
     "launch capabilities: core readiness contract",
-    policy.includes('OPTIONAL_CAPABILITY_ITEM_IDS = ["naver", "telegram"]') &&
+      policy.includes('OPTIONAL_CAPABILITY_ITEM_IDS = ["coupang", "naver", "telegram"]') &&
       policy.includes('CORE_RUNTIME_ITEM_IDS = ["supabase", "site", "approval_link", "admin_password", "cron_secret"]') &&
       policy.includes("getLaunchBlockingItemIds") &&
       policy.includes("getRequiredConnectionCheckIds") &&
