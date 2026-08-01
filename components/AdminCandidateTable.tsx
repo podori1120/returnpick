@@ -11,6 +11,7 @@ import { categoryOptions, getCategoryLabel } from "@/lib/category";
 import { isApprovalSampleAffiliateUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { formatDate, formatPercent, formatPrice } from "@/lib/format";
 import { getAppliedDiscountRate } from "@/lib/priceReference";
+import { getNaverPriceTrust } from "@/lib/naverPriceTrust";
 import { getCustomerPublishReadiness, getDealQuality } from "@/lib/quality";
 import { getPublicWebEvidence } from "@/lib/publicWebEvidence";
 import type { Category, ProductWithScore, SourcingStatus } from "@/lib/types";
@@ -79,6 +80,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
   const [missingAffiliateOnly, setMissingAffiliateOnly] = useState(false);
   const [publishReadyOnly, setPublishReadyOnly] = useState(false);
   const [publicBlockedOnly, setPublicBlockedOnly] = useState(false);
+  const [naverPriceNeedsReviewOnly, setNaverPriceNeedsReviewOnly] = useState(false);
   const [sort, setSort] = useState<SortKey>("score");
 
   async function loadProducts() {
@@ -131,6 +133,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
     setConditionUnknownOnly(false);
     setSelectedProductIds([]);
     setSort("score");
+    setNaverPriceNeedsReviewOnly(false);
 
     if (queue === "publish_ready") {
       setStatus("needs_review");
@@ -185,6 +188,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
       .filter((product) => (missingAffiliateOnly ? !isProductPublishReady(product) : true))
       .filter((product) => (publishReadyOnly ? isCustomerPublishReady(product) : true))
       .filter((product) => (publicBlockedOnly ? isPublishedPublicBlocked(product) : true))
+      .filter((product) => (naverPriceNeedsReviewOnly ? getNaverPriceTrust(product).trustedPrice == null : true))
       .filter((product) => (query ? product.title.toLowerCase().includes(query.toLowerCase()) : true))
       .filter((product) => (product.latest_score?.total_score ?? 0) >= minScoreValue)
       .filter((product) => {
@@ -201,18 +205,20 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
         if (sort === "price") return (b.return_price ?? b.source_price ?? 0) - (a.return_price ?? a.source_price ?? 0);
         return b.created_at.localeCompare(a.created_at);
       });
-  }, [products, status, category, conditionUnknownOnly, missingAffiliateOnly, publishReadyOnly, publicBlockedOnly, query, minScore, minPrice, maxPrice, sort]);
+  }, [products, status, category, conditionUnknownOnly, missingAffiliateOnly, publishReadyOnly, publicBlockedOnly, naverPriceNeedsReviewOnly, query, minScore, minPrice, maxPrice, sort]);
 
   const reviewStats = useMemo(() => {
     const needsReview = products.filter((product) => product.sourcing_status === "needs_review");
     const publishReady = needsReview.filter(isCustomerPublishReady);
     const linkBackfillNeeded = needsReview.filter((product) => !isProductPublishReady(product));
     const publicBlocked = products.filter(isPublishedPublicBlocked);
+    const naverPriceNeedsReview = products.filter((product) => getNaverPriceTrust(product).trustedPrice == null);
     return {
       needsReviewCount: needsReview.length,
       publishReadyCount: publishReady.length,
       linkBackfillNeededCount: linkBackfillNeeded.length,
-      publicBlockedCount: publicBlocked.length
+      publicBlockedCount: publicBlocked.length,
+      naverPriceNeedsReviewCount: naverPriceNeedsReview.length
     };
   }, [products]);
 
@@ -230,6 +236,22 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
 
   function showPublicRepairQueue() {
     applyCandidateQueue("public_repair");
+  }
+
+  function showNaverPriceQueue() {
+    setStatus("all");
+    setCategory("all");
+    setQuery("");
+    setMinScore("");
+    setMinPrice("");
+    setMaxPrice("");
+    setConditionUnknownOnly(false);
+    setMissingAffiliateOnly(false);
+    setPublishReadyOnly(false);
+    setPublicBlockedOnly(false);
+    setNaverPriceNeedsReviewOnly(true);
+    setSelectedProductIds([]);
+    setSort("latest");
   }
 
   const publishReadyFiltered = useMemo(() => filtered.filter(isCustomerPublishReady), [filtered]);
@@ -381,7 +403,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
           </div>
         ) : null}
 
-        <div className="mb-4 grid gap-2 md:grid-cols-4">
+        <div className="mb-4 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
           <button
             className="focus-ring rounded-lg border border-line bg-mist p-3 text-left hover:border-pine hover:bg-white"
             onClick={showReviewQueue}
@@ -417,6 +439,15 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
             <span className="block text-xs font-black">공개 보강 대기</span>
             <span className="mt-1 block text-2xl font-black">{reviewStats.publicBlockedCount.toLocaleString("ko-KR")}건</span>
             <span className="mt-1 block text-xs font-bold">게시됐지만 고객 화면 숨김</span>
+          </button>
+          <button
+            className="focus-ring rounded-lg border border-sky/30 bg-sky/5 p-3 text-left text-ink hover:bg-sky/10"
+            onClick={showNaverPriceQueue}
+            type="button"
+          >
+            <span className="block text-xs font-black text-sky-800">네이버 가격 보강</span>
+            <span className="mt-1 block text-2xl font-black">{reviewStats.naverPriceNeedsReviewCount.toLocaleString("ko-KR")}건</span>
+            <span className="mt-1 block text-xs font-bold text-steel">없음·검증 필요</span>
           </button>
         </div>
 
@@ -471,6 +502,10 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
               type="checkbox"
             />
             제휴 링크 보강 필요
+          </label>
+          <label className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-bold text-steel">
+            <input checked={naverPriceNeedsReviewOnly} onChange={(event) => setNaverPriceNeedsReviewOnly(event.target.checked)} type="checkbox" />
+            네이버 가격 보강 필요
           </label>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -534,7 +569,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
         </div>
 
         <div className="mt-4 overflow-auto rounded-lg border border-line">
-          <table className="w-full min-w-[1240px] text-left text-sm">
+          <table className="w-full min-w-[1340px] text-left text-sm">
             <thead className="bg-mist text-xs font-black text-steel">
               <tr>
                 <th className="px-3 py-2">선택</th>
@@ -542,6 +577,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
                 <th className="px-3 py-2">카테고리</th>
                 <th className="px-3 py-2">점수</th>
                 <th className="px-3 py-2">가격</th>
+                <th className="px-3 py-2">네이버 기준가</th>
                 <th className="px-3 py-2">할인</th>
                 <th className="px-3 py-2">상태</th>
                 <th className="px-3 py-2">수익 퍼널</th>
@@ -554,6 +590,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
               {filtered.map((product) => {
                 const discount = getAppliedDiscountRate(product);
                 const quality = getDealQuality(product);
+                const naverPriceTrust = getNaverPriceTrust(product);
                 const revenue = productMetrics[product.id];
                 const approvalSampleAffiliate = isApprovalSampleAffiliateUrl(product.affiliate_url);
                 const affiliateReady = isProductPublishReady(product);
@@ -593,6 +630,19 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
                       <ScoreBadge score={product.latest_score?.total_score} />
                     </td>
                     <td className="px-3 py-3 font-bold">{formatPrice(product.return_price ?? product.source_price ?? product.new_price)}</td>
+                    <td className="px-3 py-3">
+                      {naverPriceTrust.trustedPrice != null ? (
+                        <>
+                          <p className="font-bold text-pine">{formatPrice(naverPriceTrust.trustedPrice)}</p>
+                          <p className="mt-1 text-[11px] font-bold text-steel">{naverPriceTrust.label}</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-black text-coral">{naverPriceTrust.status === "unverified" ? "검증 필요" : "가격 없음"}</p>
+                          <p className="mt-1 max-w-[150px] text-[11px] font-bold leading-4 text-steel">{naverPriceTrust.note}</p>
+                        </>
+                      )}
+                    </td>
                     <td className="px-3 py-3 font-bold">{formatPercent(discount)}</td>
                     <td className="px-3 py-3">{product.sourcing_status}</td>
                     <td className="px-3 py-3 text-xs font-bold text-steel">
