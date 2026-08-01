@@ -470,8 +470,8 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
       "4. 실행이 끝나면 Vercel을 재배포합니다.",
       "5. ReturnPick /admin > 승인 후 운영 즉시 가동 준비 > 실제 연결 테스트를 다시 누릅니다.",
       "",
-      `기대 schema_version: ${supabaseSchemaIssue?.expected ?? "2026-08-01-affiliate-surface-attribution"}`,
-      "확인 항목: returnpick_schema_meta, is_strict_coupang_partners_url, product_snapshots, RLS 정책, affiliate_events"
+      `기대 schema_version: ${supabaseSchemaIssue?.expected ?? "2026-08-01-public-column-boundary"}`,
+      "확인 항목: returnpick_schema_meta, is_strict_coupang_partners_url, product_snapshots, RLS 정책, 공개 컬럼 권한, affiliate_events"
     ].join("\n");
 
     try {

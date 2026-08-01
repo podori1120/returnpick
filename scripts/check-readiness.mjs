@@ -1255,6 +1255,10 @@ if (fileExists("package.json") && fileExists("scripts/verify-supabase-schema.mjs
       supabaseSchemaVerifier.includes("affiliate_events") &&
       supabaseSchemaVerifier.includes("context") &&
       supabaseSchemaVerifier.includes("writeSmokeCheck") &&
+      supabaseSchemaVerifier.includes("publicColumnBoundaryCheck") &&
+      supabaseSchemaVerifier.includes("NEXT_PUBLIC_SUPABASE_ANON_KEY") &&
+      supabaseSchemaVerifier.includes("internal product columns denied") &&
+      supabaseSchemaVerifier.includes("internal snapshot columns denied") &&
       supabaseSchemaVerifier.includes("NEXT_PUBLIC_SUPABASE_URL") &&
       supabaseSchemaVerifier.includes("SUPABASE_SERVICE_ROLE_KEY") &&
       supabaseSchemaVerifier.includes("loadEnvFiles"),
@@ -1268,6 +1272,8 @@ if (fileExists("package.json") && fileExists("scripts/verify-supabase-schema.mjs
       supabaseSetupRunbook.includes("is_strict_coupang_partners_url") &&
       supabaseSetupRunbook.includes("sourced_products_public_affiliate_url_check") &&
       supabaseSetupRunbook.includes("Public can read published products") &&
+      supabaseSetupRunbook.includes("public role revoke boundary") &&
+      supabaseSetupRunbook.includes("internal product column boundary") &&
       supabaseSetupRunbook.includes("npm run schema:production") &&
       supabaseSetupRunbook.includes("npm run doctor:production:launch") &&
       !supabaseSetupRunbook.includes("process.env") &&
@@ -1362,7 +1368,7 @@ if (fileExists("scripts/verify-scheduled-affiliate-backfill.mjs")) {
 
 if (fileExists("sql/schema.sql")) {
   const schema = readText("sql/schema.sql");
-  const schemaVersion = "2026-08-01-affiliate-surface-attribution";
+  const schemaVersion = "2026-08-01-public-column-boundary";
   const apiReadinessSource = fileExists("lib/apiReadiness.ts") ? readText("lib/apiReadiness.ts") : "";
   check(
     "schema version marker",
@@ -1412,6 +1418,21 @@ if (fileExists("sql/schema.sql")) {
     (schema.match(/is_strict_coupang_partners_url/g) ?? []).length >= 5 &&
       schema.includes("is_strict_coupang_partners_url(sourced_products.affiliate_url)"),
     "public product, score, and snapshot RLS policies expose only strict affiliate-ready published products",
+    "required"
+  );
+  const publicProductGrant = schema.match(/grant select \(([\s\S]*?)\) on table sourced_products to anon, authenticated;/)?.[1] ?? "";
+  const publicSnapshotGrant = schema.match(/grant select \(([\s\S]*?)\) on table product_snapshots to anon, authenticated;/)?.[1] ?? "";
+  check(
+    "schema public column boundary",
+    schema.includes("revoke all on table") &&
+      schema.includes("from anon, authenticated") &&
+      publicProductGrant.includes("public_note") &&
+      !publicProductGrant.includes("raw_json") &&
+      !publicProductGrant.includes("admin_memo") &&
+      !publicProductGrant.includes("rejection_reason") &&
+      publicSnapshotGrant.includes("change_flags") &&
+      !publicSnapshotGrant.includes("raw_json"),
+    "anon and authenticated roles can read customer-facing fields only; provider payloads and admin notes remain service-role-only",
     "required"
   );
   check("schema keyword uniqueness", schema.includes("keyword_key") && schema.includes("sourcing_keywords_keyword_category_key"), "sourcing keywords are unique by normalized keyword and category", "required");
@@ -2653,7 +2674,7 @@ if (fileExists("lib/apiReadiness.ts")) {
   check(
     "readiness: supabase schema version marker",
     readiness.includes("EXPECTED_SCHEMA_VERSION") &&
-      readiness.includes("2026-08-01-affiliate-surface-attribution") &&
+      readiness.includes("2026-08-01-public-column-boundary") &&
       readiness.includes("returnpick_schema_meta") &&
       readiness.includes("schema_version"),
     "admin readiness verifies the deployed DB has the latest schema.sql marker",
@@ -2744,6 +2765,9 @@ if (fileExists("lib/apiReadiness.ts")) {
     "readiness: anon public RLS smoke test",
     readiness.includes("runAnonPublicRlsSmokeCheck") &&
       readiness.includes("anon_can_read_affiliate_ready_product") &&
+      readiness.includes("anon_can_read_public_product_columns") &&
+      readiness.includes("anon_cannot_read_internal_product_columns") &&
+      readiness.includes("anon_cannot_read_internal_snapshot_columns") &&
       readiness.includes("anon_cannot_read_unpublished_product") &&
       readiness.includes("anon_public_rls_smoke"),
     "admin readiness verifies public RLS with the anon key, not only service role access",

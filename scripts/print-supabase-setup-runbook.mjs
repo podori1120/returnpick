@@ -18,7 +18,10 @@ const requiredFragments = [
   { label: "published affiliate constraint", text: "sourced_products_public_affiliate_url_check" },
   { label: "public product RLS policy", text: "Public can read published products" },
   { label: "public score RLS policy", text: "Public can read scores for published products" },
-  { label: "public snapshot RLS policy", text: "Public can read snapshots for published products" }
+  { label: "public snapshot RLS policy", text: "Public can read snapshots for published products" },
+  { label: "public role revoke boundary", text: "revoke all on table" },
+  { label: "public product column grant", text: "on table sourced_products to anon, authenticated" },
+  { label: "public snapshot column grant", text: "on table product_snapshots to anon, authenticated" }
 ];
 
 function readSchema() {
@@ -39,7 +42,17 @@ function extractSchemaVersion(sql) {
 const sql = readSchema();
 if (!sql) process.exit();
 
-const missing = requiredFragments.filter((item) => !sql.includes(item.text));
+const publicProductGrant = sql.match(/grant select \(([\s\S]*?)\) on table sourced_products to anon, authenticated;/i)?.[1] ?? "";
+const publicSnapshotGrant = sql.match(/grant select \(([\s\S]*?)\) on table product_snapshots to anon, authenticated;/i)?.[1] ?? "";
+const missing = [
+  ...requiredFragments.filter((item) => !sql.includes(item.text)),
+  ...(!publicProductGrant || /raw_json|admin_memo|rejection_reason/.test(publicProductGrant)
+    ? [{ label: "internal product column boundary", text: "sourced_products grant excludes raw_json/admin_memo/rejection_reason" }]
+    : []),
+  ...(!publicSnapshotGrant || publicSnapshotGrant.includes("raw_json")
+    ? [{ label: "internal snapshot column boundary", text: "product_snapshots grant excludes raw_json" }]
+    : [])
+];
 const schemaVersion = extractSchemaVersion(sql);
 
 console.log("ReturnPick Supabase setup runbook");
@@ -54,7 +67,7 @@ if (missing.length) {
   for (const item of missing) console.log(`- ${item.label}: ${item.text}`);
   process.exitCode = 1;
 } else {
-  console.log("Schema guard passed. The local schema includes the launch-critical tables, RPC, constraint, and RLS policies.");
+  console.log("Schema guard passed. The local schema includes the launch-critical tables, RPC, constraint, RLS policies, and public column boundary.");
 }
 
 console.log("");
@@ -72,3 +85,4 @@ console.log("- sourcing, scoring, Telegram, affiliate event, and product snapsho
 console.log("- is_strict_coupang_partners_url accepts only product-level Coupang Partners short links.");
 console.log("- published products are public only when they have a strict product affiliate URL.");
 console.log("- service role writes and anon public RLS reads both pass.");
+console.log("- anon/authenticated can read customer-facing columns only; raw_json and admin-only fields are denied.");

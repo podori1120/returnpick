@@ -98,6 +98,7 @@ Vercel에 넣기 전 로컬에서 Supabase SQL 적용 상태만 직접 확인하
 
 ```powershell
 $env:NEXT_PUBLIC_SUPABASE_URL="https://프로젝트.supabase.co"
+$env:NEXT_PUBLIC_SUPABASE_ANON_KEY="anon-key"
 $env:SUPABASE_SERVICE_ROLE_KEY="service-role-key"
 npm run schema:production
 ```
@@ -108,15 +109,15 @@ Supabase SQL 적용 전에 로컬 `schema.sql`이 첫 가동에 필요한 테이
 npm run schema:setup
 ```
 
-이 검사는 `returnpick_schema_meta`의 스키마 버전, 필수 테이블과 컬럼, `is_strict_coupang_partners_url` 함수, `sourcing_runs`와 `affiliate_events` 쓰기/정리 경로를 확인합니다. service role key는 화면에 마스킹해서 표시하고, 실제 값은 출력하지 않습니다.
+이 검사는 `returnpick_schema_meta`의 스키마 버전, 필수 테이블과 컬럼, `is_strict_coupang_partners_url` 함수, `sourcing_runs`와 `affiliate_events` 쓰기/정리 경로, anon 역할의 공개 컬럼 읽기와 내부 컬럼 차단을 확인합니다. anon key와 service role key는 화면에 마스킹해서 표시하고, 실제 값은 출력하지 않습니다.
 
 `schema.sql`은 새로 공개되는 상품이 `https://link.coupang.com/a/짧은코드` 형태의 엄격한 쿠팡 파트너스 단축 링크 없이 `published` 상태가 되는 것을 DB 레벨에서도 막습니다. 테스트·샘플처럼 보이는 단축 코드는 서버와 DB 양쪽에서 거부합니다. 이 제약은 `not valid`로 추가되어 기존 레거시 데이터 때문에 SQL 적용이 중단되지는 않지만, 이후 새로 저장하거나 수정하는 공개 상품에는 바로 적용됩니다. 기존 문제 데이터는 `/admin` 실제 연결 테스트의 `공개 데이터 품질` 항목에서 찾아 정리하세요.
 
-`schema.sql`은 `returnpick_schema_meta` 테이블에 `schema_version=2026-08-01-affiliate-surface-attribution` 표식도 기록합니다. `/admin`의 실제 연결 테스트는 이 값을 확인하므로, Supabase 테이블은 있어도 최신 SQL을 다시 적용하지 않은 경우 `Supabase 운영 DB` 카드에서 바로 드러납니다. `last_observed_at`은 자동 소싱이 상품을 다시 찾은 시각만 기록하며, 관리자 수정 시각과 섞이지 않습니다. 관리자 수동 후보는 자동 관측 시각을 부여하지 않으므로, 수동 입력만으로 `24시간 내 수집` 상태가 되지 않고 구매 전 쿠팡 페이지 재확인이 계속 표시됩니다.
+`schema.sql`은 `returnpick_schema_meta` 테이블에 `schema_version=2026-08-01-public-column-boundary` 표식도 기록합니다. `/admin`의 실제 연결 테스트는 이 값을 확인하므로, Supabase 테이블은 있어도 최신 SQL을 다시 적용하지 않은 경우 `Supabase 운영 DB` 카드에서 바로 드러납니다. `last_observed_at`은 자동 소싱이 상품을 다시 찾은 시각만 기록하며, 관리자 수정 시각과 섞이지 않습니다. 관리자 수동 후보는 자동 관측 시각을 부여하지 않으므로, 수동 입력만으로 `24시간 내 수집` 상태가 되지 않고 구매 전 쿠팡 페이지 재확인이 계속 표시됩니다.
 
 또한 실제 연결 테스트는 Supabase RPC로 `is_strict_coupang_partners_url` 함수를 직접 호출해 정상 파트너스 단축 링크는 허용하고, 테스트 코드처럼 보이는 링크와 일반 쿠팡 상품 URL은 거부하는지 확인합니다. 버전 표식만 맞고 DB 함수가 빠졌거나 다르게 적용된 상태도 이 단계에서 막힙니다.
 
-운영 데이터가 늘어날 때 공개 상품 목록, 관리자 검토 큐, 수집 실행 로그, 텔레그램 로그, 가격 스냅샷, 클릭 퍼널 지표가 느려지지 않도록 `schema.sql`에 전용 인덱스를 포함했습니다. 이미 Supabase를 만들어 둔 경우 최신 `sql/schema.sql`을 다시 실행해 이 인덱스와 스키마 버전 표식을 반영하세요.
+운영 데이터가 늘어날 때 공개 상품 목록, 관리자 검토 큐, 수집 실행 로그, 텔레그램 로그, 가격 스냅샷, 클릭 퍼널 지표가 느려지지 않도록 `schema.sql`에 전용 인덱스를 포함했습니다. 공개 역할에는 고객 화면용 상품·점수·가격 스냅샷 컬럼만 `select` 권한을 주고, `raw_json`, 관리자 메모, 거절 사유, 내부 로그는 서비스 역할에서만 읽도록 제한합니다. 이미 Supabase를 만들어 둔 경우 최신 `sql/schema.sql`을 다시 실행해 이 인덱스, 권한 경계, 스키마 버전 표식을 반영하세요.
 
 ## 6. 쿠팡 파트너스 API 설정
 

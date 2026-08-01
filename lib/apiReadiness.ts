@@ -21,7 +21,7 @@ import { isStrongAdminPassword } from "@/lib/validators";
 type ReadinessState = "ready" | "missing" | "partial" | "disabled";
 type ReadinessMode = "pre_approval" | "manual_launch_ready" | "api_ready" | "launch_ready";
 
-const EXPECTED_SCHEMA_VERSION = "2026-08-01-affiliate-surface-attribution";
+const EXPECTED_SCHEMA_VERSION = "2026-08-01-public-column-boundary";
 
 export type ApiReadinessItem = {
   id: string;
@@ -1290,6 +1290,30 @@ async function runAnonPublicRlsSmokeCheck(client: NonNullable<ReturnType<typeof 
         count: visibleProduct.count ?? null
       });
 
+      const publicProductColumns = await anonClient
+        .from("sourced_products")
+        .select("id,title,affiliate_url,public_note,last_observed_at")
+        .eq("id", productId)
+        .maybeSingle();
+      steps.push({
+        step: "anon_can_read_public_product_columns",
+        ok: !publicProductColumns.error && publicProductColumns.data?.id === productId,
+        error: publicProductColumns.error?.message ?? null,
+        count: publicProductColumns.data ? 1 : 0
+      });
+
+      const restrictedProductColumns = await anonClient
+        .from("sourced_products")
+        .select("raw_json,admin_memo,rejection_reason")
+        .eq("id", productId)
+        .maybeSingle();
+      steps.push({
+        step: "anon_cannot_read_internal_product_columns",
+        ok: Boolean(restrictedProductColumns.error),
+        error: restrictedProductColumns.error?.message ?? null,
+        count: restrictedProductColumns.data ? 1 : 0
+      });
+
       const visibleScore = await anonClient.from("deal_scores").select("id", { count: "exact", head: true }).eq("id", scoreId);
       steps.push({
         step: "anon_can_read_public_score",
@@ -1304,6 +1328,18 @@ async function runAnonPublicRlsSmokeCheck(client: NonNullable<ReturnType<typeof 
         ok: !visibleSnapshot.error && visibleSnapshot.count === 1,
         error: visibleSnapshot.error?.message ?? null,
         count: visibleSnapshot.count ?? null
+      });
+
+      const restrictedSnapshotColumns = await anonClient
+        .from("product_snapshots")
+        .select("raw_json")
+        .eq("id", snapshotId)
+        .maybeSingle();
+      steps.push({
+        step: "anon_cannot_read_internal_snapshot_columns",
+        ok: Boolean(restrictedSnapshotColumns.error),
+        error: restrictedSnapshotColumns.error?.message ?? null,
+        count: restrictedSnapshotColumns.data ? 1 : 0
       });
 
       const unpublish = await client.from("sourced_products").update({ is_published: false, sourcing_status: "approved" }).eq("id", productId);

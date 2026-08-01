@@ -7,7 +7,7 @@ create table if not exists returnpick_schema_meta (
 );
 
 insert into returnpick_schema_meta (key, value, updated_at)
-values ('schema_version', '2026-08-01-affiliate-surface-attribution', now())
+values ('schema_version', '2026-08-01-public-column-boundary', now())
 on conflict (key)
 do update set value = excluded.value, updated_at = now();
 
@@ -278,3 +278,76 @@ using (
       and is_strict_coupang_partners_url(sourced_products.affiliate_url)
   )
 );
+
+-- Public API roles may read only customer-facing columns. Server routes use the
+-- service role for sourcing and admin work, so internal provenance and notes stay private.
+revoke all on table
+  returnpick_schema_meta,
+  sourcing_keywords,
+  sourced_products,
+  deal_scores,
+  sourcing_runs,
+  telegram_logs,
+  product_snapshots,
+  affiliate_events
+from anon, authenticated;
+
+grant select (
+  id,
+  source,
+  source_product_id,
+  category,
+  keyword,
+  title,
+  brand,
+  model_name,
+  image_url,
+  source_url,
+  coupang_url,
+  affiliate_url,
+  source_price,
+  return_price,
+  new_price,
+  naver_lowest_price,
+  condition_grade,
+  stock_count,
+  spec_json,
+  sourcing_status,
+  is_published,
+  public_note,
+  last_observed_at,
+  created_at,
+  updated_at
+) on table sourced_products to anon, authenticated;
+
+grant select (
+  id,
+  product_id,
+  total_score,
+  price_score,
+  condition_score,
+  spec_score,
+  category_risk_score,
+  hidden_cost_score,
+  as_score,
+  timing_score,
+  verdict,
+  reasons,
+  risk_flags,
+  score_detail,
+  created_at,
+  updated_at
+) on table deal_scores to anon, authenticated;
+
+grant select (
+  id,
+  product_id,
+  observed_at,
+  source_price,
+  return_price,
+  new_price,
+  naver_lowest_price,
+  stock_count,
+  condition_grade,
+  change_flags
+) on table product_snapshots to anon, authenticated;
