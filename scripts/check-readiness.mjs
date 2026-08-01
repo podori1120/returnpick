@@ -1973,6 +1973,9 @@ if (
       approvalButton.includes('channel = "web_approval_sample"') &&
       approvalButton.includes('context = "approval_sample"') &&
       eventRoute.includes("isManualAffiliateTrackingRequest") &&
+      eventRoute.includes('detailViewChannels: ["web_approval_sample_detail"]') &&
+      readText("components/AffiliateEventTracker.tsx").includes("ApprovalSampleViewTracker") &&
+      readText("app/products/approval-sample/page.tsx").includes("ApprovalSampleViewTracker") &&
       eventRoute.includes("NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL") &&
       eventRoute.includes('fetchSite !== "same-origin"') &&
       eventRoute.includes("referrerUrl.origin !== getPublicRequestOrigin(request)") &&

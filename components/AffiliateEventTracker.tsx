@@ -55,6 +55,21 @@ export function EditorialPickViewTracker() {
   return null;
 }
 
+export function ApprovalSampleViewTracker() {
+  useEffect(() => {
+    const currentUtmSource = getCurrentUtmSource();
+    const utmSource = currentUtmSource ?? getUtmSource();
+    trackAffiliateEvent({
+      eventType: "detail_view",
+      channel: "web_approval_sample_detail",
+      utmSource,
+      context: "approval_sample"
+    });
+  }, []);
+
+  return null;
+}
+
 const editorialCardTracking = {
   home: {
     context: "editorial_home_card",

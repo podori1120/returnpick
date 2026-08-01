@@ -14,6 +14,7 @@ import {
   Truck
 } from "lucide-react";
 import ApprovalCoupangButton from "@/components/ApprovalCoupangButton";
+import { ApprovalSampleViewTracker } from "@/components/AffiliateEventTracker";
 import { approvalSampleProduct } from "@/lib/approvalSample";
 import { isCoupangPartnersLink } from "@/lib/coupangLink";
 import { getSiteUrl } from "@/lib/siteUrl";
@@ -88,6 +89,7 @@ export default function ApprovalSampleProductPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-28 pt-8 sm:px-6 lg:pb-10 lg:pt-10">
+      <ApprovalSampleViewTracker />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }} />
 
       <section className="mb-5 rounded-lg border border-line bg-white p-4 shadow-soft">

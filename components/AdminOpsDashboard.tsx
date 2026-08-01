@@ -149,6 +149,7 @@ function channelLabel(channel: string) {
   const labels: Record<string, string> = {
     web: "웹 기본",
     web_approval_sample: "직접 검수 추천 CTA",
+    web_approval_sample_detail: "승인 샘플 상세 진입",
     web_editorial_pick: "추천 콘텐츠",
     telegram_editorial_pick: "텔레그램 추천 콘텐츠",
     web_editorial_card_picks: "검수 추천 모음 카드",

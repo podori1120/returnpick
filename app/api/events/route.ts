@@ -11,7 +11,7 @@ const manualTrackingSurfaces = [
     pathname: "/products/approval-sample",
     impressionChannels: [],
     affiliateClickChannels: ["web_approval_sample"],
-    detailViewChannels: [],
+    detailViewChannels: ["web_approval_sample_detail"],
     telegramDetailChannels: [],
     shareCopyChannels: []
   },
