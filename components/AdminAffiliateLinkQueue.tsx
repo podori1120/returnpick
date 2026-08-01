@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Copy, ExternalLink, Link2, RefreshCw, Search, Upload, Wand2 } from "lucide-react";
+import { Copy, ExternalLink, Link2, RefreshCw, Search, ShieldCheck, Upload, Wand2 } from "lucide-react";
 import { getAffiliateIdentityReadiness } from "@/lib/affiliateIdentity";
 import { getCategoryLabel } from "@/lib/category";
 import { buildCoupangSearchUrl, isApprovalSampleAffiliateUrl, isCoupangPartnersLink, isUsableAffiliateUrl } from "@/lib/coupangLink";
@@ -96,6 +96,8 @@ type AffiliateLinkVerificationResponse = {
   error?: string;
   message?: string;
 };
+
+const MAX_BULK_LINK_CHECKS = 8;
 
 type CheckedAffiliateLinkVerification = AffiliateLinkVerification & {
   checked_url: string;
@@ -238,6 +240,7 @@ export default function AdminAffiliateLinkQueue({
   const [backfillResult, setBackfillResult] = useState<BackfillResult | null>(null);
   const [bulkImportRunning, setBulkImportRunning] = useState(false);
   const [bulkImportResult, setBulkImportResult] = useState<BulkImportResult | null>(null);
+  const [bulkVerificationRunning, setBulkVerificationRunning] = useState(false);
   const [checkingLinkId, setCheckingLinkId] = useState<string | null>(null);
   const [linkVerifications, setLinkVerifications] = useState<Record<string, CheckedAffiliateLinkVerification>>({});
   const [notice, setNotice] = useState<{ type: "info" | "success" | "error"; message: string } | null>(null);
@@ -384,6 +387,39 @@ export default function AdminAffiliateLinkQueue({
       return verification;
     } finally {
       setCheckingLinkId(null);
+    }
+  }
+
+  async function verifyVisibleAffiliateLinks() {
+    const targets = visibleProducts
+      .filter((product) => isCoupangPartnersLink(inputs[product.id]?.trim() ?? ""))
+      .slice(0, MAX_BULK_LINK_CHECKS);
+    if (!targets.length) {
+      setNotice({ type: "info", message: "현재 화면에 자동 확인할 상품별 파트너스 링크가 없습니다." });
+      return;
+    }
+
+    setBulkVerificationRunning(true);
+    setNotice({ type: "info", message: `현재 화면의 파트너스 링크 ${targets.length}건을 순차 확인 중입니다.` });
+    let matchedCount = 0;
+    let mismatchCount = 0;
+    let manualCount = 0;
+    try {
+      for (const product of targets) {
+        const verification = await verifyAffiliateUrl(product, "verify", inputs[product.id]);
+        if (verification.ok) matchedCount += 1;
+        else if (verification.identity_status === "MISMATCH") mismatchCount += 1;
+        else manualCount += 1;
+      }
+      await loadProducts();
+      setNotice({
+        type: mismatchCount ? "info" : "success",
+        message: `자동 확인 ${targets.length}건 완료 · 상품 일치 ${matchedCount}건 · 불일치 ${mismatchCount}건 · 수동 확인 필요 ${manualCount}건`
+      });
+    } catch {
+      setNotice({ type: "error", message: "네트워크 문제로 일괄 링크 확인을 끝내지 못했습니다. 남은 링크를 다시 실행하세요." });
+    } finally {
+      setBulkVerificationRunning(false);
     }
   }
 
@@ -548,6 +584,17 @@ export default function AdminAffiliateLinkQueue({
             type="button"
           >
             <Wand2 size={15} aria-hidden /> API로 24개 자동 보강
+          </button>
+          <button
+            className="focus-ring inline-flex items-center gap-2 rounded-lg border border-pine/30 bg-pine/5 px-3 py-2 text-sm font-black text-pine hover:bg-pine/10 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={verifyVisibleAffiliateLinks}
+            disabled={bulkVerificationRunning || checkingLinkId !== null || !visibleProducts.some((product) => isCoupangPartnersLink(inputs[product.id]?.trim() ?? ""))}
+            type="button"
+          >
+            <ShieldCheck className={bulkVerificationRunning ? "animate-pulse" : ""} size={15} aria-hidden />
+            {bulkVerificationRunning
+              ? "링크 확인 중"
+              : `보이는 링크 ${Math.min(MAX_BULK_LINK_CHECKS, visibleProducts.filter((product) => isCoupangPartnersLink(inputs[product.id]?.trim() ?? "")).length)}건 확인`}
           </button>
           <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-black hover:bg-mist disabled:opacity-60" onClick={loadProducts} disabled={loading} type="button">
             <RefreshCw size={15} aria-hidden /> {loading ? "불러오는 중" : "새로고침"}
@@ -796,7 +843,7 @@ export default function AdminAffiliateLinkQueue({
                     <button
                       className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-black hover:bg-mist disabled:cursor-not-allowed disabled:opacity-50"
                       onClick={() => verifyAffiliateUrl(product)}
-                      disabled={!isCoupangPartnersLink(inputValue) || checkingLinkId !== null}
+                      disabled={!isCoupangPartnersLink(inputValue) || checkingLinkId !== null || bulkVerificationRunning}
                       type="button"
                     >
                       <RefreshCw className={checkingLinkId === product.id ? "animate-spin" : ""} size={14} aria-hidden />
@@ -851,7 +898,7 @@ export default function AdminAffiliateLinkQueue({
                         <button
                           className="focus-ring mt-2 inline-flex items-center justify-center rounded-lg border border-current px-3 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-50"
                           onClick={() => verifyAffiliateUrl(product, "manual_confirm")}
-                          disabled={checkingLinkId !== null}
+                          disabled={checkingLinkId !== null || bulkVerificationRunning}
                           type="button"
                         >
                           브라우저 확인 완료
@@ -863,7 +910,7 @@ export default function AdminAffiliateLinkQueue({
                     <button
                       className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-black hover:bg-mist disabled:cursor-not-allowed disabled:opacity-50"
                       onClick={() => saveAffiliateUrl(product, "save")}
-                      disabled={!linkReady || identityMismatch || savingId === product.id}
+                      disabled={!linkReady || identityMismatch || savingId === product.id || bulkVerificationRunning}
                       type="button"
                     >
                       <Link2 size={14} aria-hidden /> 링크 저장
@@ -871,7 +918,7 @@ export default function AdminAffiliateLinkQueue({
                     <button
                       className="focus-ring rounded-lg bg-pine px-3 py-2 text-xs font-black text-white hover:bg-ink disabled:cursor-not-allowed disabled:opacity-50"
                       onClick={() => saveAffiliateUrl(product, "publish")}
-                      disabled={!linkReady || !identityReady || savingId === product.id}
+                      disabled={!linkReady || !identityReady || savingId === product.id || bulkVerificationRunning}
                       title={identityReady ? "검수된 현재 링크를 저장하고 게시합니다." : "게시 전 상품번호 일치 확인이 필요합니다."}
                       type="button"
                     >

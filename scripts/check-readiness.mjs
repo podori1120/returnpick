@@ -1767,7 +1767,12 @@ if (
       linkQueue.includes("linkVerifications") &&
       linkQueue.includes("affiliateUrlOverride") &&
       linkQueue.includes('await verifyAffiliateUrl(product, "verify", affiliateUrl)') &&
-      linkQueue.includes("링크는 저장했지만 목적지 확인이 추가로 필요합니다."),
+      linkQueue.includes("링크는 저장했지만 목적지 확인이 추가로 필요합니다.") &&
+      linkQueue.includes("MAX_BULK_LINK_CHECKS") &&
+      linkQueue.includes("verifyVisibleAffiliateLinks") &&
+      linkQueue.includes("자동 확인") &&
+      linkQueue.includes("상품 일치") &&
+      linkQueue.includes("수동 확인 필요"),
     "authenticated admins compare one pasted link with the server-loaded candidate, retain unverified links in the queue, and can explicitly confirm only unresolved destinations",
     "required"
   );
