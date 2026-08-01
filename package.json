@@ -28,6 +28,7 @@
     "manual-import:check": "node scripts/verify-manual-import-safety.mjs",
     "affiliate-identity:check": "node scripts/verify-affiliate-identity.mjs",
     "bootstrap-catalog:check": "node scripts/verify-bootstrap-catalog-runtime.mjs",
+    "demo-catalog:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-demo-catalog-stability.mjs",
     "supabase-config:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-supabase-config-guard.mjs",
     "content-kit:check": "node scripts/verify-product-distribution-kit.mjs",
     "launch-capabilities:check": "node scripts/verify-launch-capability-policy.mjs",

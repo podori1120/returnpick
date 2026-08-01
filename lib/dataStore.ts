@@ -4,6 +4,7 @@ import path from "path";
 import { readBootstrapCatalog } from "@/lib/bootstrapCatalog";
 import { isGenericCoupangLandingUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { demoCatalog } from "@/lib/demoCatalog";
+import { stableDemoProductId } from "@/lib/demoIdentity";
 import { getCustomerPublishReadiness, getDealQuality } from "@/lib/quality";
 import { getNaverPriceTrust } from "@/lib/naverPriceTrust";
 import { isUsableProductImageUrl } from "@/lib/productImageUrl";
@@ -110,8 +111,12 @@ function createInitialKeywords(): SourcingKeyword[] {
 
 function makeProduct(input: ProductInput): SourcedProduct {
   const stamp = now();
+  const stableId =
+    !input.id && input.source === "mock" && input.source_product_id
+      ? stableDemoProductId(input.source_product_id)
+      : null;
   return {
-    id: input.id ?? randomUUID(),
+    id: input.id ?? stableId ?? randomUUID(),
     source: input.source,
     source_product_id: input.source_product_id ?? null,
     category: input.category,
@@ -294,6 +299,14 @@ function hydrateDemoCatalog(state: MemoryState): MemoryState {
     }
 
     if (existing.source_product_id?.startsWith("seed-")) {
+      const previousId = existing.id;
+      if (previousId !== seed.id) {
+        existing.id = seed.id;
+        state.scores = state.scores.map((score) => (score.product_id === previousId ? { ...score, product_id: seed.id } : score));
+        state.snapshots = state.snapshots.map((snapshot) => (snapshot.product_id === previousId ? { ...snapshot, product_id: seed.id } : snapshot));
+        state.telegramLogs = state.telegramLogs.map((log) => (log.product_id === previousId ? { ...log, product_id: seed.id } : log));
+        state.affiliateEvents = state.affiliateEvents.map((event) => (event.product_id === previousId ? { ...event, product_id: seed.id } : event));
+      }
       existing.sourcing_status = "published";
       existing.is_published = true;
       existing.is_rejected = false;

@@ -208,6 +208,7 @@ const requiredFiles = [
   "lib/affiliateLinkBackfill.ts",
   "lib/affiliateIdentity.ts",
   "lib/bootstrapCatalog.ts",
+  "lib/demoIdentity.ts",
   "lib/coupangAffiliateLinkVerifier.ts",
   "lib/editorialCampaign.ts",
   "lib/productDistributionKit.ts",
@@ -249,6 +250,7 @@ const requiredFiles = [
   "scripts/verify-scheduled-affiliate-backfill.mjs",
   "scripts/verify-affiliate-identity.mjs",
   "scripts/verify-bootstrap-catalog-runtime.mjs",
+  "scripts/verify-demo-catalog-stability.mjs",
   "scripts/verify-supabase-config-guard.mjs",
   "scripts/verify-product-distribution-kit.mjs",
   "scripts/verify-launch-capability-policy.mjs",
@@ -450,6 +452,13 @@ if (
     "scripts: bootstrap catalog runtime check command",
     packageJson.includes('"bootstrap-catalog:check": "node scripts/verify-bootstrap-catalog-runtime.mjs"'),
     "package.json exposes a production-runtime bootstrap catalog hydration check",
+    "required"
+  );
+  check(
+    "scripts: demo catalog stability command",
+    packageJson.includes('"demo-catalog:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-demo-catalog-stability.mjs"') &&
+      fileExists("scripts/verify-demo-catalog-stability.mjs"),
+    "package.json exposes a deterministic local demo product identity check",
     "required"
   );
   check(
