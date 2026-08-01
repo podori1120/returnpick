@@ -3,7 +3,8 @@ import CompareBoard from "@/components/CompareBoard";
 
 export const metadata: Metadata = {
   title: "비교함 | ReturnPick 리턴픽",
-  description: "리턴픽에서 저장한 반품 노트북, 모니터, 소형가전 딜을 점수, 가격, 반품등급, 제휴 링크 준비 상태별로 비교합니다."
+  description: "리턴픽에서 저장한 반품 노트북, 모니터, 소형가전 딜을 점수, 가격, 반품등급, 제휴 링크 준비 상태별로 비교합니다.",
+  robots: { index: false, follow: false }
 };
 
 export default function ComparePage() {

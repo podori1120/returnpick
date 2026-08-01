@@ -40,7 +40,7 @@ export default function ApprovalCoupangButton({
       href={href}
       target="_blank"
       rel="nofollow sponsored noopener noreferrer"
-      onClick={(event) => {
+      onClick={() => {
         const currentUtmSource = getCurrentUtmSource();
         const utmSource = currentUtmSource ?? getUtmSource();
         trackAffiliateEvent({
@@ -49,13 +49,6 @@ export default function ApprovalCoupangButton({
           utmSource,
           context
         });
-
-        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-
-        event.preventDefault();
-        const opened = window.open(href, "_blank", "noopener,noreferrer");
-        if (opened) return;
-        window.location.assign(href);
       }}
     >
       {label} <ExternalLink size={16} aria-hidden />

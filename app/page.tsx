@@ -22,7 +22,7 @@ import PurposeDealExplorer, { type PurposeExplorerItem } from "@/components/Purp
 import RecentDealsRail from "@/components/RecentDealsRail";
 import { categoryOptions, getCategoryLabel } from "@/lib/category";
 import { listProducts } from "@/lib/dataStore";
-import { matchesUseCase } from "@/lib/dealIntelligence";
+import { getUseCaseMatches } from "@/lib/dealIntelligence";
 import { approvalSampleProduct } from "@/lib/approvalSample";
 import { homeCategoryDetails, homePurposeOptions } from "@/lib/homeDiscovery";
 import { isDemoProduct, isPublicDealVisible } from "@/lib/publicDeal";
@@ -54,19 +54,26 @@ export default async function HomePage() {
     description: homeCategoryDetails[category.value].description
   }));
   const purposeItems: PurposeExplorerItem[] = homePurposeOptions.map((purpose) => {
-    const matchingProducts = products.filter((product) => purpose.useCaseIds.some((useCaseId) => matchesUseCase(product, useCaseId)));
+    const matchingProducts = products
+      .map((product) => {
+        const purposeMatches = getUseCaseMatches(product).filter((match) => purpose.useCaseIds.includes(match.id));
+        return { product, fitScore: Math.max(...purposeMatches.map((match) => match.score), 0) };
+      })
+      .filter((item) => item.fitScore >= 60)
+      .sort((a, b) => b.fitScore - a.fitScore || (b.product.latest_score?.total_score ?? 0) - (a.product.latest_score?.total_score ?? 0));
     const topDeal = matchingProducts[0];
     return {
       id: purpose.id,
       count: matchingProducts.length,
       topDeal: topDeal
         ? {
-            href: `/deals/${topDeal.id}`,
-            title: topDeal.title,
-            categoryLabel: getCategoryLabel(topDeal.category),
-            score: topDeal.latest_score?.total_score ?? null,
-            verdict: topDeal.latest_score?.verdict ?? null,
-            conditionGrade: topDeal.condition_grade
+            href: `/deals/${topDeal.product.id}`,
+            title: topDeal.product.title,
+            categoryLabel: getCategoryLabel(topDeal.product.category),
+            score: topDeal.product.latest_score?.total_score ?? null,
+            fitScore: topDeal.fitScore,
+            verdict: topDeal.product.latest_score?.verdict ?? null,
+            conditionGrade: topDeal.product.condition_grade
           }
         : null
     };

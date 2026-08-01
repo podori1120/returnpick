@@ -83,6 +83,8 @@ export default function CompareBoard() {
     return { byScore, byPrice, byDiscount };
   }, [products]);
 
+  const unavailableItems = error ? [] : items.filter((item) => !products.some((product) => product.id === item.id));
+
   function removeItem(id: string) {
     const next = readCompareItems().filter((item) => item.id !== id);
     writeCompareItems(next);
@@ -107,13 +109,37 @@ export default function CompareBoard() {
     return (
       <section className="rounded-lg border border-line bg-white p-8 text-center shadow-soft">
         {error ? <AlertTriangle className="mx-auto text-coral" size={34} aria-hidden /> : <Scale className="mx-auto text-pine" size={34} aria-hidden />}
-        <h2 className="mt-3 text-xl font-black">{error ? "비교 정보를 불러오지 못했습니다" : "아직 비교할 상품이 없습니다"}</h2>
+        <h2 className="mt-3 text-xl font-black">
+          {error ? "비교 정보를 불러오지 못했습니다" : items.length ? "비교한 상품이 공개 목록에서 사라졌습니다" : "아직 비교할 상품이 없습니다"}
+        </h2>
         <p className="mt-2 text-sm font-semibold leading-6 text-steel">
-          {error || "딜 목록이나 상세 페이지에서 비교함을 눌러 최대 6개까지 모아볼 수 있습니다."}
+          {error || (items.length ? "비공개되었거나 만료된 상품을 비교함에서 제거한 뒤 새로운 딜을 비교해 보세요." : "딜 목록이나 상세 페이지에서 비교함을 눌러 최대 6개까지 모아볼 수 있습니다.")}
         </p>
-        <Link className="focus-ring mt-5 inline-flex rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink" href="/deals">
-          딜 보러가기
-        </Link>
+        {unavailableItems.length ? (
+          <div className="mx-auto mt-5 max-w-lg rounded-lg border border-lemon bg-lemon/20 p-4 text-left">
+            <p className="text-xs font-black text-ink">현재 확인되지 않는 비교 상품 {unavailableItems.length}개</p>
+            <ul className="mt-3 space-y-2">
+              {unavailableItems.map((item) => (
+                <li key={item.id} className="flex items-center justify-between gap-3 text-sm font-bold text-ink">
+                  <span className="min-w-0 truncate">{item.title}</span>
+                  <button className="focus-ring shrink-0 rounded-md border border-line bg-white px-2.5 py-1.5 text-xs font-black text-steel hover:text-pine" onClick={() => removeItem(item.id)} type="button">
+                    제거
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          <Link className="focus-ring inline-flex rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink" href="/deals">
+            딜 보러가기
+          </Link>
+          {items.length ? (
+            <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-4 py-3 text-sm font-black hover:bg-mist" onClick={clearItems} type="button">
+              <Trash2 size={16} aria-hidden /> 비교함 비우기
+            </button>
+          ) : null}
+        </div>
       </section>
     );
   }
@@ -131,6 +157,19 @@ export default function CompareBoard() {
             <Trash2 size={16} aria-hidden /> 모두 비우기
           </button>
         </div>
+        {unavailableItems.length ? (
+          <div className="mt-4 rounded-lg border border-lemon bg-lemon/20 p-3" role="status">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-black text-ink">비공개되었거나 만료된 비교 상품 {unavailableItems.length}개</p>
+              <button className="focus-ring rounded-md border border-line bg-white px-2.5 py-1.5 text-xs font-black text-steel hover:text-pine" onClick={() => unavailableItems.forEach((item) => removeItem(item.id))} type="button">
+                확인되지 않는 상품 제거
+              </button>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold text-steel">
+              {unavailableItems.map((item) => <span key={item.id} className="rounded-md bg-white px-2.5 py-1">{item.title}</span>)}
+            </div>
+          </div>
+        ) : null}
         {best.byScore ? (
           <div className="mt-4 grid gap-3 md:grid-cols-3">
             <div className="rounded-lg bg-pine/10 p-4">

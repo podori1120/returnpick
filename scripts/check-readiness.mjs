@@ -415,9 +415,15 @@ if (fileExists("components/AffiliateButton.tsx") && fileExists("components/Appro
     affiliateButton.includes("isUsableAffiliateUrl") &&
       affiliateButton.includes("affiliateLinkReady") &&
       affiliateButton.includes("if (!affiliateLinkReady)") &&
+      affiliateButton.includes('target="_blank"') &&
+      !affiliateButton.includes("window.open") &&
+      !affiliateButton.includes("window.location.assign") &&
       approvalButton.includes("isCoupangPartnersLink") &&
       approvalButton.includes("partnerLinkReady") &&
-      approvalButton.includes("if (!partnerLinkReady)"),
+      approvalButton.includes("if (!partnerLinkReady)") &&
+      approvalButton.includes('target="_blank"') &&
+      !approvalButton.includes("window.open") &&
+      !approvalButton.includes("window.location.assign"),
     "purchase buttons fail closed when a caller passes a missing, regular, or invalid Coupang URL",
     "required"
   );
@@ -875,6 +881,9 @@ if (
       savedBoard.includes("/api/products/compare?ids=") &&
       savedBoard.includes("AffiliateButton") &&
       savedBoard.includes("AffiliateNotice") &&
+      savedBoard.includes("unavailableItems") &&
+      savedBoard.includes("removeUnavailableItems") &&
+      savedBoard.includes("확인되지 않는 찜한 상품") &&
       clientTracking.includes("savedDealsChangeEvent") &&
       layout.includes('href="/saved"') &&
       dealCard.includes("SavedDealButton") &&
@@ -2148,7 +2157,7 @@ if (
     "approval sample: customer-ready visual without invented commerce data",
     approvalCard.includes("next/image") &&
       approvalCard.includes("연출 이미지") &&
-      approvalCard.includes("쿠팡 파트너스 제휴 링크") &&
+      approvalCard.includes("쿠팡 파트너스 활동") &&
       approvalData.includes("window-cleaning-robot-editorial.webp") &&
       approvalData.includes("9204971165 - 27182792409") &&
       approvalPage.includes("approvalSampleProduct.imageNotice") &&
@@ -2187,17 +2196,33 @@ if (
     "required"
   );
   check(
+    "editorial pick: card purchase CTA is disclosed and tracked",
+    approvalCard.includes("ApprovalCoupangButton") &&
+      approvalCard.includes('label="쿠팡에서 가격 확인"') &&
+      approvalCard.includes("쿠팡 파트너스 활동의 일환으로") &&
+      approvalCard.includes('href=\"/disclosure\"') &&
+      approvalCard.includes("web_editorial_card_home") &&
+      approvalCard.includes("web_editorial_card_deals") &&
+      approvalCard.includes("web_editorial_card_picks") &&
+      eventRoute.includes('affiliateClickChannels: ["web_editorial_card_home"]') &&
+      eventRoute.includes('affiliateClickChannels: ["web_editorial_card_deals"]') &&
+      eventRoute.includes('affiliateClickChannels: ["web_editorial_card_picks"]'),
+    "the verified editorial card exposes an explicit affiliate CTA with disclosure and records clicks only on its exact public surface",
+    "required"
+  );
+  check(
     "home discovery: search and use-case entry points",
     homePage.includes('form action="/deals"') &&
       homePage.includes('name="search"') &&
       homePage.includes('placeholder="상품명·브랜드·모델명 검색"') &&
-      homePage.includes("matchesUseCase") &&
+      homePage.includes("getUseCaseMatches") &&
       homePage.includes("homePurposeOptions") &&
       homePage.includes("<PurposeDealExplorer") &&
       purposeExplorer.includes('role="tablist"') &&
       purposeExplorer.includes('role="tabpanel"') &&
       purposeExplorer.includes("aria-selected={selectedTab}") &&
       purposeExplorer.includes('/deals?useCase=${selected.primaryUseCaseId}&sort=fit') &&
+      homePage.includes("fitScore") &&
       purposeExplorer.includes("자동 수집 후보가 관리자 검수와 상품별 파트너스 링크 확인을 통과하면") &&
       homePage.includes("approvalSampleProduct.detailPath"),
     "the homepage supports product search, keyboard-accessible purpose tabs, matched-deal comparison, and an honest editorial fallback before inventory exists",
@@ -2438,6 +2463,9 @@ if (fileExists("components/CompareBoard.tsx") && fileExists("components/CompareB
     compareBoard.includes("getStoredJsonArray") &&
       compareBoard.includes("비교 상품 정보를 불러오지 못했습니다") &&
       compareBoard.includes("네트워크 문제로 비교 상품 정보를 불러오지 못했습니다") &&
+      compareBoard.includes("unavailableItems") &&
+      compareBoard.includes("비교한 상품이 공개 목록에서 사라졌습니다") &&
+      compareBoard.includes("비교함 비우기") &&
       compareButton.includes("setStoredJsonArray") &&
       compareDock.includes("setStoredJsonArray"),
     "compare cart storage and API failures do not break the public purchase flow",

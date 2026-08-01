@@ -21,6 +21,7 @@ export type PurposeDealSummary = {
   title: string;
   categoryLabel: string;
   score: number | null;
+  fitScore: number;
   verdict: string | null;
   conditionGrade: string;
 };
@@ -149,6 +150,7 @@ export default function PurposeDealExplorer({
                 <div className="mt-3 flex flex-wrap gap-2 text-xs font-black">
                   <span className="rounded-md bg-white/10 px-2.5 py-1">{selectedMetrics.topDeal.categoryLabel}</span>
                   <span className="rounded-md bg-white/10 px-2.5 py-1">상태 {selectedMetrics.topDeal.conditionGrade}</span>
+                  <span className="rounded-md bg-lemon px-2.5 py-1 text-ink">용도 적합도 {selectedMetrics.topDeal.fitScore}점</span>
                   {selectedMetrics.topDeal.score != null ? <span className="rounded-md bg-lemon px-2.5 py-1 text-ink">{selectedMetrics.topDeal.score}점</span> : null}
                   {selectedMetrics.topDeal.verdict ? <span className="rounded-md bg-pine px-2.5 py-1">{selectedMetrics.topDeal.verdict}</span> : null}
                 </div>

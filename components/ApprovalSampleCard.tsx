@@ -1,14 +1,21 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Droplets, Gauge, ShieldCheck } from "lucide-react";
+import ApprovalCoupangButton from "@/components/ApprovalCoupangButton";
 import { EditorialPickImpressionTracker } from "@/components/AffiliateEventTracker";
 import { approvalSampleProduct } from "@/lib/approvalSample";
 import { isCoupangPartnersLink } from "@/lib/coupangLink";
 
 const highlightIcons = [Gauge, Droplets, ShieldCheck];
+const cardTracking = {
+  home: { channel: "web_editorial_card_home", context: "editorial_home_card" },
+  deals: { channel: "web_editorial_card_deals", context: "editorial_deals_card" },
+  picks: { channel: "web_editorial_card_picks", context: "editorial_picks_card" }
+} as const;
 
 export default function ApprovalSampleCard({ placement }: { placement: "home" | "deals" | "picks" }) {
   const approvalUrlReady = isCoupangPartnersLink(process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL?.trim() ?? "");
+  const tracking = cardTracking[placement];
 
   return (
     <article className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">
@@ -47,11 +54,25 @@ export default function ApprovalSampleCard({ placement }: { placement: "home" | 
           <span className="mt-4 inline-flex items-center gap-2 text-sm font-black text-pine group-hover:text-ink">
             검수 내용과 구매 전 확인사항 보기 <ArrowRight size={16} aria-hidden />
           </span>
-          <p className="mt-3 border-t border-line pt-3 text-[11px] font-semibold leading-5 text-steel">
-            {approvalUrlReady ? "쿠팡 파트너스 제휴 링크가 포함된 추천 상품입니다." : "쿠팡 파트너스 링크 설정 상태를 확인하세요."}
-          </p>
         </div>
       </Link>
+      <div className="border-t border-line p-5">
+        <ApprovalCoupangButton
+          href={process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL?.trim() ?? ""}
+          label="쿠팡에서 가격 확인"
+          channel={tracking.channel}
+          context={tracking.context}
+          className="focus-ring inline-flex w-full items-center justify-center gap-2 rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink"
+        />
+        <p className="mt-2 text-[11px] font-semibold leading-4 text-steel">
+          {approvalUrlReady
+            ? "이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다. 가격과 재고, 배송 정보는 쿠팡 상품 페이지에서 최종 확인하세요."
+            : "쿠팡 파트너스 링크 설정 상태를 확인하세요. 가격과 재고, 배송 정보는 쿠팡 상품 페이지에서 최종 확인하세요."}
+        </p>
+        <Link className="mt-2 inline-flex text-xs font-black text-pine underline decoration-pine/30 underline-offset-4 hover:text-ink" href="/disclosure">
+          제휴 안내 자세히 보기
+        </Link>
+      </div>
     </article>
   );
 }

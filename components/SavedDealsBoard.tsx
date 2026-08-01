@@ -70,6 +70,21 @@ export default function SavedDealsBoard() {
     setItems([]);
   }
 
+  function removeItem(id: string) {
+    const next = getSavedDealItems().filter((item) => item.id !== id);
+    setSavedDealItems(next);
+    setItems(next);
+  }
+
+  const unavailableItems = error ? [] : items.filter((item) => !products.some((product) => product.id === item.id));
+
+  function removeUnavailableItems() {
+    const unavailableIds = new Set(unavailableItems.map((item) => item.id));
+    const next = getSavedDealItems().filter((item) => !unavailableIds.has(item.id));
+    setSavedDealItems(next);
+    setItems(next);
+  }
+
   if (loading) {
     return (
       <div className="rounded-lg border border-line bg-white p-8 text-center shadow-soft">
@@ -109,6 +124,26 @@ export default function SavedDealsBoard() {
           <p className="mt-4 rounded-lg border border-lemon bg-lemon/20 px-3 py-2 text-xs font-bold leading-5 text-ink" role="status">
             비공개되었거나 만료된 {removedCount}개 상품은 현재 목록에서 제외했습니다.
           </p>
+        ) : null}
+        {unavailableItems.length ? (
+          <div className="mt-4 rounded-lg border border-lemon bg-lemon/20 p-3" role="status">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-black text-ink">확인되지 않는 찜한 상품 {unavailableItems.length}개</p>
+              <button className="focus-ring rounded-md border border-line bg-white px-2.5 py-1.5 text-xs font-black text-steel hover:text-pine" onClick={removeUnavailableItems} type="button">
+                확인되지 않는 상품 제거
+              </button>
+            </div>
+            <ul className="mt-2 space-y-2">
+              {unavailableItems.map((item) => (
+                <li key={item.id} className="flex items-center justify-between gap-3 text-xs font-bold text-ink">
+                  <span className="min-w-0 truncate">{item.title}</span>
+                  <button className="focus-ring shrink-0 rounded-md border border-line bg-white px-2.5 py-1.5 font-black text-steel hover:text-pine" onClick={() => removeItem(item.id)} type="button">
+                    제거
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : null}
         {error ? (
           <p className="mt-4 rounded-lg border border-coral/30 bg-coral/10 px-3 py-2 text-sm font-bold text-coral" role="alert">

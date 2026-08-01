@@ -55,24 +55,16 @@ export default function AffiliateButton({
   }
 
   return (
-      <a
+    <a
       className={
         className ??
         "focus-ring inline-flex w-full items-center justify-center gap-2 rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink"
       }
       href={affiliateHref}
-      onClick={(event) => {
+      onClick={() => {
         const utmSource = getUtmSource();
         const resolvedChannel = buildTrackingChannel(channel, placement, utmSource);
         if (sponsored) trackAffiliateEvent({ productId, eventType: "affiliate_click", channel: resolvedChannel, utmSource });
-        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-
-        event.preventDefault();
-        const opened = window.open(affiliateHref, "_blank", "noopener,noreferrer");
-        if (opened) {
-          return;
-        }
-        window.location.assign(affiliateHref);
       }}
       rel={sponsored ? "sponsored nofollow noopener noreferrer" : "nofollow noopener noreferrer"}
       target="_blank"

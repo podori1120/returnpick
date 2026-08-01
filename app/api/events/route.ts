@@ -28,7 +28,7 @@ const manualTrackingSurfaces = [
     context: "editorial_home_card",
     pathname: "/",
     impressionChannels: ["web_editorial_card_home"],
-    affiliateClickChannels: [],
+    affiliateClickChannels: ["web_editorial_card_home"],
     detailViewChannels: [],
     telegramDetailChannels: [],
     shareCopyChannels: []
@@ -37,7 +37,7 @@ const manualTrackingSurfaces = [
     context: "editorial_deals_card",
     pathname: "/deals",
     impressionChannels: ["web_editorial_card_deals"],
-    affiliateClickChannels: [],
+    affiliateClickChannels: ["web_editorial_card_deals"],
     detailViewChannels: [],
     telegramDetailChannels: [],
     shareCopyChannels: []
@@ -46,7 +46,7 @@ const manualTrackingSurfaces = [
     context: "editorial_picks_card",
     pathname: "/picks",
     impressionChannels: ["web_editorial_card_picks"],
-    affiliateClickChannels: [],
+    affiliateClickChannels: ["web_editorial_card_picks"],
     detailViewChannels: [],
     telegramDetailChannels: [],
     shareCopyChannels: []
