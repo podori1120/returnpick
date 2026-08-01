@@ -151,6 +151,14 @@ function EmptyDealsCatalog() {
         <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-steel">
           자동 수집 후보는 상품별 가격·반품 근거·파트너스 링크를 확인한 뒤 순차적으로 공개합니다. 지금은 실제 구매 경로가 확인된 추천과 카테고리별 구매 기준을 먼저 확인할 수 있습니다.
         </p>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <Link className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-4 py-2.5 text-sm font-black text-white hover:bg-ink" href={approvalSampleProduct.detailPath}>
+            직접 검수 추천 보기 <ArrowRight size={16} aria-hidden />
+          </Link>
+          <Link className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line bg-white px-4 py-2.5 text-sm font-black text-ink hover:border-pine hover:text-pine" href="/picks">
+            검수 추천 모음 <ArrowRight size={16} aria-hidden />
+          </Link>
+        </div>
       </header>
 
       <section className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center" aria-labelledby="direct-review-title">
