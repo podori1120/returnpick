@@ -1106,6 +1106,8 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-env.mjs"
     envVerifier.includes('from "./load-env-files.mjs"') &&
       envVerifier.includes("envRawEntries") &&
       envVerifier.includes("outerWhitespaceSource") &&
+      envVerifier.includes("isVercelMaskedValue") &&
+      envVerifier.includes("Vercel env pull masks this secret locally") &&
       envVerifier.includes("leading or trailing whitespace") &&
       envVerifier.includes("validateCoupangPartnersUrl") &&
       envVerifier.includes("validateTelegramBotToken") &&

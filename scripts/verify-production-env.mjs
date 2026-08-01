@@ -28,6 +28,11 @@ function looksLikePlaceholderValue(value) {
   );
 }
 
+function isVercelMaskedValue(value) {
+  const raw = String(value ?? "").trim().toUpperCase();
+  return raw === "[SENSITIVE]" || raw === "[REDACTED]" || raw === "[ENCRYPTED]";
+}
+
 function validatePublicHttpsUrl(value) {
   try {
     const url = new URL(value);
@@ -187,6 +192,15 @@ function checkEnvItem(check) {
     return;
   }
 
+  if (isVercelMaskedValue(value)) {
+    add(
+      launchMode ? "FAIL" : "WARN",
+      check.name,
+      "Vercel env pull masks this secret locally; use the live Vercel readiness check or provide the real value in a local-only env file"
+    );
+    return;
+  }
+
   const whitespaceSource = outerWhitespaceSource(check.name);
   if (whitespaceSource) {
     add("FAIL", check.name, `value has leading or trailing whitespace in ${whitespaceSource}; paste the value again without spaces`);
@@ -206,7 +220,15 @@ for (const check of checks) checkEnvItem(check);
 const anon = envValue("NEXT_PUBLIC_SUPABASE_ANON_KEY");
 const service = envValue("SUPABASE_SERVICE_ROLE_KEY");
 if (anon && service) {
-  add(anon === service ? "FAIL" : "PASS", "SUPABASE_KEYS_DIFFER", anon === service ? "anon and service role keys must be different" : "anon and service role keys differ");
+  if (isVercelMaskedValue(anon) || isVercelMaskedValue(service)) {
+    add(
+      launchMode ? "FAIL" : "WARN",
+      "SUPABASE_KEYS_DIFFER",
+      "Vercel env pull masked one or both Supabase keys locally; compare the actual key fields in Supabase or use the live readiness check"
+    );
+  } else {
+    add(anon === service ? "FAIL" : "PASS", "SUPABASE_KEYS_DIFFER", anon === service ? "anon and service role keys must be different" : "anon and service role keys differ");
+  }
 }
 
 if (envValue("PUBLIC_WEB_CRAWL_ENABLED") === "true") {

@@ -316,7 +316,7 @@ npm run env:vercel
 npm run env:check:launch
 ```
 
-`env:pull:production`은 Vercel Production 값을 `.env.production`으로 내려받습니다. 이 파일은 Git과 Vercel 업로드에서 제외되어 있으며, 점검용으로만 사용합니다. `env:vercel`은 Vercel Production의 핵심 출시 변수 이름과 권장 선택 기능 이름을 분리해서 확인합니다. Vercel CLI가 값은 `Encrypted`로 숨기므로 실제 비밀값은 출력하지 않습니다. `env:check`는 `.env.production`, `.env.local`, `.env`를 읽어 비밀값을 출력하지 않고 누락·빈 값·형식 오류만 보여줍니다. 승인 전에는 쿠팡·네이버·Supabase·텔레그램 키 누락이 경고로 남을 수 있고, `env:vercel:launch` 또는 `env:check:launch`는 Supabase·쿠팡 등 핵심 출시 값이 없거나 형식이 틀리면 실패합니다. 네이버와 텔레그램 누락은 경고로 남지만 핵심 출시 검사를 실패시키지 않습니다.
+`env:pull:production`은 Vercel Production 값을 `.env.production`으로 내려받습니다. 이 파일은 Git과 Vercel 업로드에서 제외되어 있으며, 점검용으로만 사용합니다. `env:vercel`은 Vercel Production의 핵심 출시 변수 이름과 권장 선택 기능 이름을 분리해서 확인합니다. Vercel CLI가 값은 `Encrypted` 또는 `[SENSITIVE]`로 숨기므로 실제 비밀값은 출력하지 않습니다. `env:check`는 마스킹된 값을 형식 오류로 오판하지 않고 "Vercel env pull masks this secret locally" 경고로 표시하므로, 실제 운영 준비 여부는 배포된 `/admin`의 API readiness 또는 `doctor:production` 라이브 점검으로 확인합니다. `.env.production`, `.env.local`, `.env`를 읽어 비밀값을 출력하지 않고 누락·빈 값·형식 오류만 보여줍니다. 승인 전에는 쿠팡·네이버·Supabase·텔레그램 키 누락이 경고로 남을 수 있고, `env:vercel:launch` 또는 `env:check:launch`는 Supabase·쿠팡 등 핵심 출시 값이 없거나 형식이 틀리면 실패합니다. 네이버와 텔레그램 누락은 경고로 남지만 핵심 출시 검사를 실패시키지 않습니다.
 
 `env:check:launch`가 실패하면 `Next action checklist`가 함께 출력됩니다. 이 목록은 Vercel Production에 채워야 할 핵심 변수와 네이버·텔레그램 선택 기능을 분리해서 보여주며, 값 자체는 출력하지 않습니다. 핵심 목록을 채운 뒤 재배포하고 `npm run env:vercel:launch`와 `npm run doctor:production:launch` 순서로 다시 확인하세요. Vercel에 값을 막 넣은 직후라면 로컬 `.env.production`이 낡았을 수 있으므로 `npm run doctor:production:launch:fresh`를 쓰면 Production 값을 다시 내려받은 뒤 같은 점검을 이어서 실행합니다.
 
