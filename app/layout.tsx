@@ -48,6 +48,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link className="rounded-md px-3 py-2 hover:bg-mist hover:text-ink" href="/deals">
                 딜 보기
               </Link>
+              <Link className="rounded-md px-3 py-2 hover:bg-mist hover:text-ink" href="/picks">
+                검수 추천
+              </Link>
               <Link className="rounded-md px-3 py-2 hover:bg-mist hover:text-ink" href="/compare">
                 비교함
               </Link>

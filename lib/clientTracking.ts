@@ -13,7 +13,8 @@ export type ManualAffiliateEventContext =
   | "approval_sample"
   | "editorial_pick"
   | "editorial_home_card"
-  | "editorial_deals_card";
+  | "editorial_deals_card"
+  | "editorial_picks_card";
 
 const sessionKey = "returnpick_anon_session_id";
 const utmSourceKey = "returnpick_utm_source";

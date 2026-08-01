@@ -183,6 +183,7 @@ const requiredFiles = [
   "app/api/cron/telegram-digest/route.ts",
   "app/api/events/route.ts",
   "app/deals/category/[category]/page.tsx",
+  "app/picks/page.tsx",
   "app/picks/novatech-s1-window-cleaner/page.tsx",
   "app/picks/novatech-s1-window-cleaner/opengraph-image.tsx",
   "app/picks/novatech-s1-window-cleaner/twitter-image.tsx",
@@ -648,6 +649,7 @@ if (fileExists("app/robots.ts") && fileExists("app/sitemap.ts")) {
       sitemap.includes('/guide/return-checklist') &&
       sitemap.includes('/guide/safe-categories') &&
       sitemap.includes('/disclosure') &&
+      sitemap.includes('path: "/picks"') &&
       sitemap.includes('/picks/novatech-s1-window-cleaner') &&
       !sitemap.includes('/products/approval-sample'),
     "robots protects admin/API while sitemap exposes core public, guide, disclosure, and indexable editorial routes",
@@ -2054,20 +2056,25 @@ if (
   check(
     "editorial pick: measured card impressions",
     approvalCard.includes("EditorialPickImpressionTracker") &&
-      approvalCard.includes('placement: "home" | "deals"') &&
+      approvalCard.includes('placement: "home" | "deals" | "picks"') &&
       eventTracker.includes("returnpick_impressed_editorial_surfaces") &&
       eventTracker.includes('eventType: "impression"') &&
       eventTracker.includes('context: "editorial_home_card"') &&
       eventTracker.includes('context: "editorial_deals_card"') &&
+      eventTracker.includes('context: "editorial_picks_card"') &&
       eventTracker.includes('channel: "web_editorial_card_home"') &&
       eventTracker.includes('channel: "web_editorial_card_deals"') &&
+      eventTracker.includes('channel: "web_editorial_card_picks"') &&
       eventRoute.includes('pathname: "/"') &&
       eventRoute.includes('impressionChannels: ["web_editorial_card_home"]') &&
       eventRoute.includes('pathname: "/deals"') &&
       eventRoute.includes('impressionChannels: ["web_editorial_card_deals"]') &&
+      eventRoute.includes('pathname: "/picks"') &&
+      eventRoute.includes('impressionChannels: ["web_editorial_card_picks"]') &&
       eventRoute.includes('body.event_type === "impression"') &&
       homePage.includes('<ApprovalSampleCard placement="home" />') &&
-      dealsPage.includes('<ApprovalSampleCard placement="deals" />'),
+      dealsPage.includes('<ApprovalSampleCard placement="deals" />') &&
+      approvalCard.includes('placement: "home" | "deals" | "picks"'),
     "the home and deals fallback cards record one session-safe impression through exact path and channel allowlists",
     "required"
   );
@@ -2116,6 +2123,27 @@ if (
       dealsPage.includes('<ApprovalSampleCard placement="deals" />') &&
       dealsPage.includes("파트너스 링크와 쿠팡 상품번호가 연결된 추천만 보여드립니다."),
     "when the public catalog is empty, home and /deals lead with the only verified affiliate-backed editorial pick instead of zero-count filters",
+    "required"
+  );
+}
+
+if (fileExists("app/picks/page.tsx") && fileExists("app/sitemap.ts") && fileExists("app/api/events/route.ts")) {
+  const picksPage = readText("app/picks/page.tsx");
+  const sitemap = readText("app/sitemap.ts");
+  const eventRoute = readText("app/api/events/route.ts");
+  check(
+    "public funnel: editorial pick hub",
+    picksPage.includes('const canonicalUrl = `${siteUrl}/picks`') &&
+      picksPage.includes('title: pageTitle') &&
+      picksPage.includes("isPublicDealReady") &&
+      picksPage.includes("ProductImpressionTracker") &&
+      picksPage.includes('<ApprovalSampleCard placement="picks" />') &&
+      picksPage.includes("공식 API나 허용된 공개 근거") &&
+      picksPage.includes("AffiliateNotice") &&
+      sitemap.includes('path: "/picks"') &&
+      eventRoute.includes('context: "editorial_picks_card"') &&
+      eventRoute.includes('pathname: "/picks"'),
+    "the public editorial hub keeps a verified fallback, adds only customer-ready products, exposes SEO metadata, and attributes its card impressions",
     "required"
   );
 }

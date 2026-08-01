@@ -14,6 +14,7 @@ ReturnPick은 반품 노트북, 모니터, 로봇청소기, 무선청소기, 공
 - 운영 대시보드, 검토 우선순위, 가격·재고 변동 기록
 - 네이버 쇼핑 공식 API 후보 수집과 robots.txt를 확인하는 공개 웹 참고 수집
 - 쿠팡 파트너스 제휴 링크 클릭 퍼널 추적
+- `/picks` 검수 추천 허브: 승인용 직접 검수 콘텐츠와 실제 고객공개 상품을 한 곳에서 연결
 
 ## 2. 이 프로젝트가 하지 않는 것
 
@@ -382,6 +383,8 @@ npm run deploy:production:go-live -- confirm
 
 `check:production`은 운영 `/products/approval-sample`, `/disclosure`, `/robots.txt`, `/sitemap.xml`, `/`, `/admin`, `/api/admin/api-readiness`, 실제 연결 테스트, 비인증 `/api/admin/launch` POST 보호 확인, `/api/admin/scheduler-health`를 호출해 현재 상태를 보고합니다. 승인용 페이지뿐 아니라 공개 제휴 안내 페이지가 200으로 열리고, 쿠팡 파트너스 고지·수수료 안내·가격/재고 변동 안내가 들어 있는지, `robots.txt`가 공개 화면을 허용하면서 `/admin`과 `/api`를 막는지, 사이트맵에 메인·딜 목록·가이드·제휴 안내·승인용 상품 페이지가 포함되는지도 함께 확인합니다. 또한 공개 페이지의 referrer/보안 헤더와 `/admin`, `/api`의 `noindex`·`no-store` 헤더가 운영 배포에 실제 반영됐는지도 확인합니다. 특히 `/api/admin/launch`는 관리자 비밀번호 없이 POST했을 때 실제 데이터 작업을 시작하지 않고 `UNAUTHORIZED`, `ADMIN_PASSWORD_NOT_CONFIGURED`, `ADMIN_PASSWORD_WEAK_CONFIGURATION` 중 하나로 닫히는지 확인합니다. `/admin`에서는 Next.js 정적 JS 청크까지 읽어 `상품별 링크 보강`, `품질 보강 대기`, `링크 보강 큐로 이동`, `품질 보강 후보로 이동` 문구가 실제 배포 번들에 들어 있는지 확인하므로, 관리자 보강 화면을 고쳤지만 Vercel alias가 예전 배포를 보고 있는 상황도 잡을 수 있습니다. 운영 CLI인 `check:production`, `doctor:production`, `schema:production`, `launch:production`은 `RETURNPICK_ADMIN_PASSWORD`/`ADMIN_PASSWORD` 환경변수뿐 아니라 `vercel env pull .env.production --environment=production`으로 내려받은 `.env.production`, `.env.local`, `.env`도 순서대로 읽습니다. 값이 비어 있으면 비밀값을 출력하지 않고 어느 파일의 어떤 키가 빈 값인지 알려줍니다. report 모드의 `check:production`은 관리자 비밀번호가 없으면 관리자 API 실시간 점검만 경고로 건너뛰고 공개 승인 페이지·제휴 안내·robots·sitemap·배포 헤더 검증 결과를 계속 보여줍니다. `check:production:launch`는 관리자 비밀번호와 API 키, 운영 필수 연결이 모두 준비되지 않았으면 실패로 끝납니다. 첫 가동 확인 전이라 `FIRST_LAUNCH_NOT_CONFIRMED`가 나오면 환경변수는 준비된 상태일 수 있으므로 `/admin#admin-first-launch`에서 첫 가동 실행을 완료하세요. 자동 스케줄러까지 완전 가동 중인지 엄격히 보려면 `node scripts/verify-production-readiness.mjs --launch --strict-scheduler`를 사용할 수 있습니다.
 
+`check:production`은 `/picks` 검수 추천 허브도 함께 확인합니다. 허브는 공개 딜이 없는 승인 전에도 직접 검수 콘텐츠를 제공하고, 실제 상품이 추가되면 고객공개 품질 기준을 통과한 상품만 자동으로 합칩니다. 그래서 빈 목록을 억지로 채우지 않으면서도 검색·블로그·텔레그램 유입이 구매 전 확인 페이지로 이어집니다.
+
 운영 준비가 통과한 뒤 첫 가동도 CLI로 실행할 수 있습니다. 이 명령은 기본적으로 실제 데이터 작업을 시작하지 않고 운영 readiness와 필수 연결 테스트만 확인합니다.
 
 ```powershell
@@ -573,6 +576,8 @@ API 자동 보강 중 특정 상품의 DB 저장만 실패해도 전체 배치�
 - 빠른 프리셋: 80점 이상, 20% 이상 할인, 게시 적합, 확인필요, 재고 1개
 - 결과 수, 평균 점수, 최대 할인율, 최저 판매가, 반품 확인 수
 - 딜 레이더: 최고 점수, 최대 할인, 게시 적합 수, 강한 카테고리, 용도별 딜 수, 가격대별 딜 수
+
+`/picks`는 구매 전 확인 콘텐츠의 공개 허브입니다. 공개 상품이 아직 없을 때는 승인용 링크가 연결된 직접 검수 콘텐츠를 먼저 보여주고, 이후 `published`이면서 고객공개 품질 기준을 통과한 상품만 자동으로 추가합니다. 허브의 카드 노출은 `web_editorial_card_picks` 채널로 기록하며, 가격·재고·반품등급이 확인되지 않은 값은 만들어내지 않습니다.
 
 ## 12. 텔레그램 발송 방법
 

@@ -41,6 +41,15 @@ const manualTrackingSurfaces = [
     detailViewChannels: [],
     telegramDetailChannels: [],
     shareCopyChannels: []
+  },
+  {
+    context: "editorial_picks_card",
+    pathname: "/picks",
+    impressionChannels: ["web_editorial_card_picks"],
+    affiliateClickChannels: [],
+    detailViewChannels: [],
+    telegramDetailChannels: [],
+    shareCopyChannels: []
   }
 ] as const;
 

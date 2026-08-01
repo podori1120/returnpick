@@ -75,6 +75,7 @@ const categoryLandingRequirements = [
 const sitemapRequiredPaths = [
   "/",
   "/deals",
+  "/picks",
   "/disclosure",
   "/picks/novatech-s1-window-cleaner",
   "/guide/return-checklist",
@@ -108,7 +109,8 @@ const adminUiRequiredText = [
 const editorialCardBundleRequiredText = [
   "returnpick_impressed_editorial_surfaces",
   "web_editorial_card_home",
-  "web_editorial_card_deals"
+  "web_editorial_card_deals",
+  "web_editorial_card_picks"
 ];
 const maxAdminScriptChunksToScan = 25;
 const maxAdminScriptChunkCharacters = 1_500_000;
@@ -242,6 +244,28 @@ function checkEditorialPickPage(html, status) {
     fail("editorial pick", `missing first-sale funnel evidence: ${missing.join(", ")}`);
   } else {
     pass("editorial pick", "purchase CTA, disclosure, and attributed detail sharing are present");
+  }
+}
+
+function checkEditorialHubPage(html, status) {
+  if (status !== 200) {
+    fail("editorial hub", `/picks returned ${status}`);
+    return;
+  }
+
+  const required = [
+    `rel="canonical" href="${siteUrl}/picks"`,
+    "구매 전에 확인할 추천 콘텐츠",
+    "ReturnPick 검수 추천",
+    "쿠팡 파트너스 활동의 일환"
+  ];
+  const missing = required.filter((value) => !html.includes(value));
+  if (containsLikelyMojibake(html)) missing.push("readable_korean");
+
+  if (missing.length) {
+    fail("editorial hub", `missing editorial hub evidence: ${missing.join(", ")}`);
+  } else {
+    pass("editorial hub", "verified editorial fallback, customer-ready catalog handoff, canonical metadata, and disclosure are present");
   }
 }
 
@@ -506,7 +530,7 @@ async function checkEditorialCardTrackingBundle(pages) {
   if (missing.size) {
     fail("editorial card tracking bundle", `missing deployed tracking text: ${[...missing].join(", ")}; fetched ${fetched}/${scanned} chunks`);
   } else {
-    pass("editorial card tracking bundle", `home/deals card impressions are present in deployed client chunks; fetched ${fetched}/${scanned} chunks`);
+    pass("editorial card tracking bundle", `home/deals/picks card impressions are present in deployed client chunks; fetched ${fetched}/${scanned} chunks`);
   }
 }
 
@@ -635,6 +659,13 @@ async function main() {
   }
 
   try {
+    const editorialHub = await readText("/picks");
+    checkEditorialHubPage(editorialHub.text, editorialHub.response.status);
+  } catch (error) {
+    fail("editorial hub", error instanceof Error ? error.message : "fetch failed");
+  }
+
+  try {
     const editorialPick = await readText("/picks/novatech-s1-window-cleaner");
     checkEditorialPickPage(editorialPick.text, editorialPick.response.status);
   } catch (error) {
@@ -696,10 +727,11 @@ async function main() {
   }
 
   try {
-    const [home, deals] = await Promise.all([readText("/"), readText("/deals")]);
+    const [home, deals, picks] = await Promise.all([readText("/"), readText("/deals"), readText("/picks")]);
     await checkEditorialCardTrackingBundle([
       { path: "/", html: home.text, status: home.response.status },
-      { path: "/deals", html: deals.text, status: deals.response.status }
+      { path: "/deals", html: deals.text, status: deals.response.status },
+      { path: "/picks", html: picks.text, status: picks.response.status }
     ]);
   } catch (error) {
     fail("editorial card tracking bundle", error instanceof Error ? error.message : "fetch failed");

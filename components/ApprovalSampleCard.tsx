@@ -6,7 +6,7 @@ import { approvalSampleProduct } from "@/lib/approvalSample";
 
 const highlightIcons = [Gauge, Droplets, ShieldCheck];
 
-export default function ApprovalSampleCard({ placement }: { placement: "home" | "deals" }) {
+export default function ApprovalSampleCard({ placement }: { placement: "home" | "deals" | "picks" }) {
   return (
     <article className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">
       <EditorialPickImpressionTracker placement={placement} />

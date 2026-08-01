@@ -140,6 +140,7 @@ function channelLabel(channel: string) {
     web_approval_sample: "직접 검수 추천 CTA",
     web_editorial_pick: "추천 콘텐츠",
     telegram_editorial_pick: "텔레그램 추천 콘텐츠",
+    web_editorial_card_picks: "검수 추천 모음 카드",
     telegram: "텔레그램 기본",
     web_detail_hero: "상세 상단 CTA",
     telegram_detail_hero: "텔레그램 상단 CTA",
@@ -169,7 +170,8 @@ function surfaceLabel(context: string) {
     approval_sample: "승인 샘플",
     editorial_pick: "편집 추천",
     editorial_home_card: "홈 추천 카드",
-    editorial_deals_card: "딜 목록 추천 카드"
+    editorial_deals_card: "딜 목록 추천 카드",
+    editorial_picks_card: "검수 추천 모음 카드"
   };
   return labels[context] ?? context.replace(/_/g, " ");
 }

@@ -63,6 +63,10 @@ const editorialCardTracking = {
   deals: {
     context: "editorial_deals_card",
     channel: "web_editorial_card_deals"
+  },
+  picks: {
+    context: "editorial_picks_card",
+    channel: "web_editorial_card_picks"
   }
 } as const;
 
