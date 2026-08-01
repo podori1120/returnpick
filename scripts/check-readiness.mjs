@@ -252,6 +252,7 @@ const requiredFiles = [
   "scripts/verify-manual-import-safety.mjs",
   "scripts/verify-naver-product-match.mjs",
   "scripts/verify-naver-price-trust.mjs",
+  "scripts/verify-coupang-provider.mjs",
   "scripts/verify-provider-product-merge.mjs",
   "scripts/verify-scoring-rules.mjs",
   "scripts/verify-public-web-config.mjs",
@@ -523,6 +524,25 @@ if (fileExists("package.json") && fileExists("lib/naverProductMatch.ts") && file
       matcherCheck.includes("accessory rejection") &&
       matcherCheck.includes("confidence-first price ranking"),
     "Naver price matching rejects accessories, model/spec conflicts, ambiguous variants, and weak identities before comparing prices",
+    "required"
+  );
+}
+
+if (fileExists("package.json") && fileExists("lib/providers/coupangPartnersProvider.ts") && fileExists("scripts/verify-coupang-provider.mjs")) {
+  const packageJson = readText("package.json");
+  const coupangProviderCheck = readText("scripts/verify-coupang-provider.mjs");
+  check(
+    "scripts: Coupang provider contract check command",
+    packageJson.includes('"coupang-provider:check": "node scripts/verify-coupang-provider.mjs"'),
+    "package.json exposes a deterministic Coupang provider response-shape check",
+    "required"
+  );
+  check(
+    "provider: Coupang nested deeplink response contract",
+    coupangProviderCheck.includes("nested deeplink response normalization") &&
+      coupangProviderCheck.includes("API_NOT_CONFIGURED") &&
+      coupangProviderCheck.includes("shorten_url"),
+    "Coupang deeplink parsing keeps nested response support and the unconfigured-provider contract covered",
     "required"
   );
 }

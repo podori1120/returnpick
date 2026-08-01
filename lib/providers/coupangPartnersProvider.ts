@@ -184,6 +184,54 @@ function extractProductArray(payload: Record<string, unknown>) {
   return match ? { items: match[1] as Record<string, unknown>[], arrayPath: match[0] } : null;
 }
 
+function collectObjectRecords(value: unknown, depth = 0): Array<Record<string, unknown>> {
+  if (depth > 4 || value == null || typeof value !== "object") return [];
+  if (Array.isArray(value)) return value.flatMap((item) => collectObjectRecords(item, depth + 1)).slice(0, 128);
+
+  const record = value as Record<string, unknown>;
+  const nested = Object.values(record).flatMap((child) =>
+    child && typeof child === "object" ? collectObjectRecords(child, depth + 1) : []
+  );
+  return [record, ...nested].slice(0, 128);
+}
+
+function deeplinkFieldValues(record: Record<string, unknown>) {
+  return [
+    record.shortenUrl,
+    record.shorten_url,
+    record.shortUrl,
+    record.short_url,
+    record.affiliateUrl,
+    record.affiliate_url,
+    record.deepLink,
+    record.deep_link,
+    record.deeplink,
+    record.deeplinkUrl,
+    record.deeplink_url,
+    record.landingUrl,
+    record.landing_url,
+    record.url
+  ];
+}
+
+function findDeeplinkUrl(payload: Record<string, unknown>) {
+  const records = collectObjectRecords(payload);
+  for (const record of records) {
+    const url = firstUsableAffiliateUrl(...deeplinkFieldValues(record));
+    if (url) return url;
+  }
+  return null;
+}
+
+function findRawDeeplinkUrl(payload: Record<string, unknown>) {
+  const records = collectObjectRecords(payload);
+  for (const record of records) {
+    const rawUrl = deeplinkFieldValues(record).map(stringFromUnknown).find(Boolean);
+    if (rawUrl) return rawUrl;
+  }
+  return null;
+}
+
 async function fetchCoupangJson(method: "GET" | "POST", path: string, body?: Record<string, unknown>) {
   const response = await fetchWithTimeout(`${baseUrl}${path}`, {
     method,
@@ -296,33 +344,10 @@ export async function createCoupangDeeplink(originalUrl: string) {
         continue;
       }
 
-      const data = result.payload.data as unknown;
-      const first = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : data && typeof data === "object" ? (data as Record<string, unknown>) : undefined;
-      const deeplink = firstUsableAffiliateUrl(
-        first?.shortenUrl,
-        first?.shorten_url,
-        first?.shortUrl,
-        first?.short_url,
-        first?.affiliateUrl,
-        first?.affiliate_url,
-        first?.landingUrl,
-        first?.landing_url,
-        first?.url,
-        result.payload.shortenUrl,
-        result.payload.shorten_url,
-        result.payload.shortUrl,
-        result.payload.short_url
-      );
+      const deeplink = findDeeplinkUrl(result.payload);
       if (deeplink) return { status: "ok" as const, url: deeplink };
 
-      const rawUrl =
-        stringFromUnknown(first?.shortenUrl) ??
-        stringFromUnknown(first?.shorten_url) ??
-        stringFromUnknown(first?.landingUrl) ??
-        stringFromUnknown(first?.landing_url) ??
-        stringFromUnknown(first?.url) ??
-        stringFromUnknown(result.payload.shortenUrl) ??
-        stringFromUnknown(result.payload.shorten_url);
+      const rawUrl = findRawDeeplinkUrl(result.payload);
       errors.push(
         rawUrl
           ? `${path}: COUPANG_DEEPLINK_NO_PARTNERS_URL`

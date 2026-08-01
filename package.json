@@ -32,6 +32,7 @@
     "launch-capabilities:check": "node scripts/verify-launch-capability-policy.mjs",
     "naver-match:check": "node scripts/verify-naver-product-match.mjs",
     "naver-price-trust:check": "node scripts/verify-naver-price-trust.mjs",
+    "coupang-provider:check": "node scripts/verify-coupang-provider.mjs",
     "provider-merge:check": "node scripts/verify-provider-product-merge.mjs",
     "public-web:check": "node scripts/verify-public-web-config.mjs",
     "public-web-url:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-public-web-url-safety.mjs",
