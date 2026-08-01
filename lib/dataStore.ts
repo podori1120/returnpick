@@ -41,6 +41,7 @@ type AffiliateEventInput = {
   product_id?: string | null;
   event_type: AffiliateEventType;
   channel?: string | null;
+  context?: string | null;
   anon_session_id?: string | null;
   referrer?: string | null;
   utm_source?: string | null;
@@ -875,6 +876,7 @@ export async function createAffiliateEvent(input: AffiliateEventInput) {
     product_id: input.product_id ?? null,
     event_type: input.event_type,
     channel: safeEventText(input.channel, 80),
+    context: safeEventText(input.context, 80),
     anon_session_id: safeEventText(input.anon_session_id, 120),
     referrer: safeEventText(input.referrer, 500),
     utm_source: safeEventText(input.utm_source, 120),
@@ -1000,6 +1002,22 @@ export async function getRevenueMetrics() {
     };
   }).sort((a, b) => b.affiliate_clicks - a.affiliate_clicks || b.detail_views - a.detail_views);
 
+  const surfaceMetrics = Array.from(new Set(events.map((event) => event.context).filter((context): context is string => Boolean(context)))).map((context) => {
+    const surfaceEvents = events.filter((event) => event.context === context);
+    const impressions = surfaceEvents.filter((event) => event.event_type === "impression").length;
+    const detailViews = surfaceEvents.filter((event) => event.event_type === "detail_view" || event.event_type === "telegram_detail_click").length;
+    const affiliateClicks = surfaceEvents.filter((event) => event.event_type === "affiliate_click").length;
+    return {
+      context,
+      impressions,
+      detail_views: detailViews,
+      affiliate_clicks: affiliateClicks,
+      telegram_clicks: surfaceEvents.filter((event) => event.event_type === "telegram_detail_click").length,
+      detail_ctr: ratio(detailViews, impressions),
+      affiliate_ctr: ratio(affiliateClicks, detailViews)
+    };
+  }).sort((a, b) => b.affiliate_clicks - a.affiliate_clicks || b.detail_views - a.detail_views || b.impressions - a.impressions);
+
   const missingAffiliateUrl = publishedProducts.filter((product) => !isUsableAffiliateUrl(product.affiliate_url)).length;
   const publicQualityBlocked = publishedProducts.filter((product) => !getCustomerPublishReadiness(product).ready).length;
   const ctaReady = publishedProducts.length - publicQualityBlocked;
@@ -1020,6 +1038,7 @@ export async function getRevenueMetrics() {
     categoryMetrics,
     channelMetrics,
     sourceMetrics,
+    surfaceMetrics,
     knownProductEventCount: events.filter((event) => event.product_id && productMap.has(event.product_id)).length
   };
 }

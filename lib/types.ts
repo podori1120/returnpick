@@ -131,6 +131,7 @@ export interface AffiliateEvent {
   product_id: string | null;
   event_type: AffiliateEventType;
   channel: string | null;
+  context: string | null;
   anon_session_id: string | null;
   referrer: string | null;
   utm_source: string | null;

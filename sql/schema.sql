@@ -7,7 +7,7 @@ create table if not exists returnpick_schema_meta (
 );
 
 insert into returnpick_schema_meta (key, value, updated_at)
-values ('schema_version', '2026-07-31-product-observation-time', now())
+values ('schema_version', '2026-08-01-affiliate-surface-attribution', now())
 on conflict (key)
 do update set value = excluded.value, updated_at = now();
 
@@ -130,6 +130,7 @@ create table if not exists affiliate_events (
   product_id uuid references sourced_products(id) on delete set null,
   event_type text not null check (event_type in ('impression', 'detail_view', 'affiliate_click', 'telegram_detail_click', 'share_copy')),
   channel text,
+  context text,
   anon_session_id text,
   referrer text,
   utm_source text,
@@ -140,6 +141,9 @@ alter table affiliate_events drop constraint if exists affiliate_events_event_ty
 alter table affiliate_events
   add constraint affiliate_events_event_type_check
   check (event_type in ('impression', 'detail_view', 'affiliate_click', 'telegram_detail_click', 'share_copy'));
+
+alter table affiliate_events
+  add column if not exists context text;
 
 create table if not exists product_snapshots (
   id uuid primary key default gen_random_uuid(),
@@ -206,6 +210,7 @@ create index if not exists affiliate_events_created_idx on affiliate_events (cre
 create index if not exists affiliate_events_product_created_idx on affiliate_events (product_id, created_at desc);
 create index if not exists affiliate_events_type_created_idx on affiliate_events (event_type, created_at desc);
 create index if not exists affiliate_events_channel_created_idx on affiliate_events (channel, created_at desc);
+create index if not exists affiliate_events_context_created_idx on affiliate_events (context, created_at desc);
 
 create or replace function set_updated_at()
 returns trigger as $$

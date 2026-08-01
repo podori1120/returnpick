@@ -147,6 +147,7 @@ export async function POST(request: Request) {
 
   const productId = cleanProductId(body.product_id);
   const channel = cleanTrackingLabel(body.channel, "web");
+  const context = cleanTrackingLabel(body.context);
   const manualAffiliateEvent = !productId && isManualAffiliateTrackingRequest(request, body, channel);
   if (!productId && !manualAffiliateEvent) {
     return NextResponse.json({ ok: false, skipped: "PRODUCT_ID_REQUIRED" }, { status: 202 });
@@ -159,6 +160,7 @@ export async function POST(request: Request) {
         product_id: null,
         event_type: eventType,
         channel,
+        context,
         anon_session_id: cleanAnonSessionId(body.anon_session_id),
         referrer,
         utm_source: cleanTrackingLabel(body.utm_source)

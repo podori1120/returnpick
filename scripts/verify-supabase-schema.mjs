@@ -5,7 +5,7 @@ import { envValue, loadEnvFiles } from "./load-env-files.mjs";
 
 loadEnvFiles();
 
-const EXPECTED_SCHEMA_VERSION = "2026-07-31-product-observation-time";
+const EXPECTED_SCHEMA_VERSION = "2026-08-01-affiliate-surface-attribution";
 const requiredTables = [
   "returnpick_schema_meta",
   "sourcing_keywords",
@@ -21,7 +21,7 @@ const requiredSchemaChecks = [
   { table: "sourced_products", columns: "id,affiliate_url,naver_lowest_price,condition_grade,sourcing_status,last_observed_at" },
   { table: "deal_scores", columns: "id,product_id,total_score,risk_flags,score_detail" },
   { table: "telegram_logs", columns: "id,product_id,target_type,target_key,status,created_at" },
-  { table: "affiliate_events", columns: "id,event_type,channel,utm_source,anon_session_id" },
+  { table: "affiliate_events", columns: "id,event_type,channel,context,utm_source,anon_session_id" },
   { table: "product_snapshots", columns: "id,product_id,change_flags,observed_at" }
 ];
 
@@ -103,6 +103,7 @@ async function writeSmokeCheck(client) {
     .insert({
       event_type: "detail_view",
       channel: "schema_live_check",
+      context: "schema_live_check",
       anon_session_id: "00000000-0000-4000-8000-000000000000",
       referrer: "https://returnpick.vercel.app/schema-live-check",
       utm_source: "schema_live_check"

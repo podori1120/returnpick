@@ -102,6 +102,15 @@ type RevenueMetrics = {
     affiliate_clicks: number;
     affiliate_ctr: number;
   }>;
+  surfaceMetrics: Array<{
+    context: string;
+    impressions: number;
+    detail_views: number;
+    affiliate_clicks: number;
+    telegram_clicks: number;
+    detail_ctr: number;
+    affiliate_ctr: number;
+  }>;
 };
 
 type MetricsResponse = {
@@ -153,6 +162,16 @@ function sourceLabel(source: string) {
     telegram: "텔레그램"
   };
   return labels[source] ?? source.replace(/_/g, " ");
+}
+
+function surfaceLabel(context: string) {
+  const labels: Record<string, string> = {
+    approval_sample: "승인 샘플",
+    editorial_pick: "편집 추천",
+    editorial_home_card: "홈 추천 카드",
+    editorial_deals_card: "딜 목록 추천 카드"
+  };
+  return labels[context] ?? context.replace(/_/g, " ");
 }
 
 export default function AdminOpsDashboard({ password, refreshToken }: { password: string; refreshToken: number }) {
@@ -452,6 +471,22 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
                   </div>
                 ))}
                 {!topCtaChannels.length ? <p className="text-xs font-bold text-steel">아직 구매 CTA 클릭 위치 데이터가 없습니다.</p> : null}
+              </div>
+            </div>
+            <div className="mt-5 border-t border-line pt-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-black text-steel">콘텐츠별 전환</p>
+                <span className="text-[11px] font-black text-steel">편집형 CTA 포함</span>
+              </div>
+              <div className="mt-3 space-y-2">
+                {revenueMetrics.surfaceMetrics.slice(0, 5).map((item) => (
+                  <div key={item.context} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 text-xs font-bold">
+                    <span className="min-w-0 truncate">{surfaceLabel(item.context)}</span>
+                    <span className="shrink-0 text-steel">상세 {item.detail_views} · 클릭 {item.affiliate_clicks}</span>
+                    <span className="w-12 shrink-0 text-right font-black text-pine">{item.affiliate_ctr}%</span>
+                  </div>
+                ))}
+                {!revenueMetrics.surfaceMetrics.length ? <p className="text-xs font-bold text-steel">아직 콘텐츠별 전환 데이터가 없습니다.</p> : null}
               </div>
             </div>
           </div>

@@ -1149,6 +1149,7 @@ if (fileExists("package.json") && fileExists("scripts/verify-supabase-schema.mjs
       supabaseSchemaVerifier.includes("is_strict_coupang_partners_url") &&
       supabaseSchemaVerifier.includes("sourcing_runs") &&
       supabaseSchemaVerifier.includes("affiliate_events") &&
+      supabaseSchemaVerifier.includes("context") &&
       supabaseSchemaVerifier.includes("writeSmokeCheck") &&
       supabaseSchemaVerifier.includes("NEXT_PUBLIC_SUPABASE_URL") &&
       supabaseSchemaVerifier.includes("SUPABASE_SERVICE_ROLE_KEY") &&
@@ -1259,7 +1260,7 @@ if (fileExists("sql/schema.sql")) {
   const schema = readText("sql/schema.sql");
   check(
     "schema version marker",
-    schema.includes("returnpick_schema_meta") && schema.includes("2026-07-31-product-observation-time") && schema.includes("schema_version"),
+    schema.includes("returnpick_schema_meta") && schema.includes("2026-08-01-affiliate-surface-attribution") && schema.includes("schema_version"),
     "schema.sql writes a launch-ready schema version marker for admin readiness",
     "required"
   );
@@ -1275,6 +1276,14 @@ if (fileExists("sql/schema.sql")) {
     check(`schema table: ${table}`, schema.includes(`create table if not exists ${table}`), table, "required");
   }
   check("schema event type: share_copy", schema.includes("'share_copy'"), "affiliate_events accepts share_copy", "required");
+  check(
+    "schema revenue surface attribution",
+    schema.includes("context text") &&
+      schema.includes("add column if not exists context text") &&
+      schema.includes("affiliate_events_context_created_idx"),
+    "affiliate funnel events retain an allowlisted content surface for editorial and approval CTA attribution",
+    "required"
+  );
   check("schema published RLS", schema.includes("Public can read published products"), "public can read only published products", "required");
   check(
     "schema public affiliate constraint",
@@ -1317,6 +1326,7 @@ if (fileExists("sql/schema.sql")) {
     "affiliate_events_product_created_idx",
     "affiliate_events_type_created_idx",
     "affiliate_events_channel_created_idx",
+    "affiliate_events_context_created_idx",
     "product_snapshots_product_observed_idx"
   ];
   check(
@@ -1825,8 +1835,9 @@ if (fileExists("app/api/events/route.ts")) {
       eventsRoute.includes("cleanAnonSessionId") &&
       eventsRoute.includes("EVENT_PAYLOAD_TOO_LARGE") &&
       eventsRoute.includes("cleanTrackingLabel(body.channel, \"web\")") &&
+      eventsRoute.includes("cleanTrackingLabel(body.context)") &&
       eventsRoute.includes("cleanTrackingLabel(body.utm_source)"),
-    "affiliate event tracking accepts only safe label fields, UUID anon sessions, and bounded payloads",
+    "affiliate event tracking accepts only safe label fields, including content surface attribution, UUID anon sessions, and bounded payloads",
     "required"
   );
   check(
@@ -1837,6 +1848,18 @@ if (fileExists("app/api/events/route.ts")) {
       eventsRoute.includes("PRODUCT_NOT_PUBLIC_READY") &&
       eventsRoute.includes("product_id: productId"),
     "affiliate event tracking stores events only for published affiliate-ready products",
+    "required"
+  );
+}
+
+if (fileExists("lib/dataStore.ts")) {
+  const dataStore = readText("lib/dataStore.ts");
+  check(
+    "revenue metrics: editorial surface attribution",
+    dataStore.includes("context: safeEventText(input.context, 80)") &&
+      dataStore.includes("const surfaceMetrics =") &&
+      dataStore.includes("surfaceMetrics,"),
+    "admin revenue metrics group approval and editorial events even when no sourced product row exists",
     "required"
   );
 }
