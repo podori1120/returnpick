@@ -826,6 +826,14 @@ if (
     "required"
   );
   check(
+    "admin sourcing: spreadsheet bulk-entry helper",
+    manualProductBulkForm.includes("BULK_FIELD_ORDER") &&
+      manualProductBulkForm.includes("navigator.clipboard.writeText(BULK_FIELD_ORDER)") &&
+      manualProductBulkForm.includes("실제 쿠팡 상품 URL과 상품별 파트너스 링크"),
+    "bulk intake exposes a copyable spreadsheet column order and keeps product-specific link requirements visible",
+    "required"
+  );
+  check(
     "admin sourcing: batch manual candidate intake",
     adminProductsImportRoute.includes("requireAdmin(request)") &&
       adminProductsImportRoute.includes("MAX_ROWS = 40") &&

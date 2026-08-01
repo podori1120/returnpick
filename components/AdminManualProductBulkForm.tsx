@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { FileCheck2, Upload } from "lucide-react";
+import { Copy, FileCheck2, Upload } from "lucide-react";
+
+const BULK_FIELD_ORDER = "상품명\t카테고리\t쿠팡 상품 URL\t상품별 파트너스 링크\t브랜드\t모델명\t이미지 URL\t수집 당시 가격\t반품가\t새상품가\t네이버 최저가\t반품등급\t재고 수량\t공개 메모";
 
 function headers(password: string) {
   return { "Content-Type": "application/json", "x-admin-password": password };
@@ -110,6 +112,15 @@ export default function AdminManualProductBulkForm({ password, onCreated }: { pa
     }
   }
 
+  async function copyFieldOrder() {
+    try {
+      await navigator.clipboard.writeText(BULK_FIELD_ORDER);
+      setNotice({ type: "success", message: "열 순서를 복사했습니다. 스프레드시트 첫 행에 붙여넣은 뒤 실제 상품 행을 작성하세요." });
+    } catch {
+      setNotice({ type: "error", message: "브라우저에서 복사가 차단되었습니다. HTTPS 관리자 페이지에서 다시 시도하세요." });
+    }
+  }
+
   return (
     <section id="admin-manual-product-bulk" data-import-policy="append-only" className="scroll-mt-4 rounded-lg border border-line bg-white p-5 shadow-soft">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -123,7 +134,16 @@ export default function AdminManualProductBulkForm({ password, onCreated }: { pa
         <p className="mt-3 max-w-3xl rounded-md border border-lemon/40 bg-lemon/15 px-3 py-2 text-xs font-bold leading-5 text-ink">
           기존 쿠팡 상품번호 또는 같은 카테고리·상품명이 있으면 자동 갱신하지 않고 건너뜁니다. 기존 상품 수정은 후보 검토 화면에서 명시적으로 진행하세요.
         </p>
-        <FileCheck2 className="text-pine" size={24} aria-hidden />
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <button
+            className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-xs font-black text-ink hover:bg-mist"
+            onClick={() => void copyFieldOrder()}
+            type="button"
+          >
+            <Copy size={14} aria-hidden /> 열 순서 복사
+          </button>
+          <FileCheck2 className="m-1 text-pine" size={24} aria-hidden />
+        </div>
       </div>
 
       {notice ? (
@@ -139,6 +159,10 @@ export default function AdminManualProductBulkForm({ password, onCreated }: { pa
         placeholder={"LG 그램 16 16GB 512GB\tlaptop\thttps://www.coupang.com/vp/products/123456789\thttps://link.coupang.com/a/...\tLG\tGram 16\t이미지URL\t1290000\t899000\t1690000\t1420000\t최상\t2\t배터리 상태 확인\n27인치 QHD 모니터\tmonitor\thttps://www.coupang.com/vp/products/987654321\t\t브랜드\t모델명"}
         aria-label="수동 후보 일괄 입력"
       />
+      <div className="mt-3 grid gap-2 rounded-lg border border-line bg-mist p-3 text-xs font-bold leading-5 text-steel sm:grid-cols-2">
+        <p>스프레드시트에서 행을 복사해 붙여넣으면 탭 기준으로 읽습니다. 실제 쿠팡 상품 URL과 상품별 파트너스 링크를 한 행에 맞춰 주세요.</p>
+        <p>승인용 샘플 링크·일반 쿠팡 URL·상품번호가 다른 링크는 저장 또는 게시 단계에서 차단됩니다. 확인되지 않은 반품 정보는 비워 두어도 됩니다.</p>
+      </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs font-semibold leading-5 text-steel">열 순서: 상품명 · 카테고리 · 상품 URL · 파트너스 링크 · 브랜드 · 모델명 · 이미지 · 수집 당시 가격 · 반품가 · 새상품가 · 네이버 최저가 · 등급 · 재고 · 공개 메모. 뒤쪽 7개는 선택입니다. 최대 40줄입니다.</p>
         <button className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-4 py-2.5 text-sm font-black text-white hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60" disabled={running || !entries.trim()} onClick={() => void importCandidates()} type="button">
