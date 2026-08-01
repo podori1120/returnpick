@@ -9,11 +9,39 @@ export interface WebReturnInfo {
   confidence: number;
 }
 
+export interface ReturnEvidenceSource {
+  condition_grade?: ConditionGrade | null;
+  return_price?: number | null;
+  stock_count?: number | null;
+}
+
+const weakConditionGrades: ReadonlySet<ConditionGrade> = new Set(["알수없음", "확인필요"]);
+
+export function resolveConditionGrade(
+  providerGrade: ConditionGrade | null | undefined,
+  webGrade: ConditionGrade | null | undefined
+): ConditionGrade {
+  if (providerGrade && !weakConditionGrades.has(providerGrade)) return providerGrade;
+  return webGrade ?? providerGrade ?? "확인필요";
+}
+
+export function resolveWebReturnEvidence(source: ReturnEvidenceSource, web: WebReturnInfo) {
+  return {
+    condition_grade: resolveConditionGrade(source.condition_grade, web.condition_grade),
+    return_price: source.return_price ?? web.return_price ?? null,
+    stock_count: source.stock_count ?? web.stock_count ?? null
+  };
+}
+
+function standaloneKoreanTerm(term: string) {
+  return new RegExp(`(?:^|[^가-힣A-Za-z0-9])${term}(?=$|[^가-힣A-Za-z0-9])`, "i");
+}
+
 const gradePatterns: Array<[ConditionGrade, RegExp[]]> = [
-  ["미개봉", [/미개봉/i, /새상품\s*급/i, /unopened/i]],
-  ["최상", [/반품\s*[- ]?\s*최상/i, /\b최상\b/i, /like\s*new/i]],
-  ["상", [/반품\s*[- ]?\s*상\b/i, /\b상급\b/i, /\b상\b/i]],
-  ["중", [/반품\s*[- ]?\s*중\b/i, /\b중급\b/i, /\b중\b/i]],
+  ["미개봉", [standaloneKoreanTerm("미개봉"), /새상품\s*급/i, /unopened/i]],
+  ["최상", [/반품\s*[- ]?\s*최상(?=$|[^가-힣A-Za-z0-9])/i, standaloneKoreanTerm("최상"), /like\s*new/i]],
+  ["상", [/반품\s*[- ]?\s*상(?=$|[^가-힣A-Za-z0-9])/i, /상급/i, standaloneKoreanTerm("상")]],
+  ["중", [/반품\s*[- ]?\s*중(?=$|[^가-힣A-Za-z0-9])/i, /중급/i, standaloneKoreanTerm("중")]],
   ["알수없음", [/상태\s*미상/i, /등급\s*미상/i, /알\s*수\s*없/i]]
 ];
 

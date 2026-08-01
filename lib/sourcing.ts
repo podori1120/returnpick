@@ -21,7 +21,7 @@ import { searchPublicWebProducts } from "@/lib/providers/publicWebProvider";
 import type { ProviderProduct, ProviderSearchResult } from "@/lib/providers/types";
 import { mergeProviderProductBatches } from "@/lib/providerProductMerge";
 import type { JsonValue, SourcedProduct, SourcingKeyword, SourcingStatus } from "@/lib/types";
-import { extractReturnInfoFromText, toReturnInfoJson } from "@/lib/webReturnInfo";
+import { extractReturnInfoFromText, resolveWebReturnEvidence, toReturnInfoJson } from "@/lib/webReturnInfo";
 
 function isWithinKeywordPrice(product: ProviderProduct, keyword: SourcingKeyword) {
   const price = product.return_price ?? product.source_price ?? product.new_price;
@@ -267,18 +267,16 @@ async function enrichAndSaveProduct(product: ProviderProduct, keyword: SourcingK
     product.title,
     product.raw_json?.web_return_info ? JSON.stringify(product.raw_json.web_return_info) : null
   );
-  const inferredCondition = product.condition_grade ?? webReturnInfo.condition_grade ?? "확인필요";
-  const inferredReturnPrice = product.return_price ?? webReturnInfo.return_price ?? (webReturnInfo.isReturnCandidate ? product.source_price ?? null : null);
-  const inferredStock = product.stock_count ?? webReturnInfo.stock_count ?? null;
+  const resolvedReturnInfo = resolveWebReturnEvidence(product, webReturnInfo);
 
   const { product: saved, inserted } = await upsertSourcedProduct({
     ...product,
     keyword: keyword.keyword,
     affiliate_url: affiliate.affiliateUrl,
     naver_lowest_price: naverPrice.price,
-    condition_grade: inferredCondition,
-    return_price: inferredReturnPrice,
-    stock_count: inferredStock,
+    condition_grade: resolvedReturnInfo.condition_grade,
+    return_price: resolvedReturnInfo.return_price,
+    stock_count: resolvedReturnInfo.stock_count,
     spec_json: specJson,
     raw_json: {
       ...(product.raw_json ?? {}),

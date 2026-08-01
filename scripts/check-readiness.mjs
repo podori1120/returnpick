@@ -224,6 +224,7 @@ const requiredFiles = [
   "lib/productImageUrl.ts",
   "lib/providerProductMerge.ts",
   "lib/publicWebUrlSafety.ts",
+  "lib/webReturnInfo.ts",
   "lib/scoring.ts",
   "lib/sourcingRunKinds.ts",
   "lib/sourcing.ts",
@@ -257,6 +258,7 @@ const requiredFiles = [
   "scripts/verify-provider-product-merge.mjs",
   "scripts/verify-scoring-rules.mjs",
   "scripts/verify-public-web-config.mjs",
+  "scripts/verify-web-return-info.mjs",
   "scripts/verify-public-web-url-safety.mjs",
   "scripts/verify-public-web-detail-enrichment.mjs",
   "scripts/print-supabase-setup-runbook.mjs",
@@ -1688,6 +1690,8 @@ if (fileExists("lib/providers/publicWebProvider.ts")) {
   const packageJson = fileExists("package.json") ? readText("package.json") : "";
   const publicWebConfigVerifier = fileExists("scripts/verify-public-web-config.mjs") ? readText("scripts/verify-public-web-config.mjs") : "";
   const publicWebUrlVerifier = fileExists("scripts/verify-public-web-url-safety.mjs") ? readText("scripts/verify-public-web-url-safety.mjs") : "";
+  const webReturnInfo = fileExists("lib/webReturnInfo.ts") ? readText("lib/webReturnInfo.ts") : "";
+  const webReturnInfoVerifier = fileExists("scripts/verify-web-return-info.mjs") ? readText("scripts/verify-web-return-info.mjs") : "";
   check(
     "provider: public web robots fail closed",
     publicWebProvider.includes("ROBOTS_UNAVAILABLE") &&
@@ -1810,6 +1814,17 @@ if (fileExists("lib/providers/publicWebProvider.ts")) {
       publicWebProvider.includes("web_return_info") &&
       fileExists("scripts/verify-public-web-detail-enrichment.mjs"),
     "detail-page return evidence and bounded enrichment are covered by a deterministic source contract check",
+    "required"
+  );
+  check(
+    "scripts: web return evidence merge contract",
+    packageJson.includes('"web-return:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-web-return-info.mjs"') &&
+      webReturnInfo.includes("resolveConditionGrade") &&
+      webReturnInfo.includes("resolveWebReturnEvidence") &&
+      webReturnInfo.includes("weakConditionGrades") &&
+      webReturnInfoVerifier.includes("no inferred return price") &&
+      webReturnInfoVerifier.includes('resolveConditionGrade("확인필요", "최상")'),
+    "web return evidence fills only weak condition grades and never treats a source price as an unverified return price",
     "required"
   );
   check(
