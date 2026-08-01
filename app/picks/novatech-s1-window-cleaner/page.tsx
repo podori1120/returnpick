@@ -16,6 +16,7 @@ import ApprovalCoupangButton from "@/components/ApprovalCoupangButton";
 import { EditorialPickViewTracker } from "@/components/AffiliateEventTracker";
 import EditorialShareBar from "@/components/EditorialShareBar";
 import { approvalSampleProduct } from "@/lib/approvalSample";
+import { isCoupangPartnersLink } from "@/lib/coupangLink";
 import { getSiteUrl } from "@/lib/siteUrl";
 
 const affiliateNotice = "이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.";
@@ -100,6 +101,7 @@ export const metadata: Metadata = {
 
 export default function NovatechS1PickPage() {
   const affiliateUrl = process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL?.trim() ?? "";
+  const affiliateUrlReady = isCoupangPartnersLink(affiliateUrl);
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -189,7 +191,7 @@ export default function NovatechS1PickPage() {
               <TimerReset className="shrink-0 text-pine" size={24} aria-hidden />
             </div>
 
-            {affiliateUrl ? (
+            {affiliateUrlReady ? (
               <ApprovalCoupangButton
                 href={affiliateUrl}
                 channel="web_editorial_pick"
@@ -198,7 +200,7 @@ export default function NovatechS1PickPage() {
               />
             ) : (
               <button className="mt-5 w-full cursor-not-allowed rounded-lg border border-line px-4 py-3 text-sm font-black text-steel" disabled type="button">
-                쿠팡 파트너스 링크 설정 필요
+                {affiliateUrl ? "쿠팡 파트너스 링크 확인 필요" : "쿠팡 파트너스 링크 설정 필요"}
               </button>
             )}
             <p className="mt-3 rounded-lg border border-pine/20 bg-pine/5 p-2 text-xs font-black leading-5 text-ink sm:p-3">{affiliateNotice}</p>
@@ -214,7 +216,7 @@ export default function NovatechS1PickPage() {
         <div className="mx-auto grid max-w-7xl gap-3 px-4 py-6 sm:grid-cols-3 sm:px-6">
           {[
             { icon: Gauge, label: "흡입력 표기", value: "5800Pa" },
-            { icon: Droplets, label: "물 분사", value: "자동 분사" },
+            { icon: Droplets, label: "물 분사", value: "자동 물 분사" },
             { icon: ShieldCheck, label: "구매 전 핵심", value: "안전줄 확인" }
           ].map((item) => (
             <div key={item.label} className="flex items-center gap-3 rounded-lg bg-white p-4">

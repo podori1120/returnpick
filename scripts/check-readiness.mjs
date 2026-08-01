@@ -2085,6 +2085,8 @@ if (
       approvalData.includes("window-cleaning-robot-editorial.webp") &&
       approvalData.includes("9204971165 - 27182792409") &&
       approvalPage.includes("approvalSampleProduct.imageNotice") &&
+      approvalPage.includes("isCoupangPartnersLink") &&
+      approvalPage.includes("approvalUrlReady") &&
       approvalPage.includes("공개 페이지: {captureUrl}") &&
       approvalPage.includes("<h1 className=\"mt-1 text-2xl font-black tracking-tight\">{productName}</h1>") &&
       approvalPage.includes("sku: approvalSampleProduct.coupangProductNumber") &&
@@ -4469,6 +4471,16 @@ if (fileExists("app/api/admin/sourcing/run/route.ts") && fileExists("lib/dataSto
       dataStore.includes("export async function upsertSourcedProduct") &&
       !updateProductBody.includes("last_observed_at"),
     "automatic sourcing refreshes last_observed_at while ordinary admin edits do not impersonate a source observation",
+    "required"
+  );
+  check(
+    "data store: production memory excludes demo catalog",
+    dataStore.includes("isDemoProduct") &&
+      dataStore.includes("isLocalDemoModeEnabled") &&
+      dataStore.includes("if (!isLocalDemoModeEnabled()) return []") &&
+      dataStore.includes("removeDemoProductsFromMemoryState") &&
+      dataStore.includes("state.products = state.products.filter((product) => !demoProductIds.has(product.id))"),
+    "Production memory fallback never seeds or restores synthetic demo products into the admin catalog",
     "required"
   );
 }

@@ -3,10 +3,13 @@ import Link from "next/link";
 import { ArrowRight, Droplets, Gauge, ShieldCheck } from "lucide-react";
 import { EditorialPickImpressionTracker } from "@/components/AffiliateEventTracker";
 import { approvalSampleProduct } from "@/lib/approvalSample";
+import { isCoupangPartnersLink } from "@/lib/coupangLink";
 
 const highlightIcons = [Gauge, Droplets, ShieldCheck];
 
 export default function ApprovalSampleCard({ placement }: { placement: "home" | "deals" | "picks" }) {
+  const approvalUrlReady = isCoupangPartnersLink(process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL?.trim() ?? "");
+
   return (
     <article className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">
       <EditorialPickImpressionTracker placement={placement} />
@@ -43,7 +46,9 @@ export default function ApprovalSampleCard({ placement }: { placement: "home" | 
           <span className="mt-4 inline-flex items-center gap-2 text-sm font-black text-pine group-hover:text-ink">
             검수 내용과 구매 전 확인사항 보기 <ArrowRight size={16} aria-hidden />
           </span>
-          <p className="mt-3 border-t border-line pt-3 text-[11px] font-semibold leading-5 text-steel">쿠팡 파트너스 제휴 링크가 포함된 추천 상품입니다.</p>
+          <p className="mt-3 border-t border-line pt-3 text-[11px] font-semibold leading-5 text-steel">
+            {approvalUrlReady ? "쿠팡 파트너스 제휴 링크가 포함된 추천 상품입니다." : "쿠팡 파트너스 링크 설정 상태를 확인하세요."}
+          </p>
         </div>
       </Link>
     </article>

@@ -7,6 +7,7 @@ import { demoCatalog } from "@/lib/demoCatalog";
 import { getCustomerPublishReadiness, getDealQuality } from "@/lib/quality";
 import { getNaverPriceTrust } from "@/lib/naverPriceTrust";
 import { isUsableProductImageUrl } from "@/lib/productImageUrl";
+import { isDemoProduct, isLocalDemoModeEnabled } from "@/lib/publicDeal";
 import { calculateDealScore, getLatestScore } from "@/lib/scoring";
 import { isSourcingExecutionRun } from "@/lib/sourcingRunKinds";
 import { getSupabaseServiceClient } from "@/lib/supabase";
@@ -172,6 +173,8 @@ function preserveExistingReviewFields(existing: SourcedProduct, payload: Sourced
 }
 
 function createInitialProducts(): SourcedProduct[] {
+  if (!isLocalDemoModeEnabled()) return [];
+
   return demoCatalog.map((item) =>
     makeProduct({
       ...item,
@@ -191,6 +194,20 @@ function createInitialProducts(): SourcedProduct[] {
       }
     })
   );
+}
+
+function removeDemoProductsFromMemoryState(state: MemoryState): MemoryState {
+  if (isLocalDemoModeEnabled()) return state;
+
+  const demoProductIds = new Set(state.products.filter(isDemoProduct).map((product) => product.id));
+  if (!demoProductIds.size) return state;
+
+  state.products = state.products.filter((product) => !demoProductIds.has(product.id));
+  state.scores = state.scores.filter((score) => !demoProductIds.has(score.product_id));
+  state.snapshots = state.snapshots.filter((snapshot) => !demoProductIds.has(snapshot.product_id));
+  state.telegramLogs = state.telegramLogs.filter((log) => !log.product_id || !demoProductIds.has(log.product_id));
+  state.affiliateEvents = state.affiliateEvents.filter((event) => !event.product_id || !demoProductIds.has(event.product_id));
+  return state;
 }
 
 type MemoryState = {
@@ -350,7 +367,7 @@ function loadMemoryState(): MemoryState {
   try {
     const parsed = JSON.parse(readFileSync(localDbPath, "utf8")) as Partial<MemoryState>;
     const fallback = createMemoryState();
-    return hydrateBootstrapCatalog(hydrateDemoCatalog({
+    return hydrateBootstrapCatalog(hydrateDemoCatalog(removeDemoProductsFromMemoryState({
       keywords: Array.isArray(parsed.keywords) ? (parsed.keywords as SourcingKeyword[]) : fallback.keywords,
       products: Array.isArray(parsed.products) ? (parsed.products as SourcedProduct[]) : fallback.products,
       scores: Array.isArray(parsed.scores) ? (parsed.scores as DealScore[]) : fallback.scores,
@@ -358,7 +375,7 @@ function loadMemoryState(): MemoryState {
       runs: Array.isArray(parsed.runs) ? (parsed.runs as SourcingRun[]) : fallback.runs,
       telegramLogs: Array.isArray(parsed.telegramLogs) ? (parsed.telegramLogs as TelegramLog[]) : fallback.telegramLogs,
       affiliateEvents: Array.isArray(parsed.affiliateEvents) ? (parsed.affiliateEvents as AffiliateEvent[]) : fallback.affiliateEvents
-    }));
+    })));
   } catch {
     return createMemoryState();
   }

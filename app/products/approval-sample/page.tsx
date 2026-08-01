@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import ApprovalCoupangButton from "@/components/ApprovalCoupangButton";
 import { approvalSampleProduct } from "@/lib/approvalSample";
+import { isCoupangPartnersLink } from "@/lib/coupangLink";
 import { getSiteUrl } from "@/lib/siteUrl";
 
 const affiliateNotice = "이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.";
@@ -24,14 +25,14 @@ const canonicalUrl = `${getSiteUrl()}/products/approval-sample`;
 const editorialImageUrl = `${getSiteUrl()}${approvalSampleProduct.imageSrc}`;
 
 const specCards = [
-  { icon: Gauge, label: "흡입 고정", value: "5800Pa", body: "창문에 붙어 이동하는 제품 특성상 흡입 고정력을 우선 확인합니다." },
+  { icon: Gauge, label: "흡입·고정력", value: "5800Pa", body: "창문에 붙어 이동하는 제품 특성상 흡입 고정력을 우선 확인합니다." },
   { icon: Droplets, label: "물 분사", value: "자동 물 분사", body: "유리면을 닦을 때 물 분사 방식과 사용 환경의 궁합을 확인해야 합니다." },
   { icon: Sparkles, label: "사용처", value: "유리창 청소", body: "높은 창문이나 넓은 유리면을 자주 관리해야 하는 경우에 적합합니다." }
 ];
 
 const recommendationReasons = [
   "창문 청소를 직접 하기 어려운 가정이나 사무실에서 확인할 만한 자동 청소기입니다.",
-  "5800Pa 흡입 고정, 자동 분수, 초슬림 구조를 함께 보는 사용자에게 적합합니다.",
+  "5800Pa 흡입력·고정력, 자동 물 분사, 초슬림 구조를 함께 보는 사용자에게 적합합니다.",
   "구매 전 쿠팡 페이지에서 가격, 재고, 배송 조건을 바로 확인할 수 있습니다."
 ];
 
@@ -71,6 +72,7 @@ export const metadata: Metadata = {
 
 export default function ApprovalSampleProductPage() {
   const approvalUrl = process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL?.trim() ?? "";
+  const approvalUrlReady = isCoupangPartnersLink(approvalUrl);
   const captureUrl = canonicalUrl;
   const productJsonLd = {
     "@context": "https://schema.org",
@@ -199,7 +201,7 @@ export default function ApprovalSampleProductPage() {
               버튼을 누르면 쿠팡 파트너스 링크가 새 탭으로 열립니다. 구매 전 쿠팡 페이지에서 가격, 재고, 배송 정보를 최종 확인하세요.
             </p>
 
-            {approvalUrl ? (
+            {approvalUrlReady ? (
               <ApprovalCoupangButton href={approvalUrl} />
             ) : (
               <button
@@ -207,7 +209,7 @@ export default function ApprovalSampleProductPage() {
                 disabled
                 type="button"
               >
-                쿠팡 파트너스 링크 설정 필요
+                {approvalUrl ? "쿠팡 파트너스 링크 확인 필요" : "쿠팡 파트너스 링크 설정 필요"}
               </button>
             )}
 
@@ -220,7 +222,7 @@ export default function ApprovalSampleProductPage() {
               <div className="flex justify-between gap-3">
                 <dt className="font-bold text-steel">링크 상태</dt>
                 <dd className={approvalUrl ? "font-black text-pine" : "font-black text-coral"}>
-                  {approvalUrl ? "설정됨" : "환경변수 필요"}
+                  {approvalUrlReady ? "설정됨" : approvalUrl ? "형식 확인 필요" : "환경변수 필요"}
                 </dd>
               </div>
             </dl>
@@ -258,7 +260,7 @@ export default function ApprovalSampleProductPage() {
         </aside>
       </section>
 
-      {approvalUrl ? (
+      {approvalUrlReady ? (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-white/95 p-3 shadow-soft backdrop-blur lg:hidden">
           <div className="mx-auto max-w-6xl">
             <ApprovalCoupangButton
