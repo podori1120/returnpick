@@ -98,6 +98,8 @@ const adminUiRequiredText = [
   "유입 채널별 전환",
   "상품별 채널 배포 키트",
   "/api/admin/content-kit?product_id=",
+  "여러 링크 한 번에 등록",
+  "/api/admin/products/link-intake/bulk",
   "링크 보강 큐로 이동",
   "품질 보강 후보로 이동",
   "API 없이 수동 확인",
@@ -457,6 +459,20 @@ function checkManualPriceRouteProtection(response, json) {
   }
 }
 
+function checkAdminPostProtection(name, path, response, json) {
+  const errorText = String(json?.error ?? json?.code ?? json?.message ?? json?.raw_text ?? "").trim();
+  const expectedBlocks = ["UNAUTHORIZED", "ADMIN_PASSWORD_NOT_CONFIGURED", "ADMIN_PASSWORD_WEAK_CONFIGURATION"];
+  if (response.status === 404 || response.status === 405) {
+    fail(name, `${path} returned ${response.status}; route may be missing`);
+  } else if (response.status < 400) {
+    fail(name, `${path} accepted an unauthenticated POST with ${response.status}`);
+  } else if (!expectedBlocks.some((code) => errorText.toUpperCase().includes(code))) {
+    fail(name, `${path} returned ${response.status} with an unexpected auth response: ${errorText || "empty body"}`);
+  } else {
+    pass(name, `unauthenticated POST is blocked with ${response.status} (${errorText})`);
+  }
+}
+
 function staticScriptSourcesFromHtml(html) {
   return [
     ...new Set(
@@ -807,6 +823,26 @@ async function main() {
   } catch (error) {
     fail("manual Naver price API headers", error instanceof Error ? error.message : "POST failed");
     fail("manual Naver price route", error instanceof Error ? error.message : "POST failed");
+  }
+
+  try {
+    const bulkAffiliateIntake = await readJson("/api/admin/products/link-intake/bulk", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ items: [] })
+    });
+    checkPrivateRouteHeaders("affiliate link bulk API headers", bulkAffiliateIntake.response);
+    checkAdminPostProtection(
+      "affiliate link bulk route",
+      "/api/admin/products/link-intake/bulk",
+      bulkAffiliateIntake.response,
+      bulkAffiliateIntake.json
+    );
+  } catch (error) {
+    fail("affiliate link bulk API headers", error instanceof Error ? error.message : "POST failed");
+    fail("affiliate link bulk route", error instanceof Error ? error.message : "POST failed");
   }
 
   let readiness = null;

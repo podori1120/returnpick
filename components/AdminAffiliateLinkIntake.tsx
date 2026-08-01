@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Link2, LoaderCircle } from "lucide-react";
+import { CheckCircle2, Link2, ListPlus, LoaderCircle } from "lucide-react";
 import { categoryOptions } from "@/lib/category";
 import { isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
 import type { Category } from "@/lib/types";
@@ -12,13 +12,51 @@ function headers(password: string) {
   return { "Content-Type": "application/json", "x-admin-password": password };
 }
 
+type BulkIntakeRow = {
+  title: string;
+  category: string;
+  affiliate_url: string;
+  coupang_url: string;
+  image_url: string;
+  public_note: string;
+  admin_memo: string;
+};
+
+type BulkIntakeResult = {
+  status: string;
+  scanned_count: number;
+  inserted_count: number;
+  error_count: number;
+  items?: Array<{ index: number; status: string; product_id: string | null; error: string | null; message: string | null }>;
+};
+
+function parseBulkRows(value: string): BulkIntakeRow[] {
+  return value
+    .split(/\r?\n/g)
+    .map((line) => line.split("\t"))
+    .filter((fields) => fields.some((field) => field.trim()))
+    .map((fields) => ({
+      title: fields[0]?.trim() ?? "",
+      category: fields[1]?.trim() ?? "",
+      affiliate_url: fields[2]?.trim() ?? "",
+      coupang_url: fields[3]?.trim() ?? "",
+      image_url: fields[4]?.trim() ?? "",
+      public_note: fields[5]?.trim() ?? "",
+      admin_memo: fields[6]?.trim() ?? ""
+    }));
+}
+
 export default function AdminAffiliateLinkIntake({ password, onCreated }: { password: string; onCreated: () => void }) {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [nextAction, setNextAction] = useState<string | null>(null);
+  const [bulkText, setBulkText] = useState("");
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkResult, setBulkResult] = useState<BulkIntakeResult | null>(null);
   const affiliateReady = isUsableAffiliateUrl(form.affiliate_url.trim());
   const suppliedUrlReady = !form.coupang_url.trim() || isUsableCoupangProductUrl(form.coupang_url.trim());
+  const bulkRows = parseBulkRows(bulkText);
 
   function update(field: keyof typeof emptyForm, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -46,6 +84,36 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
     }
   }
 
+  async function submitBulk() {
+    if (!bulkRows.length || bulkRows.length > 8) return;
+    setBulkSaving(true);
+    setBulkResult(null);
+    setNotice(null);
+    setNextAction(null);
+    try {
+      const response = await fetch("/api/admin/products/link-intake/bulk", {
+        method: "POST",
+        headers: headers(password),
+        body: JSON.stringify({ items: bulkRows })
+      });
+      const data = (await response.json().catch(() => ({}))) as BulkIntakeResult & { error?: string; message?: string };
+      if (!response.ok) {
+        setNotice({ type: "error", message: data.message ?? data.error ?? "일괄 후보 등록에 실패했습니다." });
+        return;
+      }
+      setBulkResult(data);
+      setNotice({
+        type: data.status === "ok" ? "success" : "error",
+        message: `총 ${data.scanned_count}개 중 ${data.inserted_count}개를 검수 대기 후보로 저장했습니다. 오류 ${data.error_count}개.`
+      });
+      if (data.inserted_count) onCreated();
+    } catch {
+      setNotice({ type: "error", message: "네트워크 문제로 일괄 후보 등록을 완료하지 못했습니다." });
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
   return (
     <section id="admin-affiliate-link-intake" className="scroll-mt-4 rounded-lg border border-line bg-white p-5 shadow-soft">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -64,6 +132,33 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
         <label className="text-sm font-bold text-steel">관리자 메모 (선택)<textarea className="focus-ring mt-1 min-h-20 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink" value={form.admin_memo} onChange={(event) => update("admin_memo", event.target.value)} /></label>
       </div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4"><p className="text-xs font-semibold text-steel">목적지 상품번호가 확인되지 않으면 저장하지 않습니다. 제한 응답에서 관리자가 상품 URL을 입력한 경우에도 게시 불가 검수 후보로만 저장됩니다.</p><button className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-4 py-2.5 text-sm font-black text-white hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60" disabled={saving || form.title.trim().length < 5 || !affiliateReady || !suppliedUrlReady} onClick={() => void submit()} type="button">{saving ? <LoaderCircle className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}링크로 상품번호 확인 → 검수 대기 후보 저장</button></div>
+      <div className="mt-6 border-t border-line pt-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="inline-flex items-center gap-2 text-sm font-black text-pine"><ListPlus size={16} aria-hidden /> 여러 링크 한 번에 등록</p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-steel">한 줄에 상품명, 카테고리, 파트너스 링크, 쿠팡 상품 URL을 탭으로 구분하세요. 한 번에 최대 8개까지 같은 검증을 거쳐 저장합니다.</p>
+          </div>
+          <span className="text-xs font-black text-steel">{bulkRows.length}/8개</span>
+        </div>
+        <textarea
+          aria-label="파트너스 링크 여러 개 입력"
+          className="focus-ring mt-3 min-h-28 w-full rounded-lg border border-line bg-mist px-3 py-3 font-mono text-xs leading-6 text-ink"
+          onChange={(event) => setBulkText(event.target.value)}
+          placeholder={'상품명\tlaptop\thttps://link.coupang.com/a/...\thttps://www.coupang.com/vp/products/...\n상품명\tmonitor\thttps://link.coupang.com/a/...\thttps://www.coupang.com/vp/products/...'}
+          value={bulkText}
+        />
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs font-semibold leading-5 text-steel">이미지 URL, 공개 메모, 관리자 메모는 선택 입력입니다. 가격·반품등급·재고는 이 흐름에서 만들지 않습니다.</p>
+          <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-pine bg-white px-4 py-2.5 text-sm font-black text-pine hover:bg-pine hover:text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={bulkSaving || saving || bulkRows.length < 1 || bulkRows.length > 8} onClick={() => void submitBulk()} type="button">
+            {bulkSaving ? <LoaderCircle className="animate-spin" size={16} /> : <ListPlus size={16} aria-hidden />} {bulkSaving ? "검수 중" : "여러 후보 검수 대기 저장"}
+          </button>
+        </div>
+        {bulkResult?.items?.length ? (
+          <ul className="mt-3 space-y-1 rounded-lg border border-line bg-mist p-3 text-xs font-bold text-steel">
+            {bulkResult.items.map((item) => <li key={`${item.index}-${item.product_id ?? item.error ?? "result"}`}><span className={item.status === "inserted" ? "font-black text-pine" : "font-black text-coral"}>{item.status === "inserted" ? "저장" : "확인 필요"}</span> · {item.index}번 {item.product_id ?? item.error ?? item.message ?? "처리 결과 없음"}</li>)}
+          </ul>
+        ) : null}
+      </div>
     </section>
   );
 }

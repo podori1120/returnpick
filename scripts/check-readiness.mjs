@@ -178,6 +178,7 @@ const requiredFiles = [
   "app/api/admin/products/route.ts",
   "app/api/admin/products/import/route.ts",
   "app/api/admin/products/link-intake/route.ts",
+  "app/api/admin/products/link-intake/bulk/route.ts",
   "app/api/admin/session/route.ts",
   "app/api/admin/telegram/route.ts",
   "app/api/cron/sourcing/route.ts",
@@ -252,6 +253,7 @@ const requiredFiles = [
   "scripts/verify-scheduled-affiliate-backfill.mjs",
   "scripts/verify-affiliate-identity.mjs",
   "scripts/verify-affiliate-link-intake.mjs",
+  "scripts/verify-affiliate-link-intake-bulk.mjs",
   "scripts/verify-bootstrap-catalog-runtime.mjs",
   "scripts/verify-demo-catalog-stability.mjs",
   "scripts/verify-supabase-config-guard.mjs",
@@ -429,6 +431,25 @@ if (fileExists("package.json") && fileExists("app/api/admin/products/link-intake
       intakeCheck.includes("approval sample links") &&
       intakeCheck.includes("duplicate conflicts"),
     "manual Partners-link intake is authenticated, strict, identity-bound, duplicate-safe, score-persisted, and review-only without secrets or network checks",
+    "required"
+  );
+}
+
+if (fileExists("package.json") && fileExists("app/api/admin/products/link-intake/bulk/route.ts") && fileExists("scripts/verify-affiliate-link-intake-bulk.mjs")) {
+  const packageJson = readText("package.json");
+  const bulkRoute = readText("app/api/admin/products/link-intake/bulk/route.ts");
+  const bulkCheck = readText("scripts/verify-affiliate-link-intake-bulk.mjs");
+  const intakeUi = readText("components/AdminAffiliateLinkIntake.tsx");
+  check(
+    "scripts: affiliate link bulk intake contract check",
+    packageJson.includes('"affiliate-link-intake-bulk:check": "node scripts/verify-affiliate-link-intake-bulk.mjs"') &&
+      bulkRoute.includes("requireAdmin(request)") &&
+      bulkRoute.includes("POST as intakeOne") &&
+      bulkRoute.includes("MAX_ITEMS = 8") &&
+      bulkRoute.includes("MAX_BODY_BYTES = 64_000") &&
+      bulkCheck.includes("review-only persistence") &&
+      intakeUi.includes("/api/admin/products/link-intake/bulk"),
+    "bulk Partners-link intake is authenticated, bounded, and delegates every row to the strict single-item review gate",
     "required"
   );
 }
