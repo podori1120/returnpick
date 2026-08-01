@@ -892,6 +892,18 @@ if (
     "public deal cards expose the latest observation state before a visitor opens a deal, while the detail page keeps the full verification strip",
     "required"
   );
+  check(
+    "public UX: card affiliate CTA",
+    dealCard.includes('import AffiliateButton from "@/components/AffiliateButton"') &&
+      dealCard.includes('import { getCoupangOutboundLink } from "@/lib/coupangLink"') &&
+      dealCard.includes("const outboundLink = getCoupangOutboundLink(product)") &&
+      dealCard.includes('label="쿠팡에서 가격 확인"') &&
+      dealCard.includes('placement="deal_card"') &&
+      dealCard.includes("이 페이지의 일부 링크는 제휴 링크이며") &&
+      dealCard.includes('href="/disclosure"'),
+    "customer-ready deal cards expose a tracked Coupang price CTA with nearby affiliate disclosure and a disclosure-page link",
+    "required"
+  );
 }
 
 if (

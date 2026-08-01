@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, CheckCircle2 } from "lucide-react";
+import AffiliateButton from "@/components/AffiliateButton";
 import { getCategoryLabel } from "@/lib/category";
+import { getCoupangOutboundLink } from "@/lib/coupangLink";
 import { getDealPrice, getDiscountRate, getPrimaryUseCase, getReferencePrice } from "@/lib/dealIntelligence";
 import { formatPercent, formatPrice } from "@/lib/format";
 import { getDealQuality, getReturnEvidenceLabel } from "@/lib/quality";
@@ -25,6 +27,7 @@ export default function DealCard({ product }: { product: ProductWithScore }) {
   const firstReason = score?.reasons?.[0] ?? product.public_note;
   const primaryCheck = quality.blockers[0] ?? quality.warnings[0];
   const riskCount = score?.risk_flags?.length ?? 0;
+  const outboundLink = getCoupangOutboundLink(product);
 
   return (
     <article className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">
@@ -119,6 +122,20 @@ export default function DealCard({ product }: { product: ProductWithScore }) {
           <CompareButton productId={product.id} title={product.title} />
           <SavedDealButton productId={product.id} title={product.title} />
         </div>
+        {outboundLink.isAffiliate ? (
+          <div className="border-t border-line pt-3">
+            <AffiliateButton
+              productId={product.id}
+              href={outboundLink.href}
+              label="쿠팡에서 가격 확인"
+              placement="deal_card"
+              className="focus-ring inline-flex w-full items-center justify-center gap-2 rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink"
+            />
+            <p className="mt-2 text-[11px] font-semibold leading-4 text-steel">
+              이 페이지의 일부 링크는 제휴 링크이며, 구매가 발생하면 운영자가 수수료를 받을 수 있습니다. 가격과 재고, 반품등급은 수시로 변동될 수 있습니다. <Link className="font-black text-pine underline" href="/disclosure">제휴 안내</Link>
+            </p>
+          </div>
+        ) : null}
       </div>
     </article>
   );
