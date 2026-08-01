@@ -133,6 +133,8 @@ COUPANG_PARTNER_ID=
 
 쿠팡 API 호출은 공식 HMAC 방식으로 서명합니다. 쿼리스트링이 있는 검색 요청도 서명 메시지는 `signed-date + METHOD + path + query` 형식으로 만들며, `?` 문자는 포함하지 않습니다. 인증 실패가 나면 `/admin`의 실제 연결 테스트에서 Coupang 오류 메시지와 함께 드러나도록 했습니다.
 
+응답 파서는 공식 응답의 camelCase 필드뿐 아니라 흔한 snake_case 변형과 `data.productData.products` 형태를 방어적으로 읽고, `1,299,000원`처럼 표시 형식이 붙은 가격도 숫자로 정규화합니다. 반품 등급·반품가는 응답에 근거가 없으면 계속 `확인필요` 또는 `null`로 둡니다.
+
 Vercel에 쿠팡 키를 붙여넣을 때 생길 수 있는 앞뒤 공백은 Provider 단계에서 한 번 더 제거한 뒤 설정 여부 확인, HMAC 서명, `subId` 입력에 사용합니다. 그래도 `env:check:launch`는 공백이 섞인 값 자체를 운영 준비 실패로 보므로, 최종 등록값은 공식 화면에서 다시 복사해 깨끗하게 넣는 것이 좋습니다.
 
 쿠팡 파트너스 안내처럼 최종승인 전에는 API 권한이 열리지 않을 수 있습니다. 이때 `/admin`의 실제 연결 테스트는 401/403, 권한 없음, 미승인류 응답을 `COUPANG_API_PERMISSION_OR_APPROVAL_REQUIRED`로 구분하고 “승인 후 API 메뉴에서 새 키를 발급해 Vercel에 등록”하라는 다음 행동을 표시합니다.

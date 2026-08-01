@@ -32,7 +32,8 @@ function createAuthorization(method: string, pathWithQuery: string) {
 }
 
 function numberFromUnknown(value: unknown) {
-  const parsed = Number(value);
+  const normalized = typeof value === "string" ? value.replace(/[\s,₩￦원]/g, "") : value;
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -90,18 +91,32 @@ type ProductParseContext = {
 };
 
 function normalizeProduct(item: Record<string, unknown>, keyword: string, category: Category, context: ProductParseContext): ProviderProduct {
-  const productIdField = firstPresentField(item, ["productId", "product_id", "itemId", "id", "productNo", "vendorItemId"]);
-  const titleField = firstPresentField(item, ["productName", "title", "name", "itemName"]);
-  const priceField = firstPresentField(item, ["productPrice", "price", "salePrice", "finalPrice"]);
-  const productUrlField = firstPresentField(item, ["productUrl", "url", "landingUrl"]);
-  const imageUrlField = firstPresentField(item, ["productImage", "imageUrl", "thumbnail"]);
-  const affiliateField = firstPresentField(item, ["shortenUrl", "shortUrl", "affiliateUrl", "productUrl", "url", "landingUrl"]);
+  const productIdField = firstPresentField(item, ["productId", "product_id", "itemId", "item_id", "id", "productNo", "product_no", "vendorItemId", "vendor_item_id"]);
+  const titleField = firstPresentField(item, ["productName", "product_name", "title", "name", "itemName", "item_name"]);
+  const priceField = firstPresentField(item, ["productPrice", "product_price", "price", "salePrice", "sale_price", "finalPrice", "final_price"]);
+  const productUrlField = firstPresentField(item, ["productUrl", "product_url", "url", "landingUrl", "landing_url"]);
+  const imageUrlField = firstPresentField(item, ["productImage", "product_image", "imageUrl", "image_url", "thumbnail"]);
+  const affiliateField = firstPresentField(item, ["shortenUrl", "shorten_url", "shortUrl", "short_url", "affiliateUrl", "affiliate_url", "productUrl", "product_url", "url", "landingUrl", "landing_url"]);
+  const brandField = firstPresentField(item, ["brand", "brandName", "brand_name"]);
+  const modelField = firstPresentField(item, ["modelName", "model_name"]);
   const productId = productIdField ? item[productIdField] : null;
   const title = String(titleField ? item[titleField] : keyword);
   const price = priceField ? numberFromUnknown(item[priceField]) : null;
   const productUrl = productUrlField ? String(item[productUrlField] ?? "") : "";
   const imageUrl = imageUrlField ? String(item[imageUrlField] ?? "") : "";
-  const affiliateUrl = firstUsableAffiliateUrl(item.shortenUrl, item.shortUrl, item.affiliateUrl, item.productUrl, item.url, item.landingUrl);
+  const affiliateUrl = firstUsableAffiliateUrl(
+    item.shortenUrl,
+    item.shorten_url,
+    item.shortUrl,
+    item.short_url,
+    item.affiliateUrl,
+    item.affiliate_url,
+    item.productUrl,
+    item.product_url,
+    item.url,
+    item.landingUrl,
+    item.landing_url
+  );
 
   return {
     source: "coupang_partners",
@@ -109,8 +124,8 @@ function normalizeProduct(item: Record<string, unknown>, keyword: string, catego
     category,
     keyword,
     title,
-    brand: typeof item.brand === "string" ? item.brand : null,
-    model_name: typeof item.modelName === "string" ? item.modelName : null,
+    brand: brandField ? stringFromUnknown(item[brandField]) : null,
+    model_name: modelField ? stringFromUnknown(item[modelField]) : null,
     image_url: imageUrl || null,
     source_url: productUrl || null,
     coupang_url: productUrl || null,
@@ -148,8 +163,13 @@ function extractProductArray(payload: Record<string, unknown>) {
   const data = payload.data as Record<string, unknown> | Record<string, unknown>[] | undefined;
   if (Array.isArray(data)) return { items: data, arrayPath: "data" };
   const dataRecord = data && typeof data === "object" ? data : undefined;
+  const productDataRecord = dataRecord?.productData && typeof dataRecord.productData === "object" && !Array.isArray(dataRecord.productData)
+    ? (dataRecord.productData as Record<string, unknown>)
+    : undefined;
   const candidates: Array<[string, unknown]> = [
     ["data.productData", dataRecord?.productData],
+    ["data.productData.products", productDataRecord?.products],
+    ["data.productData.items", productDataRecord?.items],
     ["data.products", dataRecord?.products],
     ["data.items", dataRecord?.items],
     ["data.productList", dataRecord?.productList],
@@ -278,10 +298,31 @@ export async function createCoupangDeeplink(originalUrl: string) {
 
       const data = result.payload.data as unknown;
       const first = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : data && typeof data === "object" ? (data as Record<string, unknown>) : undefined;
-      const deeplink = firstUsableAffiliateUrl(first?.shortenUrl, first?.shortUrl, first?.affiliateUrl, first?.landingUrl, first?.url);
+      const deeplink = firstUsableAffiliateUrl(
+        first?.shortenUrl,
+        first?.shorten_url,
+        first?.shortUrl,
+        first?.short_url,
+        first?.affiliateUrl,
+        first?.affiliate_url,
+        first?.landingUrl,
+        first?.landing_url,
+        first?.url,
+        result.payload.shortenUrl,
+        result.payload.shorten_url,
+        result.payload.shortUrl,
+        result.payload.short_url
+      );
       if (deeplink) return { status: "ok" as const, url: deeplink };
 
-      const rawUrl = stringFromUnknown(first?.shortenUrl) ?? stringFromUnknown(first?.landingUrl) ?? stringFromUnknown(first?.url);
+      const rawUrl =
+        stringFromUnknown(first?.shortenUrl) ??
+        stringFromUnknown(first?.shorten_url) ??
+        stringFromUnknown(first?.landingUrl) ??
+        stringFromUnknown(first?.landing_url) ??
+        stringFromUnknown(first?.url) ??
+        stringFromUnknown(result.payload.shortenUrl) ??
+        stringFromUnknown(result.payload.shorten_url);
       errors.push(
         rawUrl
           ? `${path}: COUPANG_DEEPLINK_NO_PARTNERS_URL`

@@ -1520,6 +1520,17 @@ if (fileExists("lib/providers/coupangPartnersProvider.ts")) {
     "required"
   );
   check(
+    "provider: coupang tolerant response fields",
+    coupangProvider.includes("product_id") &&
+      coupangProvider.includes("product_name") &&
+      coupangProvider.includes("product_price") &&
+      coupangProvider.includes("shorten_url") &&
+      coupangProvider.includes("data.productData.products") &&
+      coupangProvider.includes("replace(/[\\s,₩￦원]/g, \"\")"),
+    "Coupang normalization accepts common snake_case response fields and formatted Korean prices without inventing missing values",
+    "required"
+  );
+  check(
     "provider: coupang search meta diagnostics",
     coupangProvider.includes("response_array_path") &&
       coupangProvider.includes("normalized_product_count") &&
