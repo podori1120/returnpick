@@ -14,6 +14,17 @@ import { requireAdmin } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+const LAUNCH_RESPONSE_BUDGET_MS = 52_000;
+const MIN_ENRICHMENT_BUDGET_MS = 1_000;
+
+function remainingLaunchBudget(startedAt: number) {
+  return Math.max(0, LAUNCH_RESPONSE_BUDGET_MS - (Date.now() - startedAt));
+}
+
+function enrichmentBudget(startedAt: number, ceilingMs: number, reserveMs: number) {
+  const remaining = remainingLaunchBudget(startedAt) - reserveMs;
+  return remaining >= MIN_ENRICHMENT_BUDGET_MS ? Math.min(ceilingMs, remaining) : 0;
+}
 
 function launchErrorResponse(error: unknown) {
   const message = error instanceof Error && error.message ? error.message.slice(0, 300) : "UNKNOWN_LAUNCH_ERROR";
@@ -217,6 +228,7 @@ export async function POST(request: Request) {
   if (unauthorized) return unauthorized;
 
   try {
+  const launchStartedAt = Date.now();
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const sourcingKeywordLimit = positiveInteger(body.sourcingKeywordLimit, 6, 12);
   const affiliateLimit = positiveInteger(body.affiliateLimit, 8, 20);
@@ -312,7 +324,7 @@ export async function POST(request: Request) {
     id: "connection_checks",
     label: "실제 연결 테스트",
     status: "ok",
-    message: "쿠팡, Supabase, 공개 승인 페이지와 Cron 연결이 확인되었습니다. 네이버와 텔레그램은 설정된 경우 별도 기능으로 동작합니다.",
+    message: "쿠팡, Supabase, 공개 승인 페이지와 Cron 연결이 확인되었습니다. 네이버와 텔레그램은 설정된 경우 별도 기능으로 동작합니다. 텔레그램 다이제스트는 텔레그램 연동이 준비된 경우에만 발송합니다.",
     detail: {
       required_check_ids: requiredConnectionCheckIds,
       optional_check_ids: readiness.optionalConnectionCheckIds,
@@ -347,49 +359,10 @@ export async function POST(request: Request) {
     });
   }
 
-  try {
-    const affiliate = await backfillCoupangAffiliateLinks({ limit: affiliateLimit });
-    progressSignal.affiliate_updated_count = affiliate.updated_count;
-    steps.push({
-      id: "affiliate_backfill",
-      label: "쿠팡 파트너스 링크 자동 보강",
-      status: affiliate.status === "error" ? "error" : affiliate.status === "API_NOT_CONFIGURED" ? "skipped" : "ok",
-      message: `확인 ${affiliate.scanned_count}개, 업데이트 ${affiliate.updated_count}개, 건너뜀 ${affiliate.skipped_count}개, 오류 ${affiliate.error_count}개`,
-      detail: affiliate
-    });
-  } catch (error) {
-    steps.push({
-      id: "affiliate_backfill",
-      label: "쿠팡 파트너스 링크 자동 보강",
-      status: "error",
-      message: error instanceof Error ? error.message : "AFFILIATE_BACKFILL_FAILED"
-    });
-  }
-
-  try {
-    const naver = await backfillNaverLowestPrices({ publishedOnly: false, onlyMissing: true, limit: priceLimit });
-    progressSignal.naver_updated_count = naver.updated_count;
-    steps.push({
-      id: "naver_backfill",
-      label: "네이버 최저가 보강",
-      status: naver.status === "API_NOT_CONFIGURED" ? "skipped" : naver.status === "completed_with_errors" ? "error" : "ok",
-      message: `확인 ${naver.checked_count}개, 업데이트 ${naver.updated_count}개, 매칭 없음 ${naver.no_match_count}개, 오류 ${naver.error_count}개`,
-      detail: naver,
-      blocking: false
-    });
-  } catch (error) {
-    steps.push({
-      id: "naver_backfill",
-      label: "네이버 최저가 보강",
-      status: "error",
-      message: error instanceof Error ? error.message : "NAVER_BACKFILL_FAILED",
-      blocking: false
-    });
-  }
-
-  const summary = await productSummary();
-  const launchDelta = deltaSummary(beforeSummary, summary);
-  const launchDataSignal = getLaunchDataSignal(beforeSummary, summary, progressSignal);
+  let summary = await productSummary();
+  let launchDelta = deltaSummary(beforeSummary, summary);
+  let launchDataSignal = getLaunchDataSignal(beforeSummary, summary, progressSignal);
+  let launchConfirmation = null;
   if (!hasBlockingLaunchError(steps) && !launchDataSignal.ok) {
     steps.push({
       id: "launch_data_signal",
@@ -410,38 +383,128 @@ export async function POST(request: Request) {
       }
     });
   }
-  const hasError = hasBlockingLaunchError(steps);
-  let launchConfirmation = null;
-  if (!hasError) {
+
+  if (hasBlockingLaunchError(steps) || !launchDataSignal.ok) {
+    return NextResponse.json({
+      status: "completed_with_errors",
+      readiness: getApiReadinessSummary(),
+      steps,
+      launch_confirmation: null,
+      before_summary: beforeSummary,
+      summary,
+      delta_summary: launchDelta,
+      launch_data_signal: launchDataSignal
+    });
+  }
+
+  try {
+    launchConfirmation = await markFirstLaunchConfirmed({
+      summary,
+      delta_summary: launchDelta,
+      launch_data_signal: launchDataSignal,
+      connection_check_ids: requiredConnectionCheckIds
+    });
+    steps.push({
+      id: "launch_confirmed",
+      label: "자동 운영 시작 확인",
+      status: "ok",
+      message: "핵심 후보 신호와 연결 테스트를 먼저 기록했습니다. 예약 소싱은 즉시 실행할 수 있고, 링크·가격 보강은 남은 시간 안에서 이어집니다.",
+      detail: { run_id: launchConfirmation.id, confirmed_at: launchConfirmation.finished_at }
+    });
+  } catch (error) {
+    const message = error instanceof Error && error.message ? error.message.slice(0, 300) : "FIRST_LAUNCH_CONFIRMATION_FAILED";
+    steps.push({
+      id: "launch_confirmed",
+      label: "자동 운영 시작 확인",
+      status: "error",
+      message: "첫 가동 핵심 작업은 끝났지만 자동 운영 시작 확인 기록을 저장하지 못했습니다. 예약 소싱은 이 확인 기록이 있어야 실행됩니다.",
+      detail: {
+        reason: "FIRST_LAUNCH_CONFIRMATION_FAILED",
+        error: message,
+        operator_next_action: "Supabase sourcing_runs 쓰기 권한과 최신 schema.sql 적용 상태를 확인한 뒤 첫 가동 실행을 다시 눌러 확인 기록을 남기세요."
+      }
+    });
+    return NextResponse.json({
+      status: "completed_with_errors",
+      readiness: getApiReadinessSummary(),
+      steps,
+      launch_confirmation: null,
+      before_summary: beforeSummary,
+      summary,
+      delta_summary: launchDelta,
+      launch_data_signal: launchDataSignal
+    });
+  }
+
+  const affiliateTimeBudgetMs = enrichmentBudget(launchStartedAt, 10_000, 4_000);
+  if (!affiliateTimeBudgetMs) {
+    steps.push({
+      id: "affiliate_backfill",
+      label: "쿠팡 파트너스 링크 자동 보강",
+      status: "skipped",
+      message: "자동 운영 시작 확인을 먼저 저장했습니다. 남은 실행 시간이 짧아 링크 보강은 다음 예약 작업으로 넘겼습니다.",
+      detail: { deferred: true, operator_next_action: "다음 예약 링크 보강 또는 관리자 링크 검수 큐에서 처리하세요." },
+      blocking: false
+    });
+  } else {
     try {
-      launchConfirmation = await markFirstLaunchConfirmed({
-        summary,
-        delta_summary: launchDelta,
-        launch_data_signal: launchDataSignal,
-        connection_check_ids: requiredConnectionCheckIds
-      });
+      const affiliate = await backfillCoupangAffiliateLinks({ limit: affiliateLimit, timeBudgetMs: affiliateTimeBudgetMs });
+      progressSignal.affiliate_updated_count = affiliate.updated_count;
+      const deferred = affiliate.timed_out;
       steps.push({
-        id: "launch_confirmed",
-        label: "자동 운영 시작 확인",
-        status: "ok",
-        message: "첫 가동과 핵심 연결 테스트가 통과되어 예약 소싱을 실행할 수 있습니다. 텔레그램 다이제스트는 텔레그램 연동이 준비된 경우에만 발송합니다.",
-        detail: { run_id: launchConfirmation.id, confirmed_at: launchConfirmation.finished_at }
+        id: "affiliate_backfill",
+        label: "쿠팡 파트너스 링크 자동 보강",
+        status: deferred ? "skipped" : affiliate.status === "error" ? "error" : affiliate.status === "API_NOT_CONFIGURED" ? "skipped" : "ok",
+        message: `확인 ${affiliate.scanned_count}개, 업데이트 ${affiliate.updated_count}개, 건너뜀 ${affiliate.skipped_count}개, 오류 ${affiliate.error_count}개${deferred ? " · 남은 대상은 후속 보강으로 넘겼습니다" : ""}`,
+        detail: affiliate,
+        ...(deferred ? { blocking: false } : {})
       });
     } catch (error) {
-      const message = error instanceof Error && error.message ? error.message.slice(0, 300) : "FIRST_LAUNCH_CONFIRMATION_FAILED";
       steps.push({
-        id: "launch_confirmed",
-        label: "자동 운영 시작 확인",
+        id: "affiliate_backfill",
+        label: "쿠팡 파트너스 링크 자동 보강",
         status: "error",
-        message: "첫 가동 작업은 끝났지만 자동 운영 시작 확인 기록을 저장하지 못했습니다. 예약 소싱과 준비된 선택 채널 작업은 이 확인 기록이 있어야 실행됩니다.",
-        detail: {
-          reason: "FIRST_LAUNCH_CONFIRMATION_FAILED",
-          error: message,
-          operator_next_action: "Supabase sourcing_runs 쓰기 권한과 최신 schema.sql 적용 상태를 확인한 뒤 첫 가동 실행을 다시 눌러 확인 기록을 남기세요."
-        }
+        message: error instanceof Error ? error.message : "AFFILIATE_BACKFILL_FAILED"
       });
     }
   }
+
+  const naverTimeBudgetMs = enrichmentBudget(launchStartedAt, 10_000, 2_000);
+  if (!naverTimeBudgetMs) {
+    steps.push({
+      id: "naver_backfill",
+      label: "네이버 최저가 보강",
+      status: "skipped",
+      message: "자동 운영 시작 확인을 먼저 저장했습니다. 남은 실행 시간이 짧아 네이버 가격 보강은 후속 작업으로 넘겼습니다.",
+      detail: { deferred: true, operator_next_action: "관리자 네이버 가격 보강 패널에서 다시 실행하세요." },
+      blocking: false
+    });
+  } else {
+    try {
+      const naver = await backfillNaverLowestPrices({ publishedOnly: false, onlyMissing: true, limit: priceLimit, timeBudgetMs: naverTimeBudgetMs });
+      progressSignal.naver_updated_count = naver.updated_count;
+      steps.push({
+        id: "naver_backfill",
+        label: "네이버 최저가 보강",
+        status: naver.timed_out ? "skipped" : naver.status === "API_NOT_CONFIGURED" ? "skipped" : naver.status === "completed_with_errors" ? "error" : "ok",
+        message: `확인 ${naver.checked_count}개, 업데이트 ${naver.updated_count}개, 매칭 없음 ${naver.no_match_count}개, 오류 ${naver.error_count}개${naver.timed_out ? " · 남은 대상은 후속 보강으로 넘겼습니다" : ""}`,
+        detail: naver,
+        blocking: false
+      });
+    } catch (error) {
+      steps.push({
+        id: "naver_backfill",
+        label: "네이버 최저가 보강",
+        status: "error",
+        message: error instanceof Error ? error.message : "NAVER_BACKFILL_FAILED",
+        blocking: false
+      });
+    }
+  }
+
+  summary = await productSummary();
+  launchDelta = deltaSummary(beforeSummary, summary);
+  launchDataSignal = getLaunchDataSignal(beforeSummary, summary, progressSignal);
   const finalHasError = hasBlockingLaunchError(steps);
 
   return NextResponse.json({

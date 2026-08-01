@@ -115,7 +115,10 @@ export async function backfillNaverLowestPrices(options?: {
   onlyMissing?: boolean;
   clearExistingOnNoMatch?: boolean;
   limit?: number;
+  timeBudgetMs?: number;
 }) {
+  const timeBudgetMs = Math.max(0, Math.floor(Number(options?.timeBudgetMs ?? 0)));
+  const startedAt = Date.now();
   const products = await listProducts(options?.publishedOnly ? { published: true } : undefined);
   const targets = products
     .filter((product) => (options?.onlyMissing === false ? true : ["missing", "unverified"].includes(getNaverPriceTrust(product).status)))
@@ -127,9 +130,14 @@ export async function backfillNaverLowestPrices(options?: {
   let no_match_count = 0;
   let cleared_price_count = 0;
   let error_count = 0;
+  let timed_out = false;
   const details: NaverPriceBackfillDetail[] = [];
 
   for (const product of targets) {
+    if (timeBudgetMs > 0 && Date.now() - startedAt >= timeBudgetMs) {
+      timed_out = true;
+      break;
+    }
     checked_count += 1;
     const result = await findNaverLowestPrice(product);
 
@@ -150,6 +158,7 @@ export async function backfillNaverLowestPrices(options?: {
         no_match_count,
         cleared_price_count,
         error_count,
+        timed_out,
         details
       };
     }
@@ -275,6 +284,7 @@ export async function backfillNaverLowestPrices(options?: {
     no_match_count,
     cleared_price_count,
     error_count,
+    timed_out,
     details
   };
 }

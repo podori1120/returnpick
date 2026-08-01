@@ -3532,6 +3532,19 @@ if (fileExists("app/api/admin/launch/route.ts")) {
     "required"
   );
   check(
+    "admin api: first-launch marker precedes enrichment",
+    launchRoute.includes("LAUNCH_RESPONSE_BUDGET_MS") &&
+      launchRoute.includes("enrichmentBudget") &&
+      launchRoute.includes("timeBudgetMs: affiliateTimeBudgetMs") &&
+      launchRoute.includes("timeBudgetMs: naverTimeBudgetMs") &&
+      launchRoute.indexOf("markFirstLaunchConfirmed") < launchRoute.indexOf("backfillCoupangAffiliateLinks({ limit") &&
+      launchRoute.indexOf("markFirstLaunchConfirmed") < launchRoute.indexOf("backfillNaverLowestPrices({ publishedOnly") &&
+      readText("lib/affiliateLinkBackfill.ts").includes("timed_out") &&
+      readText("lib/naverPriceBackfill.ts").includes("timeBudgetMs"),
+    "first-launch confirmation is persisted before bounded affiliate and Naver enrichment can time out",
+    "required"
+  );
+  check(
     "admin api: first-launch confirmation",
     launchRoute.includes("markFirstLaunchConfirmed") &&
       launchRoute.includes("launch_confirmed") &&

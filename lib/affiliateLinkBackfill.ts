@@ -36,6 +36,7 @@ export type AffiliateBackfillResult = {
   skipped_count: number;
   error_count: number;
   dry_run: boolean;
+  timed_out: boolean;
   items: AffiliateBackfillItem[];
 };
 
@@ -308,9 +309,11 @@ async function resolveAffiliateLink(product: ProductWithScore) {
   };
 }
 
-export async function backfillCoupangAffiliateLinks(options?: { limit?: number; dryRun?: boolean }) {
+export async function backfillCoupangAffiliateLinks(options?: { limit?: number; dryRun?: boolean; timeBudgetMs?: number }) {
   const limit = Math.min(Math.max(Number(options?.limit ?? 20), 1), 80);
   const dryRun = Boolean(options?.dryRun);
+  const timeBudgetMs = Math.max(0, Math.floor(Number(options?.timeBudgetMs ?? 0)));
+  const startedAt = Date.now();
   const products = await listProducts();
   const targets = products
     .filter((product) => !isUsableAffiliateUrl(product.affiliate_url))
@@ -328,10 +331,15 @@ export async function backfillCoupangAffiliateLinks(options?: { limit?: number; 
     skipped_count: 0,
     error_count: 0,
     dry_run: dryRun,
+    timed_out: false,
     items: []
   };
 
   for (const product of targets) {
+    if (timeBudgetMs > 0 && Date.now() - startedAt >= timeBudgetMs) {
+      result.timed_out = true;
+      break;
+    }
     result.scanned_count += 1;
     const resolved = await resolveAffiliateLink(product);
     if (resolved.status === "API_NOT_CONFIGURED") {
@@ -419,5 +427,6 @@ export async function backfillCoupangAffiliateLinks(options?: { limit?: number; 
   }
 
   if (result.status === "ok" && result.error_count > 0) result.status = result.updated_count > 0 ? "partial" : "error";
+  if (result.timed_out && result.status === "ok") result.status = result.updated_count > 0 ? "partial" : "error";
   return result;
 }
