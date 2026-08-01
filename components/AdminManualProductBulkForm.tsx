@@ -50,13 +50,19 @@ function reasonLabel(reason?: string | null) {
     INVALID_AFFILIATE_URL: "파트너스 링크 형식이 아닙니다.",
     APPROVAL_SAMPLE_LINK_NOT_ALLOWED: "승인용 샘플 링크는 사용할 수 없습니다.",
     INVALID_IMAGE_URL: "이미지 URL을 확인하세요.",
-    TAB_FIELD_COUNT_INVALID: "탭 열 수가 3~7개가 아닙니다.",
+    TAB_FIELD_COUNT_INVALID: "탭 열 수가 3~14개가 아닙니다.",
     TITLE_MIN_LENGTH_REQUIRED: "상품명이 짧습니다.",
     INVALID_CATEGORY: "카테고리 값을 확인하세요.",
     COUPANG_PRODUCT_URL_AND_ID_REQUIRED: "상품번호를 읽을 수 있는 상세 URL이 필요합니다.",
     DUPLICATE_PRODUCT_ID: "같은 목록에서 상품번호가 중복되었습니다.",
     DUPLICATE_ROW: "입력 목록에서 상품번호가 중복되었습니다.",
-    PRODUCT_SAVE_FAILED: "상품 저장에 실패했습니다."
+    PRODUCT_SAVE_FAILED: "상품 저장에 실패했습니다.",
+    INVALID_SOURCE_PRICE: "수집 당시 가격은 숫자로 입력하세요.",
+    INVALID_RETURN_PRICE: "반품가는 숫자로 입력하세요.",
+    INVALID_NEW_PRICE: "새상품가는 숫자로 입력하세요.",
+    INVALID_NAVER_PRICE: "네이버 최저가는 숫자로 입력하세요.",
+    INVALID_STOCK_COUNT: "재고는 0 이상의 숫자로 입력하세요.",
+    INVALID_CONDITION_GRADE: "반품등급은 미개봉·최상·상·중·알수없음·확인필요 중 하나여야 합니다."
   };
   return labels[reason] ?? reason;
 }
@@ -111,7 +117,7 @@ export default function AdminManualProductBulkForm({ password, onCreated }: { pa
           <p className="text-sm font-black text-pine">후보 일괄 입력</p>
           <h2 className="mt-1 text-xl font-black">실제 상품 후보 여러 개 한 번에 추가</h2>
           <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-steel">
-            한 줄에 상품명, 카테고리, 쿠팡 상품 상세 URL, 파트너스 링크를 탭으로 구분합니다. 새 후보는 검토 대기·비공개로 추가되고 기존 상품은 기존 상태를 유지하며, 가격·반품 정보는 자동으로 채우지 않습니다.
+            한 줄에 상품명, 카테고리, 쿠팡 상품 상세 URL과 선택 정보를 탭으로 구분합니다. 새 후보는 검토 대기·비공개로 추가되고 기존 상품은 기존 상태를 유지합니다. 뒤쪽의 가격·등급·재고는 관리자가 확인한 값만 입력할 수 있습니다.
           </p>
         </div>
         <p className="mt-3 max-w-3xl rounded-md border border-lemon/40 bg-lemon/15 px-3 py-2 text-xs font-bold leading-5 text-ink">
@@ -130,11 +136,11 @@ export default function AdminManualProductBulkForm({ password, onCreated }: { pa
         className="focus-ring mt-4 min-h-40 w-full rounded-lg border border-line bg-mist px-3 py-3 font-mono text-xs leading-6 text-ink"
         value={entries}
         onChange={(event) => setEntries(event.target.value)}
-        placeholder={"LG 그램 16 16GB 512GB\tlaptop\thttps://www.coupang.com/vp/products/123456789\thttps://link.coupang.com/a/...\tLG\tGram 16\n27인치 QHD 모니터\tmonitor\thttps://www.coupang.com/vp/products/987654321\t\t브랜드\t모델명"}
+        placeholder={"LG 그램 16 16GB 512GB\tlaptop\thttps://www.coupang.com/vp/products/123456789\thttps://link.coupang.com/a/...\tLG\tGram 16\t이미지URL\t1290000\t899000\t1690000\t1420000\t최상\t2\t배터리 상태 확인\n27인치 QHD 모니터\tmonitor\thttps://www.coupang.com/vp/products/987654321\t\t브랜드\t모델명"}
         aria-label="수동 후보 일괄 입력"
       />
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs font-semibold leading-5 text-steel">필수 순서: 상품명 · 카테고리 · 상품 상세 URL · 파트너스 링크(선택). 최대 40줄입니다.</p>
+        <p className="text-xs font-semibold leading-5 text-steel">열 순서: 상품명 · 카테고리 · 상품 URL · 파트너스 링크 · 브랜드 · 모델명 · 이미지 · 수집가 · 반품가 · 새상품가 · 네이버 최저가 · 등급 · 재고 · 공개 메모. 뒤쪽 7개는 선택입니다. 최대 40줄입니다.</p>
         <button className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-4 py-2.5 text-sm font-black text-white hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60" disabled={running || !entries.trim()} onClick={() => void importCandidates()} type="button">
           <Upload size={16} aria-hidden /> {running ? "검증·추가 중" : "후보 일괄 추가"}
         </button>

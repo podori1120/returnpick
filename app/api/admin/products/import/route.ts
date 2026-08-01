@@ -6,7 +6,7 @@ import { findManualImportConflict, getManualImportTitleKey } from "@/lib/manualI
 import { getProductImageUrlIssue, isUsableProductImageUrl } from "@/lib/productImageUrl";
 import { calculateDealScore } from "@/lib/scoring";
 import { parseSpecsFromTitle } from "@/lib/specParser";
-import { isCategory, requireAdmin } from "@/lib/validators";
+import { isCategory, isConditionGrade, requireAdmin } from "@/lib/validators";
 
 type ImportItem = {
   product_id: string | null;
@@ -31,6 +31,18 @@ function getEntries(body: Record<string, unknown>) {
 
 function text(value: string | undefined, maxLength: number) {
   return value?.trim().slice(0, maxLength) ?? "";
+}
+
+function parseIntegerField(value: string | undefined, minimum: number, invalidReason: string) {
+  const raw = text(value, 40);
+  if (!raw) return { value: null as number | null, reason: null as string | null };
+
+  const normalized = raw.replace(/[\s,원₩]/g, "");
+  if (!/^\d+$/.test(normalized)) return { value: null, reason: invalidReason };
+
+  const parsed = Number(normalized);
+  if (!Number.isSafeInteger(parsed) || parsed < minimum) return { value: null, reason: invalidReason };
+  return { value: parsed, reason: null };
 }
 
 export async function POST(request: Request) {
@@ -76,7 +88,7 @@ export async function POST(request: Request) {
       const imageUrl = text(fields[6], 2_000);
       const sourceProductId = extractCoupangProductId(coupangUrl);
 
-      if (fields.length < 3 || fields.length > 7) {
+      if (fields.length < 3 || fields.length > 14) {
         skippedCount += 1;
         items.push({ product_id: sourceProductId, title: title || null, status: "skipped", reason: "TAB_FIELD_COUNT_INVALID" });
         continue;
@@ -113,6 +125,24 @@ export async function POST(request: Request) {
         items.push({ product_id: sourceProductId, title, status: "skipped", reason: getProductImageUrlIssue(imageUrl) ?? "INVALID_IMAGE_URL" });
         continue;
       }
+      const sourcePrice = parseIntegerField(fields[7], 1, "INVALID_SOURCE_PRICE");
+      const returnPrice = parseIntegerField(fields[8], 1, "INVALID_RETURN_PRICE");
+      const newPrice = parseIntegerField(fields[9], 1, "INVALID_NEW_PRICE");
+      const naverLowestPrice = parseIntegerField(fields[10], 1, "INVALID_NAVER_PRICE");
+      const stockCount = parseIntegerField(fields[12], 0, "INVALID_STOCK_COUNT");
+      const numericReason = [sourcePrice, returnPrice, newPrice, naverLowestPrice, stockCount].find((item) => item.reason)?.reason;
+      if (numericReason) {
+        skippedCount += 1;
+        items.push({ product_id: sourceProductId, title, status: "skipped", reason: numericReason });
+        continue;
+      }
+      const conditionGrade = text(fields[11], 40) || "확인필요";
+      if (!isConditionGrade(conditionGrade)) {
+        skippedCount += 1;
+        items.push({ product_id: sourceProductId, title, status: "skipped", reason: "INVALID_CONDITION_GRADE" });
+        continue;
+      }
+      const publicNote = text(fields[13], 800);
       const titleCategoryKey = getManualImportTitleKey(category, title);
       if (seenSourceProductIds.has(sourceProductId)) {
         skippedCount += 1;
@@ -158,12 +188,12 @@ export async function POST(request: Request) {
           source_url: coupangUrl,
           coupang_url: coupangUrl,
           affiliate_url: affiliateUrl || null,
-          source_price: null,
-          return_price: null,
-          new_price: null,
-          naver_lowest_price: null,
-          condition_grade: "확인필요",
-          stock_count: null,
+          source_price: sourcePrice.value,
+          return_price: returnPrice.value,
+          new_price: newPrice.value,
+          naver_lowest_price: naverLowestPrice.value,
+          condition_grade: conditionGrade,
+          stock_count: stockCount.value,
           spec_json: parseSpecsFromTitle(title, category),
           raw_json: {
             manual_entry: {
@@ -171,9 +201,19 @@ export async function POST(request: Request) {
               source: "admin_manual_batch_import",
               row,
               product_page_url: coupangUrl,
-              affiliate_link_provided: Boolean(affiliateUrl)
+              affiliate_link_provided: Boolean(affiliateUrl),
+              manually_provided_fields: [
+                sourcePrice.value != null ? "source_price" : null,
+                returnPrice.value != null ? "return_price" : null,
+                newPrice.value != null ? "new_price" : null,
+                naverLowestPrice.value != null ? "naver_lowest_price" : null,
+                fields[11] ? "condition_grade" : null,
+                stockCount.value != null ? "stock_count" : null,
+                publicNote ? "public_note" : null
+              ].filter(Boolean)
             }
           },
+          public_note: publicNote || null,
           last_observed_at: null,
           sourcing_status: "needs_review",
           is_published: false,

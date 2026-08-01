@@ -795,7 +795,10 @@ if (
       adminProductsImportRoute.includes("isUsableCoupangProductUrl") &&
       adminProductsImportRoute.includes("isUsableAffiliateUrl") &&
       adminProductsImportRoute.includes("createDealScore") &&
-      adminProductsImportRoute.includes('return_price: null') &&
+      adminProductsImportRoute.includes("parseIntegerField") &&
+      adminProductsImportRoute.includes("source_price: sourcePrice.value") &&
+      adminProductsImportRoute.includes("return_price: returnPrice.value") &&
+      adminProductsImportRoute.includes("INVALID_CONDITION_GRADE") &&
       adminProductsImportRoute.includes('sourcing_status: "needs_review"') &&
       adminProductsImportRoute.includes("is_published: false") &&
       adminProductsImportRoute.includes("DUPLICATE_PRODUCT_ID") &&
@@ -806,6 +809,9 @@ if (
       adminProductsImportRoute.includes("existing_skipped_count") &&
       manualProductBulkForm.includes("/api/admin/products/import") &&
       manualProductBulkForm.includes("최대 40줄") &&
+      manualProductBulkForm.includes("수집가") &&
+      manualProductBulkForm.includes("반품가") &&
+      manualProductBulkForm.includes("반품등급") &&
       manualProductBulkForm.includes("후보 일괄 추가") &&
       manualProductBulkForm.includes('data-import-policy="append-only"') &&
       manualProductBulkForm.includes("검토 대기·비공개") &&
