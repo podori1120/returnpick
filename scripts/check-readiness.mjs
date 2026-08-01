@@ -1360,10 +1360,18 @@ if (fileExists("scripts/verify-scheduled-affiliate-backfill.mjs")) {
 
 if (fileExists("sql/schema.sql")) {
   const schema = readText("sql/schema.sql");
+  const schemaVersion = "2026-08-01-affiliate-surface-attribution";
+  const apiReadinessSource = fileExists("lib/apiReadiness.ts") ? readText("lib/apiReadiness.ts") : "";
   check(
     "schema version marker",
-    schema.includes("returnpick_schema_meta") && schema.includes("2026-08-01-affiliate-surface-attribution") && schema.includes("schema_version"),
+    schema.includes("returnpick_schema_meta") && schema.includes(schemaVersion) && schema.includes("schema_version"),
     "schema.sql writes a launch-ready schema version marker for admin readiness",
+    "required"
+  );
+  check(
+    "schema/readiness version alignment",
+    schema.includes(schemaVersion) && apiReadinessSource.includes(schemaVersion) && !apiReadinessSource.includes("2026-07-31-product-observation-time"),
+    "Supabase SQL and deployed admin readiness use the same schema version marker",
     "required"
   );
   for (const table of [
@@ -2606,7 +2614,10 @@ if (fileExists("lib/apiReadiness.ts")) {
   );
   check(
     "readiness: supabase schema version marker",
-    readiness.includes("EXPECTED_SCHEMA_VERSION") && readiness.includes("returnpick_schema_meta") && readiness.includes("schema_version"),
+    readiness.includes("EXPECTED_SCHEMA_VERSION") &&
+      readiness.includes("2026-08-01-affiliate-surface-attribution") &&
+      readiness.includes("returnpick_schema_meta") &&
+      readiness.includes("schema_version"),
     "admin readiness verifies the deployed DB has the latest schema.sql marker",
     "required"
   );

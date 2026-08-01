@@ -21,7 +21,7 @@ import { isStrongAdminPassword } from "@/lib/validators";
 type ReadinessState = "ready" | "missing" | "partial" | "disabled";
 type ReadinessMode = "pre_approval" | "manual_launch_ready" | "api_ready" | "launch_ready";
 
-const EXPECTED_SCHEMA_VERSION = "2026-07-31-product-observation-time";
+const EXPECTED_SCHEMA_VERSION = "2026-08-01-affiliate-surface-attribution";
 
 export type ApiReadinessItem = {
   id: string;
