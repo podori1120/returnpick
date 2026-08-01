@@ -1,9 +1,28 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getSiteUrl } from "@/lib/siteUrl";
+
+const canonicalUrl = `${getSiteUrl()}/disclosure`;
 
 export const metadata: Metadata = {
   title: "제휴 안내 | ReturnPick",
-  description: "ReturnPick의 쿠팡 파트너스 제휴 링크 및 경제적 이해관계 안내"
+  description: "ReturnPick의 쿠팡 파트너스 제휴 링크 및 경제적 이해관계 안내",
+  alternates: {
+    canonical: canonicalUrl
+  },
+  openGraph: {
+    title: "제휴 안내 | ReturnPick",
+    description: "ReturnPick의 쿠팡 파트너스 제휴 링크 및 경제적 이해관계 안내",
+    url: canonicalUrl,
+    siteName: "ReturnPick",
+    locale: "ko_KR",
+    type: "website"
+  },
+  twitter: {
+    card: "summary",
+    title: "제휴 안내 | ReturnPick",
+    description: "ReturnPick의 쿠팡 파트너스 제휴 링크 및 경제적 이해관계 안내"
+  }
 };
 
 export default function DisclosurePage() {

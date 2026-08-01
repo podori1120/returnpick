@@ -661,6 +661,20 @@ if (fileExists("app/robots.ts") && fileExists("app/sitemap.ts")) {
   );
 }
 
+if (fileExists("app/disclosure/page.tsx")) {
+  const disclosurePage = readText("app/disclosure/page.tsx");
+  check(
+    "public SEO: disclosure self-canonical",
+    disclosurePage.includes('const canonicalUrl = `${getSiteUrl()}/disclosure`') &&
+      disclosurePage.includes("alternates:") &&
+      disclosurePage.includes("canonical: canonicalUrl") &&
+      disclosurePage.includes("url: canonicalUrl") &&
+      disclosurePage.includes('type: "website"'),
+    "the affiliate disclosure page owns its canonical and social URL instead of inheriting the site root",
+    "required"
+  );
+}
+
 if (fileExists("app/deals/page.tsx")) {
   const dealsPage = readText("app/deals/page.tsx");
   check(

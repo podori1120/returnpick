@@ -213,6 +213,7 @@ function checkDisclosurePage(html, status) {
     .filter(([, value]) => !html.includes(value))
     .map(([key]) => key);
 
+  if (!html.includes(`rel="canonical" href="${siteUrl}/disclosure"`)) missing.push("canonical");
   if (containsLikelyMojibake(html)) missing.push("readable_korean");
 
   if (missing.length) {
