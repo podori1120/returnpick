@@ -406,6 +406,22 @@ if (fileExists("package.json") && fileExists("lib/manualImportIdentity.ts") && f
   );
 }
 
+if (fileExists("components/AffiliateButton.tsx") && fileExists("components/ApprovalCoupangButton.tsx")) {
+  const affiliateButton = readText("components/AffiliateButton.tsx");
+  const approvalButton = readText("components/ApprovalCoupangButton.tsx");
+  check(
+    "public CTA: component-level Partners link guard",
+    affiliateButton.includes("isUsableAffiliateUrl") &&
+      affiliateButton.includes("affiliateLinkReady") &&
+      affiliateButton.includes("if (!affiliateLinkReady)") &&
+      approvalButton.includes("isCoupangPartnersLink") &&
+      approvalButton.includes("partnerLinkReady") &&
+      approvalButton.includes("if (!partnerLinkReady)"),
+    "purchase buttons fail closed when a caller passes a missing, regular, or invalid Coupang URL",
+    "required"
+  );
+}
+
 if (
   fileExists("package.json") &&
   fileExists("lib/bootstrapCatalog.ts") &&

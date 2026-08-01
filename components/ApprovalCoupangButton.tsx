@@ -7,6 +7,7 @@ import {
   trackAffiliateEvent,
   type ManualAffiliateEventContext
 } from "@/lib/clientTracking";
+import { isCoupangPartnersLink } from "@/lib/coupangLink";
 
 export default function ApprovalCoupangButton({
   href,
@@ -23,6 +24,16 @@ export default function ApprovalCoupangButton({
   telegramChannel?: string;
   context?: ManualAffiliateEventContext;
 }) {
+  const partnerLinkReady = isCoupangPartnersLink(href);
+
+  if (!partnerLinkReady) {
+    return (
+      <button className={className.replace("bg-pine", "border border-line text-steel").replace("text-white", "")} disabled type="button">
+        쿠팡 파트너스 링크 확인 필요
+      </button>
+    );
+  }
+
   return (
     <a
       className={className}

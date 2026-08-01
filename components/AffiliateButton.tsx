@@ -2,6 +2,7 @@
 
 import { ExternalLink } from "lucide-react";
 import { getUtmSource, trackAffiliateEvent } from "@/lib/clientTracking";
+import { isUsableAffiliateUrl } from "@/lib/coupangLink";
 
 function cleanTrackingPlacement(value?: string) {
   const cleaned = value
@@ -38,7 +39,10 @@ export default function AffiliateButton({
   placement?: string;
   sponsored?: boolean;
 }) {
-  if (!href) {
+  const affiliateHref = typeof href === "string" ? href.trim() : "";
+  const affiliateLinkReady = isUsableAffiliateUrl(affiliateHref);
+
+  if (!affiliateLinkReady) {
     return (
       <button
         className={className ?? "focus-ring inline-flex w-full items-center justify-center rounded-lg border border-line px-4 py-3 text-sm font-black text-steel"}
@@ -56,7 +60,7 @@ export default function AffiliateButton({
         className ??
         "focus-ring inline-flex w-full items-center justify-center gap-2 rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink"
       }
-      href={href}
+      href={affiliateHref}
       onClick={(event) => {
         const utmSource = getUtmSource();
         const resolvedChannel = buildTrackingChannel(channel, placement, utmSource);
@@ -64,11 +68,11 @@ export default function AffiliateButton({
         if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 
         event.preventDefault();
-        const opened = window.open(href, "_blank", "noopener,noreferrer");
+        const opened = window.open(affiliateHref, "_blank", "noopener,noreferrer");
         if (opened) {
           return;
         }
-        window.location.assign(href);
+        window.location.assign(affiliateHref);
       }}
       rel={sponsored ? "sponsored nofollow noopener noreferrer" : "nofollow noopener noreferrer"}
       target="_blank"
