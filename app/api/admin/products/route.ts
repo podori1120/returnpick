@@ -4,6 +4,7 @@ import { createDealScore, insertSourcedProduct, listProducts } from "@/lib/dataS
 import { extractCoupangProductId } from "@/lib/affiliateIdentity";
 import { getCoupangPartnersLinkIssue, isApprovalSampleAffiliateUrl, isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
 import { getProductImageUrlIssue, isUsableProductImageUrl } from "@/lib/productImageUrl";
+import { isPublicDealReady } from "@/lib/publicDeal";
 import { findManualImportConflict } from "@/lib/manualImportIdentity";
 import { isCategory, isSourcingStatus, requireAdmin, sanitizeText } from "@/lib/validators";
 import { parseSpecsFromTitle } from "@/lib/specParser";
@@ -23,6 +24,7 @@ export async function GET(request: Request) {
     const category = url.searchParams.get("category");
     const search = url.searchParams.get("search") ?? undefined;
     const published = url.searchParams.get("published");
+    const customerReadyOnly = url.searchParams.get("customer_ready") === "true";
     const products = await listProducts({
       status: isSourcingStatus(status) ? status : undefined,
       category: isCategory(category) ? category : undefined,
@@ -30,7 +32,7 @@ export async function GET(request: Request) {
       published: published === "true" ? true : published === "false" ? false : undefined
     });
 
-    return NextResponse.json({ products });
+    return NextResponse.json({ products: customerReadyOnly ? products.filter(isPublicDealReady) : products });
   } catch (error) {
     return adminProductsErrorResponse(error);
   }

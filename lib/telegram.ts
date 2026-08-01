@@ -59,7 +59,7 @@ function fitTelegramMessage(message: string, detailUrl: string) {
   return `${trimmedBody}\n\n...\n${footer}`;
 }
 
-export function buildTelegramMessage(product: ProductWithScore) {
+export function buildTelegramMessage(product: ProductWithScore, options: { detailUrl?: string } = {}) {
   const score = getLatestScore(product);
   const discountRate = getAppliedDiscountRate(product);
   const siteUrl = getSiteUrl();
@@ -67,7 +67,7 @@ export function buildTelegramMessage(product: ProductWithScore) {
   const risks = score?.risk_flags?.length
     ? ["가격과 재고는 변동될 수 있습니다.", "반품등급과 구성품은 구매 전 쿠팡 상품 페이지에서 다시 확인하세요."]
     : ["가격과 재고는 변동될 수 있습니다."];
-  const detailUrl = `${siteUrl.replace(/\/$/, "")}/deals/${product.id}?utm_source=telegram`;
+  const detailUrl = options.detailUrl ?? `${siteUrl.replace(/\/$/, "")}/deals/${product.id}?utm_source=telegram`;
   const dealPrice = product.return_price ?? product.source_price ?? product.new_price;
 
   const message = [

@@ -228,7 +228,7 @@ function normalizeProduct(value: unknown, index: number): { product: SourcedProd
     issue("AFFILIATE_IDENTITY_NOT_VERIFIED", "파트너스 링크의 최종 상품번호 확인이 완료되지 않았습니다.");
   }
   if (!isPublicDealReady(withCalculatedScore(product))) {
-    issue("PUBLIC_QUALITY_NOT_READY", "반품가·등급·이미지·제휴 링크를 포함한 공개 품질 기준을 통과하지 못했습니다.");
+    issue("PUBLIC_QUALITY_NOT_READY", "판매 가격·이미지·상품별 제휴 링크·목적지 확인을 포함한 공개 품질 기준을 통과하지 못했습니다. 반품가·등급 누락은 공개 경고로 처리됩니다.");
   }
 
   return { product: issues.length ? null : product, issues };

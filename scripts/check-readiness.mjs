@@ -170,6 +170,7 @@ const requiredFiles = [
   "app/api/admin/affiliate-links/import/route.ts",
   "app/api/admin/affiliate-links/verify/route.ts",
   "app/api/admin/bootstrap-catalog/route.ts",
+  "app/api/admin/content-kit/route.ts",
   "app/api/admin/keywords/route.ts",
   "app/api/admin/launch/route.ts",
   "app/api/admin/prices/backfill/route.ts",
@@ -195,6 +196,7 @@ const requiredFiles = [
   "components/AdminCandidateTable.tsx",
   "components/AdminManualProductBulkForm.tsx",
   "components/AdminEditorialTelegramCampaign.tsx",
+  "components/AdminProductDistributionKit.tsx",
   "components/AdminPriceBackfillPanel.tsx",
   "components/AdminProductEditor.tsx",
   "components/AffiliateEventTracker.tsx",
@@ -206,6 +208,7 @@ const requiredFiles = [
   "lib/bootstrapCatalog.ts",
   "lib/coupangAffiliateLinkVerifier.ts",
   "lib/editorialCampaign.ts",
+  "lib/productDistributionKit.ts",
   "lib/approvalSample.ts",
   "lib/adminNavigation.ts",
   "lib/apiReadiness.ts",
@@ -243,6 +246,7 @@ const requiredFiles = [
   "scripts/verify-scheduled-affiliate-backfill.mjs",
   "scripts/verify-affiliate-identity.mjs",
   "scripts/verify-bootstrap-catalog-runtime.mjs",
+  "scripts/verify-product-distribution-kit.mjs",
   "scripts/verify-launch-capability-policy.mjs",
   "scripts/verify-manual-import-safety.mjs",
   "scripts/verify-naver-product-match.mjs",
@@ -4019,6 +4023,47 @@ if (fileExists("components/AdminEditorialTelegramCampaign.tsx") && fileExists("a
       editorialCampaign.includes('role="status"') &&
       adminPage.includes("<AdminEditorialTelegramCampaign password={password} />"),
     "admins can preview and copy fixed Telegram or Naver Blog copy before an explicit Telegram send",
+    "required"
+  );
+}
+if (fileExists("app/api/admin/content-kit/route.ts") && fileExists("components/AdminProductDistributionKit.tsx") && fileExists("lib/productDistributionKit.ts")) {
+  const contentKitRoute = readText("app/api/admin/content-kit/route.ts");
+  const contentKit = readText("components/AdminProductDistributionKit.tsx");
+  const productDistributionKit = readText("lib/productDistributionKit.ts");
+  const adminPage = readText("app/admin/page.tsx");
+  check(
+    "admin api: product distribution kit is gated",
+    contentKitRoute.includes("requireAdmin(request)") &&
+      contentKitRoute.includes("product_id") &&
+      contentKitRoute.includes("getProductById") &&
+      contentKitRoute.includes("getProductDistributionReadiness") &&
+      contentKitRoute.includes("PRODUCT_NOT_PUBLIC_READY") &&
+      contentKitRoute.includes("buildProductDistributionKit"),
+    "product-specific channel copy is only generated for authenticated, customer-ready products",
+    "required"
+  );
+  check(
+    "admin: product distribution kit preview-first flow",
+    contentKit.includes("/api/admin/content-kit?product_id=") &&
+      contentKit.includes("customer_ready=true") &&
+      contentKit.includes("navigator.clipboard.writeText") &&
+      contentKit.includes("/api/admin/telegram") &&
+      contentKit.includes("productId: kit.productId") &&
+      contentKit.includes("네이버 블로그 원고") &&
+      contentKit.includes("제휴 안내") &&
+      contentKit.includes('id="admin-product-distribution"') &&
+      adminPage.includes("<AdminProductDistributionKit password={password} refreshToken={refreshToken} />"),
+    "admins can select a public product, review tracked channel copy, copy it, or explicitly send Telegram",
+    "required"
+  );
+  check(
+    "product distribution kit: disclosure and tracked detail links",
+    productDistributionKit.includes("AFFILIATE_DISCLOSURE") &&
+      productDistributionKit.includes("utm_source") &&
+      productDistributionKit.includes("utm_campaign") &&
+      productDistributionKit.includes("buildTelegramMessage(product, { detailUrl: telegramUrl })") &&
+      productDistributionKit.includes("approvalSampleProduct.registeredNaverBlogUrl"),
+    "generated channel copy keeps affiliate disclosure and sends users to the ReturnPick detail page with attribution",
     "required"
   );
 }

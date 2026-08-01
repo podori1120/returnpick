@@ -168,7 +168,7 @@ export default function AdminManualProductForm({ password, onCreated }: { passwo
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
-        <p className="text-xs font-semibold leading-5 text-steel">추가 후 상태는 검토 필요입니다. 게시하려면 상품별 파트너스 링크, 가격·등급·이미지 확인을 모두 통과해야 합니다.</p>
+        <p className="text-xs font-semibold leading-5 text-steel">추가 후 상태는 검토 필요입니다. 게시하려면 상품별 파트너스 링크, 판매 가격, 이미지와 목적지 확인을 통과해야 합니다. 반품가·등급이 없으면 확인필요 경고가 함께 표시됩니다.</p>
         <button className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-4 py-2.5 text-sm font-black text-white hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60" disabled={saving || form.title.trim().length < 5 || !urlReady || !affiliateUrlReady} onClick={() => void submit()} type="button">
           <ClipboardPlus size={16} aria-hidden /> {saving ? "추가 중" : "검토 후보 추가"}
         </button>

@@ -277,7 +277,7 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
       key: "quality",
       count: hiddenQualityCount,
       title: "공개 품질 보강",
-      summary: "링크는 있지만 반품가, 등급, 이미지, 가격 비교 같은 신뢰 정보가 부족한 상품입니다. 고객공개 보강 필터로 바로 좁힙니다.",
+      summary: "링크는 있지만 판매 가격, 이미지, 목적지 확인 또는 가격 비교 같은 공개 품질 정보가 부족한 상품입니다. 반품가·등급 누락은 경고로 표시되며 고객공개 보강 필터로 바로 좁힙니다.",
       buttonLabel: "공개 보강 후보 열기",
       icon: AlertTriangle,
       tone: "text-lemon",
@@ -400,7 +400,7 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
                 <p className="text-xs font-black text-ink">품질 보강 대기</p>
                 <p className="mt-1 text-2xl font-black text-ink">{hiddenQualityCount.toLocaleString("ko-KR")}개</p>
                 <p className="mt-2 text-xs font-bold leading-5 text-ink">
-                  링크는 있어도 반품가, 등급, 이미지, 가격 비교 같은 고객 신뢰 정보가 부족해 공개에서 숨겨집니다.
+                  링크는 있어도 판매 가격, 이미지, 목적지 확인 또는 가격 비교 같은 고객공개 정보가 부족해 공개에서 숨겨집니다. 반품가·등급 누락은 공개 경고로 표시됩니다.
                 </p>
               </div>
               <AlertTriangle className="shrink-0 text-ink" size={22} aria-hidden />

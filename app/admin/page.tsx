@@ -14,6 +14,7 @@ import AdminManualProductBulkForm from "@/components/AdminManualProductBulkForm"
 import AdminLogin from "@/components/AdminLogin";
 import AdminOpsDashboard from "@/components/AdminOpsDashboard";
 import AdminPriceBackfillPanel from "@/components/AdminPriceBackfillPanel";
+import AdminProductDistributionKit from "@/components/AdminProductDistributionKit";
 import AdminSchedulerPanel from "@/components/AdminSchedulerPanel";
 import AdminSourcingRunner from "@/components/AdminSourcingRunner";
 import { scrollToAdminAnchor } from "@/lib/adminNavigation";
@@ -101,6 +102,7 @@ export default function AdminPage() {
       <AdminApiReadinessPanel password={password} />
       <AdminLaunchRunner password={password} onCompleted={() => setRefreshToken((value) => value + 1)} />
       <AdminOpsDashboard password={password} refreshToken={refreshToken} />
+      <AdminProductDistributionKit password={password} refreshToken={refreshToken} />
       <AdminEditorialTelegramCampaign password={password} />
       <AdminSchedulerPanel password={password} refreshToken={refreshToken} onCompleted={() => setRefreshToken((value) => value + 1)} />
       <AdminPriceBackfillPanel password={password} onCompleted={() => setRefreshToken((value) => value + 1)} />
