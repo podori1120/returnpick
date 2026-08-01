@@ -37,6 +37,7 @@
     "public-web:check": "node scripts/verify-public-web-config.mjs",
     "public-web-url:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-public-web-url-safety.mjs",
     "public-web-detail:check": "node scripts/verify-public-web-detail-enrichment.mjs",
+    "public-web-jsonld:check": "node scripts/verify-public-web-jsonld.mjs",
     "schema:setup": "node scripts/print-supabase-setup-runbook.mjs",
     "schema:production": "node scripts/verify-supabase-schema.mjs",
     "sourcing:diagnose": "node scripts/diagnose-sourcing-recovery.mjs",
