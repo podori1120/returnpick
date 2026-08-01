@@ -226,8 +226,10 @@ const originalClientId = process.env.NAVER_CLIENT_ID;
 const originalClientSecret = process.env.NAVER_CLIENT_SECRET;
 process.env.NAVER_CLIENT_ID = "test-client";
 process.env.NAVER_CLIENT_SECRET = "test-secret";
-globalThis.fetch = async () =>
-  new Response(
+let observedSearchUrl = null;
+globalThis.fetch = async (input) => {
+  observedSearchUrl = String(input);
+  return new Response(
     JSON.stringify({
       total: 4,
       start: 1,
@@ -241,6 +243,7 @@ globalThis.fetch = async () =>
     }),
     { status: 200, headers: { "content-type": "application/json" } }
   );
+};
 
 try {
   const formatModule = loadTsModule("lib/format.ts");
@@ -258,6 +261,8 @@ try {
   assert.equal(lookup.match?.sku_rejected_count, 2);
   assert.equal(lookup.match?.sku_rejection_reasons.ACCESSORY_ONLY, 1);
   assert.equal(lookup.match?.sku_rejection_reasons.MODEL_MISMATCH, 1);
+  assert.equal(new URL(observedSearchUrl).searchParams.get("display"), "30");
+  assert.equal(new URL(observedSearchUrl).searchParams.get("sort"), "sim");
 } finally {
   globalThis.fetch = originalFetch;
   if (originalClientId === undefined) delete process.env.NAVER_CLIENT_ID;

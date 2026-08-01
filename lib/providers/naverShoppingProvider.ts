@@ -6,6 +6,10 @@ import {
   type NaverSkuMatchEvidence
 } from "@/lib/naverProductMatch";
 
+// Keep enough relevance-ranked results to find the exact model when popular
+// listings, bundles, or accessories occupy the first page.
+const NAVER_SHOPPING_DISPLAY_LIMIT = 30;
+
 export interface NaverShoppingItem {
   title: string;
   link: string | null;
@@ -124,7 +128,7 @@ export async function searchNaverShopping(query: string): Promise<NaverShoppingS
   const { clientId, clientSecret } = getNaverCredentials();
   const params = new URLSearchParams({
     query,
-    display: "10",
+    display: String(NAVER_SHOPPING_DISPLAY_LIMIT),
     sort: "sim"
   });
 
@@ -173,7 +177,7 @@ export async function searchNaverShopping(query: string): Promise<NaverShoppingS
         normalized_item_count: items.length,
         priced_item_count: items.filter((item) => typeof item.lprice === "number" && item.lprice > 0).length,
         sort: "sim",
-        display_limit: 10
+        display_limit: NAVER_SHOPPING_DISPLAY_LIMIT
       }
     };
   } catch (error) {
