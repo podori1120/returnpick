@@ -27,6 +27,10 @@ for (const signal of requiredProviderSignals) {
   if (!provider.includes(signal)) throw new Error(`missing provider detail-enrichment guard: ${signal}`);
 }
 
+for (const signal of ["collectJsonLdProducts", "application\\/ld\\+json", "readJsonLdOfferPrice", "json_ld:", "seenProductKeys"]) {
+  if (!provider.includes(signal)) throw new Error(`missing structured public-web product signal: ${signal}`);
+}
+
 if (!readme.includes("검색 결과에서 발견한 allowlist 상품 링크 중 최대 3개의 상세 페이지")) {
   throw new Error("README does not document bounded public-web detail enrichment");
 }

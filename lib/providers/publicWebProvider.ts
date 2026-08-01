@@ -279,19 +279,79 @@ function safeRedirectTarget(location: string | null, baseUrl: URL, status: numbe
   }
 }
 
+function collectJsonLdProducts(value: unknown, products: Array<Record<string, unknown>>, depth = 0) {
+  if (depth > 5 || value == null || typeof value !== "object") return;
+  if (Array.isArray(value)) {
+    for (const item of value) collectJsonLdProducts(item, products, depth + 1);
+    return;
+  }
+
+  const record = value as Record<string, unknown>;
+  const typeValues = Array.isArray(record["@type"]) ? record["@type"] : [record["@type"]];
+  const isProduct = typeValues.some((type) => typeof type === "string" && /^(?:Product|ProductGroup)$/i.test(type));
+  if (isProduct) products.push(record);
+
+  for (const key of ["@graph", "item", "mainEntity", "mainEntityOfPage"]) {
+    if (record[key] && typeof record[key] === "object") collectJsonLdProducts(record[key], products, depth + 1);
+  }
+}
+
+function readJsonLdText(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (Array.isArray(value)) return value.map(readJsonLdText).filter(Boolean).join(" ");
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return readJsonLdText(record.name ?? record.value ?? record.url);
+  }
+  return "";
+}
+
+function readJsonLdNumber(value: unknown) {
+  const parsed = Number(typeof value === "string" ? value.replace(/[,원₩￦\s]/g, "") : value);
+  return Number.isFinite(parsed) && parsed >= 10_000 ? Math.round(parsed) : null;
+}
+
+function readJsonLdOfferPrice(record: Record<string, unknown>) {
+  const offers = Array.isArray(record.offers) ? record.offers[0] : record.offers;
+  if (!offers || typeof offers !== "object") return null;
+  const offer = offers as Record<string, unknown>;
+  return readJsonLdNumber(offer.price ?? offer.lowPrice ?? offer.highPrice);
+}
+
+function readJsonLdBrand(record: Record<string, unknown>) {
+  const brand = readJsonLdText(record.brand);
+  return brand || null;
+}
+
+function readJsonLdImage(record: Record<string, unknown>, pageUrl: URL, allowedHosts: ReadonlySet<string>) {
+  const image = readJsonLdText(record.image);
+  if (!image) return null;
+  return safeAllowlistedPublicUrl(image, pageUrl, allowedHosts)?.toString() ?? null;
+}
+
+function readJsonLdUrl(record: Record<string, unknown>, pageUrl: URL, allowedHosts: ReadonlySet<string>) {
+  const rawUrl = readJsonLdText(record.url) || readJsonLdText(record["@id"]);
+  if (!rawUrl) return null;
+  return safeAllowlistedPublicUrl(rawUrl, pageUrl, allowedHosts);
+}
+
 function extractCards(html: string, category: Category, keyword: string, pageUrl: string, allowedHosts: ReadonlySet<string>): ProviderProduct[] {
   const anchorMatches = [...html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,1500}?)<\/a>/gi)];
   const base = new URL(pageUrl);
   const products: ProviderProduct[] = [];
+  const seenProductKeys = new Set<string>();
 
   for (const [index, match] of anchorMatches.entries()) {
     const productUrl = safeAllowlistedPublicUrl(match[1], base, allowedHosts);
     if (!productUrl) continue;
     const href = productUrl.toString();
+    const productKey = `url:${href}`;
+    if (seenProductKeys.has(productKey)) continue;
     const block = match[2].replace(/<script[\s\S]*?<\/script>/gi, " ");
     const text = block.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
     const returnInfo = extractReturnInfoFromText(text, href);
     if (!returnInfo.isReturnCandidate || text.length < 8) continue;
+    seenProductKeys.add(productKey);
     products.push({
       source: "public_web",
       source_product_id: href,
@@ -317,6 +377,69 @@ function extractCards(html: string, category: Category, keyword: string, pageUrl
       }
     });
     if (products.length >= 8) break;
+  }
+
+  if (products.length < 8) {
+    for (const scriptMatch of html.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(scriptMatch[1].replace(/^\s*<!--|-->\s*$/g, "").trim());
+      } catch {
+        continue;
+      }
+
+      const jsonLdProducts: Array<Record<string, unknown>> = [];
+      collectJsonLdProducts(parsed, jsonLdProducts);
+      for (const record of jsonLdProducts) {
+        const productUrl = readJsonLdUrl(record, base, allowedHosts);
+        const name = readJsonLdText(record.name);
+        if (!productUrl || name.length < 3) continue;
+        const href = productUrl.toString();
+        const productKey = `url:${href}`;
+        if (seenProductKeys.has(productKey)) continue;
+
+        const additionalProperties = Array.isArray(record.additionalProperty)
+          ? record.additionalProperty.map((item) => readJsonLdText(item)).filter(Boolean).join(" ")
+          : "";
+        const evidenceText = [name, readJsonLdText(record.description), additionalProperties, readJsonLdText(record.itemCondition)].filter(Boolean).join(" ");
+        const returnInfo = extractReturnInfoFromText(evidenceText, href);
+        if (!returnInfo.isReturnCandidate) continue;
+
+        seenProductKeys.add(productKey);
+        const offerPrice = readJsonLdOfferPrice(record);
+        products.push({
+          source: "public_web",
+          source_product_id: href,
+          category,
+          keyword,
+          title: name.slice(0, 140),
+          brand: readJsonLdBrand(record),
+          model_name: readJsonLdText(record.sku ?? record.mpn) || null,
+          image_url: readJsonLdImage(record, base, allowedHosts),
+          source_url: href,
+          coupang_url: href.includes("coupang.com") ? href : null,
+          affiliate_url: null,
+          source_price: offerPrice,
+          return_price: returnInfo.return_price,
+          new_price: offerPrice,
+          condition_grade: returnInfo.condition_grade ?? "확인필요",
+          stock_count: returnInfo.stock_count,
+          raw_json: {
+            provider: "public_web",
+            page_url: pageUrl,
+            json_ld: {
+              type: readJsonLdText(record["@type"]) || null,
+              sku: readJsonLdText(record.sku) || null,
+              mpn: readJsonLdText(record.mpn) || null,
+              offer_price: offerPrice
+            },
+            web_return_info: toReturnInfoJson(returnInfo)
+          }
+        });
+        if (products.length >= 8) break;
+      }
+      if (products.length >= 8) break;
+    }
   }
 
   return products;
