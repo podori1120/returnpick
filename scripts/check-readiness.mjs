@@ -1201,6 +1201,7 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-env.mjs"
       vercelEnvVerifier.includes("recommendedNames") &&
       vercelEnvVerifier.includes("ADMIN_PASSWORD") &&
       vercelEnvVerifier.includes("SUPABASE_SERVICE_ROLE_KEY") &&
+      vercelEnvVerifier.includes("SOURCING_ENRICHMENT_CONCURRENCY") &&
       vercelEnvVerifier.includes("TELEGRAM_BOT_TOKEN") &&
       !vercelEnvVerifier.includes("console.log(result.stdout)") &&
       !vercelEnvVerifier.includes("stdio: \"inherit\""),
@@ -1214,6 +1215,7 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-env.mjs"
       envRepairPlan.includes("Safe non-secret operational defaults") &&
       envRepairPlan.includes("CRON_USE_MOCK_FALLBACK") &&
       envRepairPlan.includes("SOURCING_TIME_BUDGET_MS") &&
+      envRepairPlan.includes("SOURCING_ENRICHMENT_CONCURRENCY") &&
       envRepairPlan.includes("AFFILIATE_BACKFILL_LIMIT") &&
       envRepairPlan.includes("PUBLIC_WEB_CRAWL_ENABLED") &&
       envRepairPlan.includes("External hourly scheduler (GitHub Actions)") &&
@@ -1454,6 +1456,15 @@ if (fileExists("lib/sourcing.ts")) {
   check("sourcing: default keyword bootstrap", sourcing.includes("ensureDefaultSourcingKeywords") && sourcing.includes("default_keywords_seeded"), "first sourcing run seeds default keywords when the DB is empty", "required");
   check("sourcing: coupang deeplink enrichment", sourcing.includes("createCoupangDeeplink") && sourcing.includes("coupang_deeplink"), "creates affiliate_url from Coupang product URLs", "required");
   check("sourcing: naver lowest price enrichment", sourcing.includes("getLowestPrice") && sourcing.includes("naver_lowest_price"), "fills naver_lowest_price when API is configured", "required");
+  check(
+    "sourcing: bounded enrichment concurrency",
+    sourcing.includes("SOURCING_ENRICHMENT_CONCURRENCY") &&
+      sourcing.includes("defaultProductEnrichmentConcurrency = 2") &&
+      sourcing.includes("maxProductEnrichmentConcurrency = 4") &&
+      sourcing.includes("product_enrichment_concurrency: productEnrichmentConcurrency"),
+    "product price/link enrichment keeps a safe default and a bounded operator-controlled concurrency limit",
+    "required"
+  );
   check(
     "sourcing: naver fallback query log",
     sourcing.includes("getLowestPriceFromQueries") &&
@@ -3009,6 +3020,7 @@ if (fileExists("components/AdminApiReadinessPanel.tsx")) {
       panel.includes("NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL") &&
       panel.includes("CRON_USE_MOCK_FALLBACK") &&
       panel.includes("SOURCING_TIME_BUDGET_MS") &&
+      panel.includes("SOURCING_ENRICHMENT_CONCURRENCY") &&
       panel.includes("AFFILIATE_BACKFILL_LIMIT") &&
       panel.includes("PUBLIC_WEB_CRAWL_ENABLED"),
     "admin can copy the required and operational Vercel environment variable template after approval",
@@ -4500,8 +4512,9 @@ if (fileExists("app/api/cron/sourcing/route.ts") && fileExists("app/api/cron/aff
 
 if (fileExists("lib/scheduler.ts")) {
   const scheduler = readText("lib/scheduler.ts");
+  const sourcingSource = fileExists("lib/sourcing.ts") ? readText("lib/sourcing.ts") : "";
   check("cron: production real-source default", scheduler.includes("getScheduledMockFallback") && scheduler.includes('process.env.NODE_ENV !== "production"'), "production cron does not use mock fallback unless explicitly enabled", "required");
-  check("cron: sourcing time budget env", scheduler.includes("SOURCING_TIME_BUDGET_MS") && scheduler.includes("SOURCING_KEYWORD_LIMIT"), "cron sourcing can be bounded by env time and keyword limits", "required");
+  check("cron: sourcing time budget env", scheduler.includes("SOURCING_TIME_BUDGET_MS") && scheduler.includes("SOURCING_KEYWORD_LIMIT") && sourcingSource.includes("SOURCING_ENRICHMENT_CONCURRENCY"), "cron sourcing can be bounded by time, keyword, and enrichment concurrency settings", "required");
   check("cron: affiliate link backfill isolation", scheduler.includes("runScheduledAffiliateBackfill") && scheduler.includes("backfillCoupangAffiliateLinks") && scheduler.includes("AFFILIATE_BACKFILL_LIMIT"), "scheduled Partners link repair runs in a separate bounded job after sourcing", "required");
   check("cron: keyword cursor resume", scheduler.includes("getNextSourcingKeywordOffset") && scheduler.includes("keywordOffset"), "scheduled sourcing resumes from the previous keyword cursor", "required");
   check("cron: persistent storage signal", scheduler.includes("persistent_storage") && scheduler.includes("hasSupabaseConfig"), "scheduler result exposes whether run logs are persisted", "required");

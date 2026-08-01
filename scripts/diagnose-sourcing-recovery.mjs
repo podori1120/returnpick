@@ -362,6 +362,18 @@ async function main() {
     add("PASS", "SOURCING_KEYWORD_LIMIT", "blank; full active keyword rotation allowed");
   }
 
+  const enrichmentConcurrency = envValue("SOURCING_ENRICHMENT_CONCURRENCY");
+  if (enrichmentConcurrency) {
+    const parsed = Number(enrichmentConcurrency);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 4) {
+      add("FAIL", "SOURCING_ENRICHMENT_CONCURRENCY", "must be an integer from 1 to 4 or blank");
+    } else {
+      add("PASS", "SOURCING_ENRICHMENT_CONCURRENCY", `${parsed} concurrent product enrichments`);
+    }
+  } else {
+    add("PASS", "SOURCING_ENRICHMENT_CONCURRENCY", "blank; sourcing defaults to 2 concurrent product enrichments");
+  }
+
   const affiliateBackfillLimit = envValue("AFFILIATE_BACKFILL_LIMIT");
   if (affiliateBackfillLimit) {
     const parsed = Number(affiliateBackfillLimit);

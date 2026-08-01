@@ -68,7 +68,18 @@ export type RunSourcingOptions = {
 const defaultSourcingTimeBudgetMs = 52000;
 const minSourcingTimeBudgetMs = 5000;
 const maxSourcingTimeBudgetMs = 55000;
-const productEnrichmentConcurrency = 2;
+const defaultProductEnrichmentConcurrency = 2;
+const maxProductEnrichmentConcurrency = 4;
+
+function getProductEnrichmentConcurrency() {
+  const raw = process.env.SOURCING_ENRICHMENT_CONCURRENCY?.trim();
+  if (!raw) return defaultProductEnrichmentConcurrency;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return defaultProductEnrichmentConcurrency;
+  return Math.min(maxProductEnrichmentConcurrency, Math.max(1, Math.floor(parsed)));
+}
+
+const productEnrichmentConcurrency = getProductEnrichmentConcurrency();
 
 async function mapWithConcurrency<T, R>(items: T[], concurrency: number, mapper: (item: T) => Promise<R>) {
   const results = new Array<R>(items.length);

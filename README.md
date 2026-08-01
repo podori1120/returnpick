@@ -247,7 +247,7 @@ curl -X POST http://localhost:3000/api/admin/sourcing/run \
 
 활성화된 `sourcing_keywords`를 읽고, 쿠팡 파트너스 API, 네이버 쇼핑 반품 후보, 공개 웹 참고 수집, mock provider 순서로 후보를 수집한 뒤 스펙 파싱, 네이버 최저가 보완, 점수화를 수행합니다.
 
-후보별 네이버 가격 검증과 쿠팡 파트너스 링크 보강은 공식 API 한도를 고려해 동시에 최대 2건만 처리합니다. 한 후보의 가격·링크·점수 저장이 실패해도 다른 후보는 계속 처리하고, 해당 상품의 오류만 실행 로그에 남겨 제한된 실행 시간 안에 더 많은 후보를 검토 대기로 쌓습니다.
+후보별 네이버 가격 검증과 쿠팡 파트너스 링크 보강은 기본적으로 동시에 2건만 처리합니다. `SOURCING_ENRICHMENT_CONCURRENCY`를 `1`~`4`로 설정하면 승인 후 응답이 안정적인 운영에서 처리량을 조정할 수 있으며, 서버는 4를 초과하는 값을 허용하지 않습니다. 한 후보의 가격·링크·점수 저장이 실패해도 다른 후보는 계속 처리하고, 해당 상품의 오류만 실행 로그에 남겨 제한된 실행 시간 안에 더 많은 후보를 검토 대기로 쌓습니다.
 
 공개 웹 참고 수집을 명시적으로 켠 경우에는 쿠팡·네이버 검색이 이미 상품을 찾았더라도 robots.txt, allowlist, Crawl-delay 검사를 통과한 공개 웹 반품 후보를 보조 공급원으로 함께 수집합니다. 동일 출처 상품 ID 또는 카테고리와 정규화 상품명이 정확히 같은 후보만 중복으로 합치고, 이때 명시적인 반품가·등급 근거가 있는 레코드를 우선합니다. 일반 API 상품이 있다는 이유만으로 공개 웹 반품 후보를 건너뛰지 않으며, 반품 근거가 없는 값은 계속 `확인필요`로 남깁니다.
 
@@ -707,6 +707,7 @@ CRON_SECRET=
 CRON_USE_MOCK_FALLBACK=false
 SOURCING_TIME_BUDGET_MS=52000
 SOURCING_KEYWORD_LIMIT=
+SOURCING_ENRICHMENT_CONCURRENCY=2
 AFFILIATE_BACKFILL_LIMIT=10
 ```
 
@@ -720,7 +721,7 @@ Cron 라우트는 `?probe=1`을 붙이면 인증만 확인하고 실제 소싱·
 
 운영 배포의 Cron 소싱은 승인용 상품별 링크·Supabase·공개 URL 등 핵심 설정이 준비되기 전에는 `LAUNCH_NOT_READY`로 데이터 작업을 하지 않습니다. 쿠팡 API 키가 없는 동안에는 `COUPANG_API_NOT_READY`로 자동 소싱만 대기하고 수동 링크 운영은 계속할 수 있습니다. 핵심 환경이 준비된 뒤에도 `/admin`의 `승인 후 첫 가동 실행`이 성공해 `launch_confirmed` 기록이 생기기 전에는 `FIRST_LAUNCH_NOT_CONFIRMED`로 대기합니다. 텔레그램 다이제스트는 이 공통 게이트를 통과한 뒤 Bot 설정이 없으면 `TELEGRAM_NOT_READY`로 발송 작업만 대기하며 예약 소싱은 계속 동작합니다. 자동 운영 센터와 수동 실행 응답은 항목명, 누락 환경변수, 다음 조치를 함께 보여주고 해결 패널로 이동시킵니다. 승인 전 화면 확인은 `자동 후보 수집` 섹션의 목업 실행으로 진행하고, 실제 반복 운영은 첫 가동 준비가 끝난 뒤 켜세요.
 
-소싱은 서버리스 함수 시간 제한을 피하기 위해 기본 52초 예산 안에서 가능한 만큼 처리하고 `completed_partial` 상태로 안전하게 끝날 수 있습니다. 실행 로그에는 `next_keyword_offset`이 저장되며, 다음 Cron 또는 관리자 실행은 이 위치부터 이어서 돌기 때문에 앞쪽 키워드만 반복 수집되는 일을 줄입니다. 운영 초기에 API 응답이 느리면 `SOURCING_KEYWORD_LIMIT=8`처럼 키워드 수를 제한한 뒤 점차 늘릴 수 있습니다.
+소싱은 서버리스 함수 시간 제한을 피하기 위해 기본 52초 예산 안에서 가능한 만큼 처리하고 `completed_partial` 상태로 안전하게 끝날 수 있습니다. 실행 로그에는 `next_keyword_offset`이 저장되며, 다음 Cron 또는 관리자 실행은 이 위치부터 이어서 돌기 때문에 앞쪽 키워드만 반복 수집되는 일을 줄입니다. 운영 초기에 API 응답이 느리면 `SOURCING_KEYWORD_LIMIT=8`처럼 키워드 수를 제한하고, 응답이 안정된 뒤에만 `SOURCING_ENRICHMENT_CONCURRENCY=3` 또는 `4`로 단계적으로 늘리세요.
 
 운영 DB 환경변수(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`)가 없으면 Vercel 서버리스 환경에서는 실행 기록과 후보 저장이 장기 유지되지 않습니다. 승인 전 화면 확인은 가능하지만, 1시간 반복 소싱을 실제 운영하려면 Supabase 연결이 먼저 필요합니다. 관리자 `자동 운영 센터`는 이 상태를 `운영 DB 미연결` 경고로 표시합니다.
 
