@@ -162,13 +162,15 @@ function isStrongModelName(value: string | null) {
 }
 
 function extractModelCodes(value: string) {
-  const excluded = /^(?:rtx|gtx|arc)\d+|^i[3579]\d+|^ultra[3579]\d*|^ryzen[3579]\d*|^(?:windows|win)\d+|^\d+(?:gb|tb|hz|kg|l)$/i;
-  const matches = text(value).match(/[a-z0-9][a-z0-9-]{3,24}/g) ?? [];
-  return unique(
+  const excluded = /^(?:lg|hp|msi|asus|amd|intel|rtx|gtx|arc|ram|ssd|nvme|usb|wifi|fhd|qhd|uhd|4k)|^i[3579]\d+|^m[1-5](?:[- ]?(?:pro|max|ultra))?$|^ultra[3579]\d*|^ryzen[3579]\d*|^(?:windows|win)\d+|^\d+(?:gb|tb|hz|kg|l)$/i;
+  const matches = text(value).match(/[a-z0-9][a-z0-9-]{1,24}/g) ?? [];
+  const candidates = unique(
     matches
       .map((item) => item.replace(/-/g, ""))
-      .filter((item) => /[a-z]/.test(item) && /\d/.test(item) && item.length >= 5 && !excluded.test(item))
+      .filter((item) => /[a-z]/.test(item) && /\d/.test(item) && item.length >= 2 && !excluded.test(item))
   );
+  // Keep short model codes such as S8 and V15, but do not match a shared suffix of a longer SKU.
+  return candidates.filter((item) => !candidates.some((other) => other !== item && other.includes(item)));
 }
 
 function allMatches(value: string, pattern: RegExp, mapper: (match: RegExpExecArray) => string) {

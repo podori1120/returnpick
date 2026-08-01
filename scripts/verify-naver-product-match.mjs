@@ -175,6 +175,34 @@ assert.equal(
   "ACCESSORY_ONLY"
 );
 
+const shortCodeRobot = {
+  category: "robot_vacuum",
+  title: "로보락 S8 MaxV Ultra 로봇청소기",
+  brand: "Roborock",
+  model_name: null,
+  spec_json: {}
+};
+assert.equal(
+  matchNaverProductSku(shortCodeRobot, candidate("로보락 S8 MaxV Ultra 로봇청소기", "로봇청소기", { brand: "로보락" })).reason_code,
+  "EXACT_MODEL_CODE"
+);
+assert.equal(
+  matchNaverProductSku(shortCodeRobot, candidate("로보락 S7 MaxV Ultra 로봇청소기", "로봇청소기", { brand: "로보락" })).reason_code,
+  "MODEL_MISMATCH"
+);
+
+const shortCodeVacuum = {
+  category: "cordless_vacuum",
+  title: "다이슨 V15 디텍트 무선청소기",
+  brand: "Dyson",
+  model_name: null,
+  spec_json: {}
+};
+assert.equal(
+  matchNaverProductSku(shortCodeVacuum, candidate("다이슨 V15 디텍트 무선청소기", "무선청소기", { brand: "다이슨" })).reason_code,
+  "EXACT_MODEL_CODE"
+);
+
 const specOnlyMonitor = {
   category: "monitor",
   title: "삼성 27인치 QHD 165Hz 게이밍 모니터",
