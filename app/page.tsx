@@ -132,7 +132,7 @@ export default async function HomePage() {
                 href={approvalSampleProduct.detailPath}
               >
                 <span className="relative h-[72px] overflow-hidden rounded-md bg-white">
-                  <Image alt={approvalSampleProduct.imageAlt} className="object-cover" fill sizes="72px" src={approvalSampleProduct.imageSrc} />
+                  <Image alt={approvalSampleProduct.imageAlt} className="object-cover" fill priority sizes="72px" src={approvalSampleProduct.imageSrc} />
                 </span>
                 <span className="min-w-0">
                   <span className="block text-xs font-black text-pine">직접 검수 추천</span>

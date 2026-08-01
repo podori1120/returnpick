@@ -19,6 +19,7 @@ export default function ApprovalSampleCard({ placement }: { placement: "home" | 
             alt={approvalSampleProduct.imageAlt}
             className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
             fill
+            priority={placement === "home"}
             sizes="(min-width: 1024px) 420px, (min-width: 768px) 50vw, 100vw"
             src={approvalSampleProduct.imageSrc}
           />
