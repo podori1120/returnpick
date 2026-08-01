@@ -69,10 +69,15 @@ assert.equal(
 
 const manuallyVerified = {
   ...product,
-  raw_json: mergeManualNaverPriceEvidence(product.raw_json, product, 850000, "2026-07-31T15:00:00.000Z")
+  raw_json: mergeManualNaverPriceEvidence(product.raw_json, product, 850000, "2026-07-31T15:00:00.000Z", {
+    sourceUrl: "https://search.shopping.naver.com/search/all?query=ideapad",
+    matchedTitle: "레노버 아이디어패드 5 16GB 512GB"
+  })
 };
 assert.equal(getNaverPriceTrust(manuallyVerified).status, "verified_manual");
 assert.equal(getNaverPriceTrust(manuallyVerified).checkedAt, "2026-07-31T15:00:00.000Z");
+assert.equal(manuallyVerified.raw_json.naver_price_manual.source_url, "https://search.shopping.naver.com/search/all?query=ideapad");
+assert.equal(manuallyVerified.raw_json.naver_price_manual.matched_title, "레노버 아이디어패드 5 16GB 512GB");
 assert.equal(getNaverPriceTrust({ ...product, naver_lowest_price: null }).status, "missing");
 
 console.log("Naver price trust checks passed: legacy rejection, API/manual verification, price binding, SKU evidence, and product-fingerprint invalidation.");

@@ -174,6 +174,7 @@ const requiredFiles = [
   "app/api/admin/keywords/route.ts",
   "app/api/admin/launch/route.ts",
   "app/api/admin/prices/backfill/route.ts",
+  "app/api/admin/prices/manual/route.ts",
   "app/api/admin/products/route.ts",
   "app/api/admin/products/import/route.ts",
   "app/api/admin/session/route.ts",
@@ -3144,6 +3145,7 @@ if (fileExists("lib/sourcingDiagnostics.ts")) {
 
 if (fileExists("components/AdminPriceBackfillPanel.tsx")) {
   const pricePanel = readText("components/AdminPriceBackfillPanel.tsx");
+  const manualPriceRoute = fileExists("app/api/admin/prices/manual/route.ts") ? readText("app/api/admin/prices/manual/route.ts") : "";
   check(
     "admin: price backfill feedback",
     pricePanel.includes('id="admin-price-backfill"') &&
@@ -3182,6 +3184,19 @@ if (fileExists("components/AdminPriceBackfillPanel.tsx")) {
       pricePanel.includes("네이버 결과:") &&
       pricePanel.includes("동일 SKU 강한 일치"),
     "admin price repair results show the selected Naver title, SKU confidence, match signals, and rejection reasons",
+    "required"
+  );
+  check(
+    "admin: manual Naver price bulk confirmation",
+    pricePanel.includes("수동 확인") &&
+      pricePanel.includes("/api/admin/prices/manual") &&
+      pricePanel.includes("상품 fingerprint") &&
+      pricePanel.includes("확인 가격 저장") &&
+      manualPriceRoute.includes("mergeManualNaverPriceEvidence") &&
+      manualPriceRoute.includes("MAX_ROWS = 80") &&
+      manualPriceRoute.includes("INVALID_NAVER_REFERENCE_URL") &&
+      manualPriceRoute.includes("createDealScore"),
+    "admin can persist bounded manual Naver price confirmations with product fingerprints, optional Naver provenance, and refreshed scores",
     "required"
   );
 }

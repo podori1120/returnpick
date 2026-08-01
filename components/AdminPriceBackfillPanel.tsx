@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ExternalLink, RefreshCw, SearchCheck } from "lucide-react";
+import { Copy, ExternalLink, RefreshCw, SearchCheck, Upload } from "lucide-react";
 
 type Summary = {
   total: number;
@@ -57,6 +57,18 @@ type BackfillResponse = {
   error?: string;
   message?: string;
 };
+
+type ManualPriceResult = {
+  status: string;
+  scanned_count: number;
+  updated_count: number;
+  skipped_count: number;
+  error_count: number;
+  items?: Array<{ product_id: string; title: string | null; status: string; price?: number; reason?: string; source_url?: string | null }>;
+  message?: string;
+};
+
+const MANUAL_PRICE_FIELD_ORDER = "상품 ID\t네이버 최저가\t네이버 근거 URL(선택)\t확인한 네이버 상품명(선택)";
 
 function headers(password: string) {
   return { "Content-Type": "application/json", "x-admin-password": password };
@@ -148,6 +160,18 @@ function signalLabel(signal: string) {
   return labels[kind] ? `${labels[kind]} ${value}` : signal;
 }
 
+function manualPriceReason(reason?: string) {
+  const labels: Record<string, string> = {
+    PRODUCT_ID_REQUIRED: "상품 ID가 올바르지 않습니다.",
+    INVALID_NAVER_PRICE: "네이버 가격은 숫자로 입력하세요.",
+    INVALID_NAVER_REFERENCE_URL: "근거 URL은 네이버의 HTTPS 주소만 허용합니다.",
+    DUPLICATE_PRODUCT_ID: "같은 상품 ID가 중복되었습니다.",
+    PRODUCT_NOT_FOUND: "상품 ID를 찾지 못했습니다."
+  };
+  if (!reason) return null;
+  return labels[reason] ?? reason;
+}
+
 function matchSummary(detail: BackfillDetail) {
   const match = detail.match;
   if (!match) return null;
@@ -171,6 +195,8 @@ export default function AdminPriceBackfillPanel({ password, onCompleted }: { pas
   const [notice, setNotice] = useState<{ type: "info" | "success" | "error"; message: string } | null>(null);
   const [lastResult, setLastResult] = useState<BackfillResult | null>(null);
   const [includeCandidates, setIncludeCandidates] = useState(true);
+  const [manualEntries, setManualEntries] = useState("");
+  const [manualResult, setManualResult] = useState<ManualPriceResult | null>(null);
 
   async function loadSummary() {
     try {
@@ -222,6 +248,48 @@ export default function AdminPriceBackfillPanel({ password, onCompleted }: { pas
       onCompleted();
     } catch {
       setNotice({ type: "error", message: "네트워크 문제로 네이버 최저가 보강을 실행하지 못했습니다." });
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  async function copyManualPriceFieldOrder() {
+    try {
+      await navigator.clipboard.writeText(MANUAL_PRICE_FIELD_ORDER);
+      setNotice({ type: "success", message: "수동 가격 입력 열 순서를 복사했습니다." });
+    } catch {
+      setNotice({ type: "error", message: "브라우저에서 복사가 차단되었습니다. HTTPS 관리자 페이지에서 다시 시도하세요." });
+    }
+  }
+
+  async function runManualPriceImport() {
+    if (!manualEntries.trim()) {
+      setNotice({ type: "error", message: "상품 ID와 네이버 가격이 있는 행을 입력하세요." });
+      return;
+    }
+    setRunning(true);
+    setManualResult(null);
+    setNotice({ type: "info", message: "관리자가 입력한 네이버 가격을 상품 fingerprint와 함께 저장하는 중입니다." });
+    try {
+      const response = await fetch("/api/admin/prices/manual", {
+        method: "POST",
+        headers: headers(password),
+        body: JSON.stringify({ entries: manualEntries })
+      });
+      const data = (await response.json().catch(() => ({}))) as ManualPriceResult & { error?: string };
+      if (!response.ok) {
+        setNotice({ type: "error", message: data.message ?? data.error ?? "수동 네이버 가격 저장에 실패했습니다." });
+        return;
+      }
+      setManualResult(data);
+      setNotice({
+        type: data.status === "error" ? "error" : data.status === "partial" ? "info" : "success",
+        message: data.message ?? `확인 ${data.scanned_count}줄 · 저장 ${data.updated_count}개 · 건너뜀 ${data.skipped_count}개 · 오류 ${data.error_count}개`
+      });
+      await loadSummary();
+      onCompleted();
+    } catch {
+      setNotice({ type: "error", message: "네트워크 문제로 수동 네이버 가격을 저장하지 못했습니다." });
     } finally {
       setRunning(false);
     }
@@ -284,6 +352,50 @@ export default function AdminPriceBackfillPanel({ password, onCompleted }: { pas
         <p className="mt-2 text-xs font-semibold leading-5 text-steel">
           후보까지 포함하면 승인 전 검토 테이블의 가격 기준도 함께 채워져 점수와 할인율 판단이 빨라집니다. API 호출량을 아끼려면 체크를 끄고 게시 상품만 보강하세요.
         </p>
+      </div>
+
+      <div className="mt-4 rounded-lg border border-pine/20 bg-pine/5 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-black text-pine">API 없이 수동 확인</p>
+            <h3 className="mt-1 text-base font-black">네이버 최저가 여러 개 직접 확인해 저장</h3>
+            <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-steel">
+              네이버에서 같은 모델·용량·옵션을 직접 대조한 상품 ID와 가격만 입력하세요. 저장 시 상품 fingerprint·확인 시각·선택한 네이버 근거 URL을 남겨 점수와 할인율에 반영합니다.
+            </p>
+          </div>
+          <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-xs font-black text-ink hover:bg-mist" onClick={() => void copyManualPriceFieldOrder()} type="button">
+            <Copy size={14} aria-hidden /> 열 순서 복사
+          </button>
+        </div>
+        <textarea
+          className="focus-ring mt-3 min-h-28 w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-xs leading-6 text-ink"
+          value={manualEntries}
+          onChange={(event) => setManualEntries(event.target.value)}
+          placeholder={"상품 ID\t네이버 최저가\t네이버 근거 URL(선택)\t확인한 네이버 상품명(선택)\n33f28f30-79f6-425e-ac6b-275bc330d620\t1420000\thttps://search.shopping.naver.com/...\t동일 모델·옵션 상품명"}
+          aria-label="수동 네이버 가격 일괄 입력"
+        />
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs font-bold leading-5 text-steel">최대 80줄 · 네이버 근거 URL은 선택이지만, 가격을 입력하기 전 동일 상품과 핵심 옵션을 직접 확인해야 합니다.</p>
+          <button className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-4 py-2.5 text-sm font-black text-white hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60" onClick={() => void runManualPriceImport()} disabled={running || !manualEntries.trim()} type="button">
+            <Upload size={15} aria-hidden /> {running ? "저장 중" : "확인 가격 저장"}
+          </button>
+        </div>
+        {manualResult ? (
+          <div className="mt-3 rounded-lg border border-line bg-white p-3 text-sm font-bold text-steel">
+            <p className="font-black text-ink">수동 가격 결과 · 확인 {manualResult.scanned_count}줄 · 저장 {manualResult.updated_count}개 · 건너뜀 {manualResult.skipped_count}개 · 오류 {manualResult.error_count}개</p>
+            {manualResult.items?.slice(0, 6).length ? (
+              <ul className="mt-2 space-y-1 text-xs">
+                {manualResult.items.slice(0, 6).map((item, index) => (
+                  <li key={`${item.product_id}-${index}`}>
+                    <span className={item.status === "updated" ? "font-black text-pine" : item.status === "error" ? "font-black text-coral" : "font-black text-steel"}>{item.status === "updated" ? "저장" : item.status === "error" ? "오류" : "건너뜀"}</span>: {item.title ?? item.product_id}
+                    {item.price ? ` · ${formatWon(item.price)}` : ""}
+                    {manualPriceReason(item.reason) ? <span className="text-coral"> · {manualPriceReason(item.reason)}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-7">

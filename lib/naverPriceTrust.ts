@@ -94,7 +94,8 @@ export function mergeManualNaverPriceEvidence(
   rawJson: Record<string, JsonValue>,
   product: NaverPriceIdentity,
   price: number | null,
-  checkedAt = new Date().toISOString()
+  checkedAt = new Date().toISOString(),
+  evidence?: { sourceUrl?: string | null; matchedTitle?: string | null }
 ) {
   return {
     ...rawJson,
@@ -102,7 +103,9 @@ export function mergeManualNaverPriceEvidence(
       status: price == null ? "cleared" : "confirmed",
       price,
       product_fingerprint: getNaverProductFingerprint(product),
-      checked_at: checkedAt
+      checked_at: checkedAt,
+      source_url: evidence?.sourceUrl ?? null,
+      matched_title: evidence?.matchedTitle ?? null
     }
   } satisfies Record<string, JsonValue>;
 }
