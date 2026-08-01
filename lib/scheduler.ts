@@ -178,7 +178,12 @@ export async function runScheduledSourcing() {
     };
   }
 
-  if (!gate.readiness.apiKeysReady) {
+  const publicWebOnly =
+    !gate.readiness.apiKeysReady &&
+    gate.readiness.runtimeReady &&
+    isCapabilityReady(gate.readiness.items, "public_web");
+
+  if (!gate.readiness.apiKeysReady && !publicWebOnly) {
     return {
       type: "sourcing",
       status: "waiting_for_api",
@@ -206,14 +211,21 @@ export async function runScheduledSourcing() {
   }
 
   const keywordOffset = await getNextSourcingKeywordOffset();
-  const run = await runSourcing({ useMockFallback, keywordLimit, keywordOffset, timeBudgetMs });
+  const run = await runSourcing({
+    useMockFallback: publicWebOnly ? false : useMockFallback,
+    sourceMode: publicWebOnly ? "public_web_only" : "auto",
+    keywordLimit,
+    keywordOffset,
+    timeBudgetMs
+  });
 
   return {
     type: "sourcing",
     status: run.status,
     first_launch_confirmed: gate.firstLaunchConfirmed,
     launch_confirmation_id: gate.launchConfirmation?.id ?? null,
-    use_mock_fallback: useMockFallback,
+    use_mock_fallback: publicWebOnly ? false : useMockFallback,
+    source_mode: publicWebOnly ? "public_web_only" : "auto",
     keyword_limit: keywordLimit,
     keyword_offset: keywordOffset,
     next_keyword_offset: getRunNextKeywordOffset(run),

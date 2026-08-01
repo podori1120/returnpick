@@ -1439,6 +1439,17 @@ if (fileExists("lib/sourcing.ts")) {
     "required"
   );
   check(
+    "sourcing: public web only mode is review-only",
+    sourcing.includes('sourceMode?: "auto" | "public_web_only"') &&
+      sourcing.includes('sourceMode === "public_web_only"') &&
+      sourcing.includes('source_mode: sourceMode') &&
+      sourcing.includes("const useMockFallback = sourceMode === \"public_web_only\" ? false") &&
+      sourcing.includes("PUBLIC_WEB_ONLY_MANUAL_REVIEW") &&
+      sourcing.includes("allowAffiliateEnrichment: sourceMode !== \"public_web_only\""),
+    "public-web-only runs avoid official/API and mock fallback paths and preserve an explicit run-mode audit field",
+    "required"
+  );
+  check(
     "sourcing: product save counted when score save fails",
     sourcing.includes("scoreError") &&
       sourcing.includes("product_score_error") &&
@@ -1713,6 +1724,15 @@ if (fileExists("lib/providers/publicWebProvider.ts")) {
       publicWebProvider.includes('status: "INVALID_TEMPLATE"') &&
       publicWebProvider.includes('if (!template.includes("{keyword}")) return null'),
     "public web collection refuses overly broad host or search template lists and requires keyword-scoped templates before fetching",
+    "required"
+  );
+  check(
+    "provider: public web config fails closed",
+    publicWebProvider.includes("invalidHost") &&
+      publicWebProvider.includes("invalidTemplate") &&
+      publicWebProvider.includes("PUBLIC_WEB_CONFIG_INVALID_BEFORE_FETCH") &&
+      publicWebProvider.includes('safeTemplateUrl(template, "returnpick-test")'),
+    "public web collection validates every configured host and template before making the first network request",
     "required"
   );
   check(
@@ -2990,6 +3010,15 @@ if (fileExists("components/AdminSourcingRunner.tsx")) {
   check("admin: mock fallback follows API readiness", runner.includes("apiKeysReady") && runner.includes("setUseMockFallback(!nextReadiness.apiKeysReady)"), "admin disables mock fallback by default after API keys are detected", "required");
   check("admin: mock fallback control locks after API readiness", runner.includes("mockFallbackLocked") && runner.includes("disabled={mockFallbackLocked}") && runner.includes("mockFallbackBlockedReason"), "admin cannot accidentally request mock fallback after API keys are detected", "required");
   check(
+    "admin: public web only sourcing control",
+    runner.includes("public_web_only") &&
+      runner.includes("publicWebOnly") &&
+      runner.includes("공개 웹 후보 수집") &&
+      runner.includes("반품 근거와 링크는 관리자 검수 후에만 공개됩니다"),
+    "admin exposes an explicit public-web-only candidate run before Coupang API approval while keeping candidates behind review",
+    "required"
+  );
+  check(
     "admin: sourcing diagnosis quick actions",
     runner.includes("diagnosisQuickActions") &&
       runner.includes('id="admin-sourcing-runner"') &&
@@ -3141,6 +3170,16 @@ if (fileExists("app/api/admin/sourcing/run/route.ts")) {
   );
   check("admin api: safe mock fallback default", route.includes("getApiReadinessSummary") && route.includes("readiness.apiKeysReady") && route.includes("mockFallbackDecision"), "admin sourcing API defaults to real-source mode when API keys are present", "required");
   check("admin api: production mock fallback hard block", route.includes("MOCK_FALLBACK_BLOCKED_AFTER_API_READY") && route.includes('process.env.NODE_ENV === "production"') && route.includes("requestedMockFallback === true"), "production admin sourcing blocks explicit mock fallback requests after API keys are present", "required");
+  check(
+    "admin api: bounded public web only sourcing",
+    route.includes("public_web_only") &&
+      route.includes("publicWebOnlyRequested") &&
+      route.includes("publicWebOnlyAllowed") &&
+      route.includes("readiness.runtimeReady") &&
+      route.includes("source_mode"),
+    "production admin sourcing permits only an explicit, runtime-ready public-web-only run when Coupang API is unavailable",
+    "required"
+  );
   check(
     "admin api: sourcing run safe error response",
     route.includes("sourcingErrorResponse") &&
@@ -4313,6 +4352,15 @@ if (fileExists("lib/scheduler.ts")) {
       scheduler.includes("getSchedulerOperatorAction") &&
       scheduler.includes("blocking_items"),
     "production scheduled jobs wait until launch readiness is complete and return concrete blocking items",
+    "required"
+  );
+  check(
+    "cron: public web only fallback",
+    scheduler.includes('isCapabilityReady(gate.readiness.items, "public_web")') &&
+      scheduler.includes("const publicWebOnly") &&
+      scheduler.includes('sourceMode: publicWebOnly ? "public_web_only" : "auto"') &&
+      scheduler.includes('status: "waiting_for_api"'),
+    "hourly sourcing can use the explicitly enabled, runtime-ready public-web source before Coupang API approval and otherwise remains gated",
     "required"
   );
   check(

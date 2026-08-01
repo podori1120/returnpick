@@ -14,6 +14,7 @@ type ApiReadinessSummary = {
   apiKeysReady: boolean;
   runtimeReady: boolean;
   launchReady: boolean;
+  items: Array<{ id: string; state: string }>;
 };
 
 type SourcingRunResponse = {
@@ -25,6 +26,7 @@ type SourcingRunResponse = {
     mockFallbackBlockedReason?: string | null;
     apiKeysReady?: boolean;
   };
+  source_mode?: "auto" | "public_web_only";
   error?: string;
   message?: string;
 };
@@ -216,7 +218,13 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
   }, [password]);
 
   async function runSourcing() {
-    if (readiness?.mode === "manual_launch_ready" && process.env.NODE_ENV === "production") {
+    const publicWebOnly = Boolean(
+      readiness &&
+        !readiness.apiKeysReady &&
+        readiness.runtimeReady &&
+        readiness.items.some((item) => item.id === "public_web" && item.state === "ready")
+    );
+    if (readiness?.mode === "manual_launch_ready" && process.env.NODE_ENV === "production" && !publicWebOnly) {
       setNotice({
         type: "warning",
         message: "쿠팡 API 권한이 없어 자동 후보 수집은 대기 중입니다. 상품별 파트너스 링크는 수동 등록·검수 큐에서 처리하세요."
@@ -226,7 +234,9 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
     setRunning(true);
     setNotice({
       type: "info",
-      message: useMockFallback
+      message: publicWebOnly
+        ? "허용된 공개 웹 검색 템플릿에서 후보를 확인하고 있습니다. 반품 근거와 링크는 관리자 검수 후에만 공개됩니다."
+        : useMockFallback
         ? "후보를 수집하고 있습니다. API가 없으면 목업 후보로 화면과 검토 흐름을 채웁니다."
         : "실제 연동 소스만 사용해 후보를 수집하고 있습니다."
     });
@@ -234,7 +244,11 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
       const response = await fetch("/api/admin/sourcing/run", {
         method: "POST",
         headers: headers(password),
-        body: JSON.stringify({ useMockFallback, timeBudgetMs: firstRunTimeBudgetMs })
+        body: JSON.stringify({
+          useMockFallback: publicWebOnly ? false : useMockFallback,
+          sourceMode: publicWebOnly ? "public_web_only" : "auto",
+          timeBudgetMs: firstRunTimeBudgetMs
+        })
       });
       const data = (await response.json().catch(() => ({}))) as SourcingRunResponse;
       if (!response.ok) {
@@ -242,7 +256,11 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
         return;
       }
       const run = data.run;
-      const fallbackNotice = data.defaults?.mockFallbackBlockedReason ? " · API 키 감지로 목업 대체 요청은 자동 차단됨" : "";
+      const fallbackNotice = data.source_mode === "public_web_only"
+        ? " · 공개 웹 전용 모드로 저장됨"
+        : data.defaults?.mockFallbackBlockedReason
+          ? " · API 키 감지로 목업 대체 요청은 자동 차단됨"
+          : "";
       if (data.defaults?.mockFallbackBlockedReason || data.defaults?.apiKeysReady) {
         setUseMockFallback(false);
       }
@@ -265,7 +283,13 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
   const latestDiagnosis = diagnoseSourcingRun(runs[0]);
   const mockFallbackLocked = Boolean(readiness?.apiKeysReady);
   const manualLaunchMode = readiness?.mode === "manual_launch_ready";
-  const automatedSourcingUnavailable = manualLaunchMode && process.env.NODE_ENV === "production";
+  const publicWebOnly = Boolean(
+    readiness &&
+      !readiness.apiKeysReady &&
+      readiness.runtimeReady &&
+      readiness.items.some((item) => item.id === "public_web" && item.state === "ready")
+  );
+  const automatedSourcingUnavailable = manualLaunchMode && process.env.NODE_ENV === "production" && !publicWebOnly;
   const latestDiagnosisQuickActions = latestDiagnosis ? diagnosisQuickActions(latestDiagnosis) : [];
 
   return (
@@ -282,13 +306,20 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
           <p className={`mt-1 text-xs font-black ${readiness?.apiKeysReady || manualLaunchMode ? "text-pine" : "text-steel"}`}>
             {readiness?.apiKeysReady
               ? "API 키 감지됨 · 목업 대체 기본 꺼짐"
+              : publicWebOnly
+                ? "공개 웹 후보 수집 가능 · 링크는 관리자 검수 후 보강"
               : manualLaunchMode
                 ? "수동 링크 운영 가능 · API 자동 수집 대기"
                 : "승인 대기 · 목업 대체 기본 켜짐"}
           </p>
-          {manualLaunchMode ? (
+          {manualLaunchMode && !publicWebOnly ? (
             <p className="mt-2 rounded-lg border border-lemon/70 bg-lemon/20 px-3 py-2 text-xs font-black text-ink">
               쿠팡 API 권한 전에는 이 버튼으로 자동 수집하지 않습니다. 관리자 수동 후보 등록에서 실제 상품별 링크를 넣어 검수·게시하세요.
+            </p>
+          ) : null}
+          {publicWebOnly ? (
+            <p className="mt-2 rounded-lg border border-pine/30 bg-pine/10 px-3 py-2 text-xs font-black text-pine">
+              쿠팡 API 없이도 allowlist와 robots.txt를 통과한 공개 웹 후보를 수집합니다. 가격·반품등급·파트너스 링크는 확인 전 공개하지 않습니다.
             </p>
           ) : null}
           {readiness?.apiKeysReady && useMockFallback ? (
@@ -339,7 +370,7 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
             disabled={running || automatedSourcingUnavailable}
             type="button"
           >
-            <Play size={16} aria-hidden /> {automatedSourcingUnavailable ? "API 권한 대기" : "후보 수집 실행"}
+            <Play size={16} aria-hidden /> {automatedSourcingUnavailable ? "API 권한 대기" : publicWebOnly ? "공개 웹 후보 수집" : "후보 수집 실행"}
           </button>
         </div>
       </div>

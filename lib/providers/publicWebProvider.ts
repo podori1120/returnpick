@@ -557,6 +557,31 @@ export async function searchPublicWebProducts(keyword: string, category: Categor
     };
   }
 
+  const invalidHost = Array.from(hosts).find((host) => !isPublicWebHostname(host));
+  if (invalidHost) {
+    const diagnostics: PublicWebDiagnostic[] = [{ status: "INVALID_TEMPLATE", error: "PUBLIC_WEB_ALLOWED_HOSTS_CONTAINS_INVALID_HOST" }];
+    return {
+      status: "INVALID_TEMPLATE",
+      products: [],
+      error: `PUBLIC_WEB_ALLOWED_HOSTS contains an invalid host: ${invalidHost.slice(0, 120)}`,
+      meta: buildPublicWebMeta(diagnostics, hosts, templates)
+    };
+  }
+
+  const invalidTemplate = templates.find((template) => {
+    const parsed = safeTemplateUrl(template, "returnpick-test");
+    return !parsed || !hosts.has(parsed.hostname.toLowerCase());
+  });
+  if (invalidTemplate) {
+    const diagnostics: PublicWebDiagnostic[] = [{ status: "INVALID_TEMPLATE", error: "PUBLIC_WEB_CONFIG_INVALID_BEFORE_FETCH" }];
+    return {
+      status: "INVALID_TEMPLATE",
+      products: [],
+      error: "PUBLIC_WEB_SEARCH_TEMPLATES contains an invalid or non-allowlisted URL.",
+      meta: buildPublicWebMeta(diagnostics, hosts, templates)
+    };
+  }
+
   const products: ProviderProduct[] = [];
   const diagnostics: PublicWebDiagnostic[] = [];
 

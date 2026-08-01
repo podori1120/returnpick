@@ -59,6 +59,7 @@ type ProductEnrichmentResult =
 
 export type RunSourcingOptions = {
   useMockFallback?: boolean;
+  sourceMode?: "auto" | "public_web_only";
   keywordLimit?: number | null;
   keywordOffset?: number | null;
   timeBudgetMs?: number | null;
@@ -247,9 +248,21 @@ async function enrichNaverLowestPrice(product: ProviderProduct, specJson: Record
   };
 }
 
-async function enrichAndSaveProduct(product: ProviderProduct, keyword: SourcingKeyword) {
+async function enrichAndSaveProduct(product: ProviderProduct, keyword: SourcingKeyword, options?: { allowAffiliateEnrichment?: boolean }) {
   const specJson = parseSpecsFromTitle(product.title, product.category);
-  const [naverPrice, affiliate] = await Promise.all([enrichNaverLowestPrice(product, specJson), enrichAffiliateUrl(product)]);
+  const allowAffiliateEnrichment = options?.allowAffiliateEnrichment ?? true;
+  const [naverPrice, affiliate] = await Promise.all([
+    enrichNaverLowestPrice(product, specJson),
+    allowAffiliateEnrichment
+      ? enrichAffiliateUrl(product)
+      : Promise.resolve({
+          affiliateUrl: null,
+          deeplinkLog: {
+            status: "PUBLIC_WEB_ONLY_MANUAL_REVIEW",
+            source_url: product.coupang_url ?? product.source_url ?? null
+          }
+        } satisfies AffiliateEnrichment)
+  ]);
   const webReturnInfo = extractReturnInfoFromText(
     product.title,
     product.raw_json?.web_return_info ? JSON.stringify(product.raw_json.web_return_info) : null
@@ -305,7 +318,8 @@ async function enrichAndSaveProduct(product: ProviderProduct, keyword: SourcingK
 
 export async function runSourcing(options?: RunSourcingOptions) {
   const startedAt = Date.now();
-  const useMockFallback = options?.useMockFallback ?? true;
+  const sourceMode = options?.sourceMode === "public_web_only" ? "public_web_only" : "auto";
+  const useMockFallback = sourceMode === "public_web_only" ? false : options?.useMockFallback ?? true;
   const keywordLimit = normalizePositiveInteger(options?.keywordLimit);
   const requestedKeywordOffset = options?.keywordOffset ?? 0;
   const timeBudgetMs = normalizeTimeBudgetMs(options?.timeBudgetMs);
@@ -375,7 +389,7 @@ export async function runSourcing(options?: RunSourcingOptions) {
       processedKeywordCount += 1;
       nextKeywordOffset = activeKeywordCount ? (keywordStartOffset + processedKeywordCount) % activeKeywordCount : 0;
       try {
-        let result = await searchCoupangProducts(keyword.keyword, keyword.category);
+        let result: ProviderSearchResult;
         let provider = "coupang_partners";
         const providerIssues: Array<Record<string, JsonValue>> = [];
         const providerContributions: Array<Record<string, JsonValue>> = [];
@@ -404,61 +418,68 @@ export async function runSourcing(options?: RunSourcingOptions) {
           });
         };
 
-        recordProviderResult("coupang_partners", result);
+        if (sourceMode === "public_web_only") {
+          result = await searchPublicWebProducts(keyword.keyword, keyword.category);
+          provider = "public_web";
+          recordProviderResult("public_web", result);
+        } else {
+          result = await searchCoupangProducts(keyword.keyword, keyword.category);
+          recordProviderResult("coupang_partners", result);
 
-        if (result.status === "API_NOT_CONFIGURED" || result.status === "error" || result.products.length === 0) {
-          const naverResult = await searchNaverReturnCandidates(keyword.keyword, keyword.category);
-          recordProviderResult("naver_shopping_candidate", naverResult);
-          if (naverResult.status === "ok" && naverResult.products.length > 0) {
-            result = naverResult;
-            provider = "naver_shopping_candidate";
-          }
-        }
-
-        const webResult = await searchPublicWebProducts(keyword.keyword, keyword.category);
-        recordProviderResult("public_web", webResult);
-        if (webResult.status === "ok" && webResult.products.length > 0) {
-          const primaryProvider = provider;
-          const primaryStatus = result.status;
-          const primaryMeta = result.meta ?? null;
-          const merged = mergeProviderProductBatches([
-            { provider: primaryProvider, products: result.products },
-            { provider: "public_web", products: webResult.products }
-          ]);
-          result = {
-            status: "ok",
-            products: merged.products,
-            meta: {
-              ...(webResult.meta ?? {}),
-              primary_provider: primaryProvider,
-              primary_status: primaryStatus,
-              primary_meta: primaryMeta,
-              supplemental_public_web_status: webResult.status,
-              supplemental_public_web_meta: webResult.meta ?? null,
-              merged_fetched_count: merged.fetchedCount,
-              merged_deduplicated_count: merged.deduplicatedCount
+          if (result.status === "API_NOT_CONFIGURED" || result.status === "error" || result.products.length === 0) {
+            const naverResult = await searchNaverReturnCandidates(keyword.keyword, keyword.category);
+            recordProviderResult("naver_shopping_candidate", naverResult);
+            if (naverResult.status === "ok" && naverResult.products.length > 0) {
+              result = naverResult;
+              provider = "naver_shopping_candidate";
             }
-          };
-          provider = merged.providers.join("+") || "public_web";
-        } else if (
-          [
-            "ROBOTS_DISALLOWED",
-            "ROBOTS_UNAVAILABLE",
-            "INVALID_TEMPLATE",
-            "UNSUPPORTED_CONTENT_TYPE",
-            "CONTENT_TOO_LARGE",
-            "REDIRECT_BLOCKED",
-            "CRAWL_DELAY_TOO_HIGH"
-          ].includes(webResult.status)
-        ) {
-          logs.push({
-            keyword: keyword.keyword,
-            category: keyword.category,
-            provider: "public_web",
-            status: webResult.status,
-            error: webResult.error ?? null,
-            provider_meta: webResult.meta ?? null
-          });
+          }
+
+          const webResult = await searchPublicWebProducts(keyword.keyword, keyword.category);
+          recordProviderResult("public_web", webResult);
+          if (webResult.status === "ok" && webResult.products.length > 0) {
+            const primaryProvider = provider;
+            const primaryStatus = result.status;
+            const primaryMeta = result.meta ?? null;
+            const merged = mergeProviderProductBatches([
+              { provider: primaryProvider, products: result.products },
+              { provider: "public_web", products: webResult.products }
+            ]);
+            result = {
+              status: "ok",
+              products: merged.products,
+              meta: {
+                ...(webResult.meta ?? {}),
+                primary_provider: primaryProvider,
+                primary_status: primaryStatus,
+                primary_meta: primaryMeta,
+                supplemental_public_web_status: webResult.status,
+                supplemental_public_web_meta: webResult.meta ?? null,
+                merged_fetched_count: merged.fetchedCount,
+                merged_deduplicated_count: merged.deduplicatedCount
+              }
+            };
+            provider = merged.providers.join("+") || "public_web";
+          } else if (
+            [
+              "ROBOTS_DISALLOWED",
+              "ROBOTS_UNAVAILABLE",
+              "INVALID_TEMPLATE",
+              "UNSUPPORTED_CONTENT_TYPE",
+              "CONTENT_TOO_LARGE",
+              "REDIRECT_BLOCKED",
+              "CRAWL_DELAY_TOO_HIGH"
+            ].includes(webResult.status)
+          ) {
+            logs.push({
+              keyword: keyword.keyword,
+              category: keyword.category,
+              provider: "public_web",
+              status: webResult.status,
+              error: webResult.error ?? null,
+              provider_meta: webResult.meta ?? null
+            });
+          }
         }
 
         if (
@@ -493,7 +514,12 @@ export async function runSourcing(options?: RunSourcingOptions) {
 
         const enrichedResults = await mapWithConcurrency<ProviderProduct, ProductEnrichmentResult>(candidates, productEnrichmentConcurrency, async (candidate) => {
           try {
-            return { candidate, saved: await enrichAndSaveProduct(candidate, keyword) };
+            return {
+              candidate,
+              saved: await enrichAndSaveProduct(candidate, keyword, {
+                allowAffiliateEnrichment: sourceMode !== "public_web_only"
+              })
+            };
           } catch (error) {
             return {
               candidate,
@@ -570,7 +596,8 @@ export async function runSourcing(options?: RunSourcingOptions) {
         time_budget_ms: timeBudgetMs,
         product_enrichment_concurrency: productEnrichmentConcurrency,
         elapsed_ms: Date.now() - startedAt,
-        use_mock_fallback: useMockFallback
+        use_mock_fallback: useMockFallback,
+        source_mode: sourceMode
       }
     });
   } catch (error) {
@@ -594,7 +621,8 @@ export async function runSourcing(options?: RunSourcingOptions) {
         stopped_by_time_budget: stoppedByTimeBudget,
         time_budget_ms: timeBudgetMs,
         elapsed_ms: Date.now() - startedAt,
-        use_mock_fallback: useMockFallback
+        use_mock_fallback: useMockFallback,
+        source_mode: sourceMode
       }
     });
   }

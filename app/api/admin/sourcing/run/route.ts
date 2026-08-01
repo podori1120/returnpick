@@ -70,7 +70,10 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const readiness = getApiReadinessSummary();
-    if (process.env.NODE_ENV === "production" && !readiness.apiKeysReady) {
+    const publicWebOnlyRequested = body.sourceMode === "public_web_only";
+    const publicWebReady = readiness.items.some((item) => item.id === "public_web" && item.state === "ready");
+    const publicWebOnlyAllowed = publicWebOnlyRequested && publicWebReady && readiness.runtimeReady;
+    if (process.env.NODE_ENV === "production" && !readiness.apiKeysReady && !publicWebOnlyAllowed) {
       return NextResponse.json({
         error: "COUPANG_API_NOT_READY",
         message: "쿠팡 API 권한이 없어 자동 후보 수집을 대기 중입니다. 상품별 쿠팡 파트너스 링크는 관리자 수동 등록으로 먼저 운영할 수 있습니다.",
@@ -78,19 +81,33 @@ export async function POST(request: Request) {
           mode: readiness.mode,
           apiKeysReady: readiness.apiKeysReady,
           launchReady: readiness.launchReady,
+          publicWebOnlyAvailable: publicWebReady && readiness.runtimeReady,
           nextAction: "최종승인 후 발급된 쿠팡 API 키 3개를 등록하면 자동 후보 수집을 시작할 수 있습니다."
         }
       }, { status: 409 });
     }
     const keywordOffset = await getNextSourcingKeywordOffset();
-    const mockFallbackDecision = getMockFallbackDecision(body);
+    const mockFallbackDecision = publicWebOnlyAllowed
+      ? {
+          useMockFallback: false,
+          requestedMockFallback: typeof body.useMockFallback === "boolean" ? body.useMockFallback : null,
+          mockFallbackBlockedReason: "PUBLIC_WEB_ONLY_MODE",
+          apiKeysReady: readiness.apiKeysReady
+        }
+      : getMockFallbackDecision(body);
     const run = await runSourcing({
       useMockFallback: mockFallbackDecision.useMockFallback,
+      sourceMode: publicWebOnlyAllowed ? "public_web_only" : "auto",
       keywordLimit: positiveInteger(body.keywordLimit),
       keywordOffset,
       timeBudgetMs: positiveInteger(body.timeBudgetMs)
     });
-    return NextResponse.json({ run, diagnosis: diagnoseSourcingRun(run), defaults: mockFallbackDecision });
+    return NextResponse.json({
+      run,
+      source_mode: publicWebOnlyAllowed ? "public_web_only" : "auto",
+      diagnosis: diagnoseSourcingRun(run),
+      defaults: mockFallbackDecision
+    });
   } catch (error) {
     return sourcingErrorResponse(error);
   }

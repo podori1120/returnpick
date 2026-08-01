@@ -183,6 +183,10 @@ npm run public-web:check
 npm run public-web-detail:check
 ```
 
+쿠팡 파트너스 API 권한이 아직 없어도, 공개웹 설정이 준비되고 Supabase 운영 저장소가 연결된 상태라면 `/admin`에서 `공개 웹 후보 수집`을 명시적으로 실행할 수 있습니다. 이 모드는 쿠팡 API 검색·딥링크·목업 대체를 사용하지 않고 allowlist와 robots.txt를 통과한 공개 페이지의 후보와 반품 근거만 `needs_review`로 저장합니다. 후보에는 파트너스 링크가 자동으로 생기지 않으므로, 게시 전 관리자 상품별 링크 검증이 반드시 필요합니다.
+
+같은 조건을 만족하면 시간별 `/api/cron/sourcing`도 공개웹 전용 모드로 동작합니다. `PUBLIC_WEB_CRAWL_ENABLED=true` 자체가 명시적 옵트인이고, Supabase·사이트·관리자·Cron·공개웹 준비도가 모두 통과하지 않으면 스케줄러는 실행하지 않고 대기합니다. robots.txt 차단, 리다이렉트, HTML 크기, Crawl-delay 제한은 모든 실행에서 그대로 적용됩니다.
+
 동작 원칙:
 
 - `PUBLIC_WEB_ALLOWED_HOSTS`에 있는 호스트만 요청
@@ -226,6 +230,15 @@ curl -X POST http://localhost:3000/api/admin/sourcing/run \
   -H "Content-Type: application/json" \
   -H "x-admin-password: YOUR_ADMIN_PASSWORD" \
   -d "{\"useMockFallback\":true}"
+```
+
+쿠팡 API 없이 공개웹 후보만 수집하려면 공개웹 설정과 운영 저장소가 준비된 뒤 다음처럼 모드를 명시합니다. 반환된 후보는 자동 게시되지 않으며, 반품 근거·상품 식별자·파트너스 링크를 관리자가 확인해야 합니다.
+
+```bash
+curl -X POST http://localhost:3000/api/admin/sourcing/run \
+  -H "Content-Type: application/json" \
+  -H "x-admin-password: YOUR_ADMIN_PASSWORD" \
+  -d "{\"sourceMode\":\"public_web_only\",\"useMockFallback\":false,\"keywordLimit\":6}"
 ```
 
 활성화된 `sourcing_keywords`를 읽고, 쿠팡 파트너스 API, 네이버 쇼핑 반품 후보, 공개 웹 참고 수집, mock provider 순서로 후보를 수집한 뒤 스펙 파싱, 네이버 최저가 보완, 점수화를 수행합니다.
