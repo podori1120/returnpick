@@ -59,29 +59,29 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Search size={17} aria-hidden />
               </button>
             </form>
-            <nav className="order-3 hide-scrollbar -mx-4 flex items-center gap-1 overflow-x-auto whitespace-nowrap px-4 pb-1 text-sm font-semibold text-steel sm:order-none sm:mx-0 sm:flex-wrap sm:gap-2 sm:overflow-visible sm:px-0 sm:pb-0">
-              <Link className="rounded-md px-3 py-2 hover:bg-mist hover:text-ink" href="/deals">
+            <nav aria-label="주요 메뉴" className="order-3 -mx-4 grid grid-cols-4 gap-1 px-4 pb-1 text-xs font-semibold text-steel sm:order-none sm:mx-0 sm:flex sm:flex-wrap sm:gap-2 sm:px-0 sm:pb-0 sm:text-sm">
+              <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/deals">
                 딜 보기
               </Link>
-              <Link className="rounded-md px-3 py-2 hover:bg-mist hover:text-ink" href="/picks">
+              <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/picks">
                 검수 추천
               </Link>
-              <Link className="rounded-md px-3 py-2 hover:bg-mist hover:text-ink" href="/compare">
+              <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/compare">
                 비교함
               </Link>
-              <Link className="rounded-md px-3 py-2 hover:bg-mist hover:text-ink" href="/saved">
+              <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/saved">
                 찜함
               </Link>
-              <Link className="rounded-md px-3 py-2 hover:bg-mist hover:text-ink" href="/guide/return-checklist">
+              <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/guide/return-checklist">
                 수령 체크
               </Link>
-              <Link className="rounded-md px-3 py-2 hover:bg-mist hover:text-ink" href="/guide/safe-categories">
+              <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/guide/safe-categories">
                 안전 카테고리
               </Link>
-              <Link className="rounded-md px-3 py-2 hover:bg-mist hover:text-ink" href="/disclosure">
+              <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/disclosure">
                 제휴 안내
               </Link>
-              <Link className="rounded-md px-3 py-2 hover:bg-mist hover:text-ink" href="/admin">
+              <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/admin">
                 관리자
               </Link>
             </nav>
