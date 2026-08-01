@@ -661,6 +661,8 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-readines
   check(
     "scripts: production env-file loader",
     envLoader.includes('defaultEnvFiles = [".env.production", ".env.local", ".env"]') &&
+    envLoader.includes("isMaskedEnvValue") &&
+    envLoader.includes("if (isMaskedEnvValue(trimmed)) continue") &&
       envLoader.includes("parseEnvFile") &&
       envLoader.includes("parseRawEnvFile") &&
       envLoader.includes("rawEnvFileCache") &&

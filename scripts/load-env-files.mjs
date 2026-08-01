@@ -2,6 +2,10 @@ import { existsSync, readFileSync } from "node:fs";
 
 export const defaultEnvFiles = [".env.production", ".env.local", ".env"];
 
+export function isMaskedEnvValue(value) {
+  return ["[SENSITIVE]", "[REDACTED]", "[ENCRYPTED]"].includes(String(value ?? "").trim().toUpperCase());
+}
+
 const envFileCache = new Map();
 const rawEnvFileCache = new Map();
 
@@ -67,7 +71,10 @@ export function loadEnvFiles(options = {}) {
     for (const [key, value] of Object.entries(values)) {
       const trimmed = String(value ?? "").trim();
       if (!trimmed) continue;
-      if (override || !String(process.env[key] ?? "").trim()) {
+      if (isMaskedEnvValue(trimmed)) continue;
+
+      const existing = String(process.env[key] ?? "").trim();
+      if (override || !existing || isMaskedEnvValue(existing)) {
         process.env[key] = trimmed;
       }
     }
