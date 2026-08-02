@@ -5,8 +5,42 @@ import SearchSuggest from "@/components/SearchSuggest";
 import { getSiteUrl } from "@/lib/siteUrl";
 import "./globals.css";
 
+const siteUrl = getSiteUrl();
+
+const siteIdentityJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${siteUrl}/#website`,
+      name: "ReturnPick",
+      alternateName: "리턴픽",
+      url: siteUrl,
+      inLanguage: "ko-KR",
+      publisher: { "@id": `${siteUrl}/#organization` },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: `${siteUrl}/deals?search={search_term_string}`
+        },
+        "query-input": "required name=search_term_string"
+      }
+    },
+    {
+      "@type": "Organization",
+      "@id": `${siteUrl}/#organization`,
+      name: "ReturnPick",
+      alternateName: "리턴픽",
+      url: siteUrl,
+      description: "반품 노트북, 모니터, 소형가전의 가격과 구매 전 확인사항을 비교하는 검수형 추천 서비스입니다.",
+      image: `${siteUrl}/opengraph-image`
+    }
+  ]
+};
+
 export const metadata: Metadata = {
-  metadataBase: new URL(getSiteUrl()),
+  metadataBase: new URL(siteUrl),
   title: {
     default: "ReturnPick | 리턴픽",
     template: "%s | ReturnPick"
@@ -34,6 +68,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko">
       <body>
+        <script
+          id="returnpick-site-jsonld"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(siteIdentityJsonLd).replace(/</g, "\\u003c") }}
+        />
         <header className="border-b border-line bg-white/90 backdrop-blur">
           <div className="mx-auto flex max-w-7xl flex-col items-stretch gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
             <Link href="/" className="flex items-center gap-3">

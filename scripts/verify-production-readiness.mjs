@@ -211,6 +211,30 @@ function checkApprovalPage(html, status) {
   }
 }
 
+function checkSiteIdentity(html, status) {
+  if (status !== 200) {
+    fail("site identity", `/ returned ${status}`);
+    return;
+  }
+
+  const required = [
+    'id="returnpick-site-jsonld"',
+    '"@type":"WebSite"',
+    '"@type":"Organization"',
+    '"@type":"SearchAction"',
+    'required name=search_term_string',
+    "ReturnPick",
+    "리턴픽"
+  ];
+  const missing = required.filter((value) => !html.includes(value));
+
+  if (missing.length) {
+    fail("site identity", `missing site/search structured data: ${missing.join(", ")}`);
+  } else {
+    pass("site identity", "WebSite, Organization, Korean identity, and SearchAction structured data are present");
+  }
+}
+
 function extractApprovalPartnersUrl(html) {
   const candidate = expectedApprovalUrl || html.match(/https:\/\/link\.coupang\.com\/a\/[A-Za-z0-9]{6,16}(?:\?[^"'<>\s]+)?/)?.[0] || "";
 
@@ -726,6 +750,13 @@ async function main() {
     else warn("admin password", detail);
   } else {
     pass("admin password", "provided by CLI, environment, or local env file");
+  }
+
+  try {
+    const home = await readText("/");
+    checkSiteIdentity(home.text, home.response.status);
+  } catch (error) {
+    fail("site identity", error instanceof Error ? error.message : "fetch failed");
   }
 
   try {

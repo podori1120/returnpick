@@ -735,6 +735,8 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-readines
       productionVerifier.includes("checkApprovalRedirect") &&
       productionVerifier.includes('redirect: "manual"') &&
       productionVerifier.includes('"approval redirect"') &&
+      productionVerifier.includes("checkSiteIdentity") &&
+      productionVerifier.includes('"site identity"') &&
       productionVerifier.includes("--strict-scheduler"),
     "production verifier checks approval-page evidence and destination, disclosure evidence, robots/sitemap coverage, deployment headers, launch/session/manual-price API protection, deployed admin repair UI chunks, admin live checks, required cards, scheduler health, and local production env files without embedding secrets",
     "required"
@@ -2280,6 +2282,7 @@ if (
   const homeDiscovery = readText("lib/homeDiscovery.ts");
   const homePage = readText("app/page.tsx");
   const dealsPage = readText("app/deals/page.tsx");
+  const layout = readText("app/layout.tsx");
   check(
     "approval sample: customer-ready visual without invented commerce data",
     approvalCard.includes("next/image") &&
@@ -2353,6 +2356,19 @@ if (
       purposeExplorer.includes("자동 수집 후보가 관리자 검수와 상품별 파트너스 링크 확인을 통과하면") &&
       homePage.includes("approvalSampleProduct.detailPath"),
     "the homepage supports product search, keyboard-accessible purpose tabs, matched-deal comparison, and an honest editorial fallback before inventory exists",
+    "required"
+  );
+  check(
+    "public SEO: site identity and search action",
+    layout.includes("siteIdentityJsonLd") &&
+      layout.includes('id="returnpick-site-jsonld"') &&
+      layout.includes('"@type": "WebSite"') &&
+      layout.includes('"@type": "Organization"') &&
+      layout.includes('"@type": "SearchAction"') &&
+      layout.includes("query-input") &&
+      layout.includes("search_term_string") &&
+      layout.includes("리턴픽"),
+    "the shared layout exposes stable Korean brand identity and a searchable deals entry point to search engines",
     "required"
   );
   check(
