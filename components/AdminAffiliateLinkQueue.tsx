@@ -70,7 +70,14 @@ type BulkImportResult = {
   error_count: number;
   dry_run?: boolean;
   publish_requested?: boolean;
-  items?: Array<{ product_id: string; title?: string | null; status: string; reason?: string; affiliate_url?: string | null }>;
+  items?: Array<{
+    product_id: string;
+    matched_by?: "internal_id" | "coupang_product_id";
+    title?: string | null;
+    status: string;
+    reason?: string;
+    affiliate_url?: string | null;
+  }>;
 };
 
 type BulkImportResponse = BulkImportResult & {
@@ -163,6 +170,7 @@ function linkResultReasonLabel(reason?: string | null) {
   if (reason === "COUPANG_API_NOT_CONFIGURED") return "쿠팡 파트너스 API 키가 아직 없습니다.";
   if (reason === "PRODUCT_ID_AND_LINK_REQUIRED") return "상품 ID와 파트너스 링크가 모두 필요합니다.";
   if (reason === "DUPLICATE_PRODUCT_ID") return "같은 상품 ID가 중복 입력되었습니다.";
+  if (reason === "AMBIGUOUS_SOURCE_PRODUCT_ID") return "같은 쿠팡 상품번호를 가진 후보가 여러 개라 잘못 연결될 수 있어 중단했습니다.";
   if (reason === "APPROVAL_SAMPLE_LINK_NOT_ALLOWED") return "승인용 샘플 링크는 실상품에 사용할 수 없습니다.";
   if (reason === "PRODUCT_NOT_FOUND") return "해당 상품 ID를 찾지 못했습니다.";
   if (reason === "PUBLISHED") return "저장 후 게시까지 완료했습니다.";
@@ -738,7 +746,7 @@ export default function AdminAffiliateLinkQueue({
           <div>
             <h3 className="text-base font-black">대량 링크 입력</h3>
             <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-steel">
-              여러 상품을 한 번에 보강할 때는 각 줄에 상품 ID와 상품별 쿠팡 파트너스 링크를 함께 붙여넣으세요. 제목은 참고용이며 저장 기준은 상품 ID입니다.
+              각 줄에 내부 상품 ID, 쿠팡 상품번호 또는 쿠팡 상품 상세 URL 중 하나와 상품별 파트너스 링크를 붙여넣으세요. 제목은 참고용이며, 같은 쿠팡 상품번호가 여러 후보에 있으면 저장하지 않습니다.
             </p>
           </div>
           <button
@@ -754,7 +762,7 @@ export default function AdminAffiliateLinkQueue({
           className="focus-ring mt-3 min-h-28 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink"
           value={bulkText}
           onChange={(event) => setBulkText(event.target.value)}
-          placeholder={`상품ID\thttps://link.coupang.com/a/상품별링크\n예: 33f28f30-79f6-425e-ac6b-275bc330d620\thttps://link.coupang.com/a/...`}
+          placeholder={`상품ID\thttps://link.coupang.com/a/상품별링크\n예: 33f28f30-79f6-425e-ac6b-275bc330d620\thttps://link.coupang.com/a/...\n또는: 1234567890\thttps://link.coupang.com/a/...`}
         />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <div className="space-y-2 text-xs font-bold text-steel">

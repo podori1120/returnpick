@@ -1,29 +1,24 @@
 import { NextResponse } from "next/server";
-import { getProductById, updateProduct } from "@/lib/dataStore";
+import { listProducts, updateProduct } from "@/lib/dataStore";
 import { getCoupangPartnersLinkIssue, isApprovalSampleAffiliateUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { getCustomerPublishReadiness } from "@/lib/quality";
 import { getAffiliateIdentityReadiness } from "@/lib/affiliateIdentity";
+import { findAffiliateImportProduct, parseAffiliateImportLine } from "@/lib/affiliateImport";
 import { createManualCatalogReview, isManualCatalogSource } from "@/lib/manualCatalogReview";
 import { requireAdmin } from "@/lib/validators";
 
 type ImportItem = {
   product_id: string;
+  matched_by?: "internal_id" | "coupang_product_id";
   title?: string | null;
   status: "valid" | "updated" | "skipped" | "error";
   reason?: string;
   affiliate_url?: string | null;
 };
 
-const uuidPattern = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-const partnersLinkPattern = /https:\/\/link\.coupang\.com\/[^\s,;]+/i;
-
 function importErrorResponse(error: unknown) {
   const message = error instanceof Error && error.message ? error.message.slice(0, 300) : "UNKNOWN_AFFILIATE_LINK_IMPORT_ERROR";
   return NextResponse.json({ error: "BULK_AFFILIATE_LINK_IMPORT_FAILED", message }, { status: 500 });
-}
-
-function normalizeAffiliateUrl(value: string | null | undefined) {
-  return value?.trim().replace(/[)\].,;]+$/g, "") ?? "";
 }
 
 function getRawEntries(body: Record<string, unknown>) {
@@ -31,12 +26,6 @@ function getRawEntries(body: Record<string, unknown>) {
   if (typeof body.entries === "string") return body.entries.split(/\r?\n/g);
   if (typeof body.text === "string") return body.text.split(/\r?\n/g);
   return [];
-}
-
-function parseImportLine(line: string) {
-  const productId = line.match(uuidPattern)?.[0] ?? null;
-  const affiliateUrl = normalizeAffiliateUrl(line.match(partnersLinkPattern)?.[0] ?? null);
-  return { productId, affiliateUrl };
 }
 
 export async function POST(request: Request) {
@@ -51,6 +40,7 @@ export async function POST(request: Request) {
       .slice(0, 80);
     const dryRun = body.dryRun === true;
     const publish = body.publish === true;
+    const products = await listProducts();
 
     const items: ImportItem[] = [];
     let validCount = 0;
@@ -63,41 +53,51 @@ export async function POST(request: Request) {
     const seenProductIds = new Set<string>();
 
     for (const line of lines) {
-      const { productId, affiliateUrl } = parseImportLine(line);
-      if (!productId || !affiliateUrl) {
+      const { productId, sourceProductId, affiliateUrl } = parseAffiliateImportLine(line);
+      if ((!productId && !sourceProductId) || !affiliateUrl) {
         skippedCount += 1;
-        items.push({ product_id: productId ?? "UNKNOWN", title: null, status: "skipped", reason: "PRODUCT_ID_AND_LINK_REQUIRED" });
+        items.push({ product_id: productId ?? sourceProductId ?? "UNKNOWN", title: null, status: "skipped", reason: "PRODUCT_ID_AND_LINK_REQUIRED" });
         continue;
       }
-      if (seenProductIds.has(productId)) {
-        skippedCount += 1;
-        items.push({ product_id: productId, title: null, status: "skipped", reason: "DUPLICATE_PRODUCT_ID" });
-        continue;
-      }
-      seenProductIds.add(productId);
 
       if (isApprovalSampleAffiliateUrl(affiliateUrl)) {
         skippedCount += 1;
-        items.push({ product_id: productId, title: null, status: "skipped", reason: "APPROVAL_SAMPLE_LINK_NOT_ALLOWED", affiliate_url: affiliateUrl });
+        items.push({ product_id: productId ?? sourceProductId ?? "UNKNOWN", title: null, status: "skipped", reason: "APPROVAL_SAMPLE_LINK_NOT_ALLOWED", affiliate_url: affiliateUrl });
         continue;
       }
       if (!isUsableAffiliateUrl(affiliateUrl)) {
         skippedCount += 1;
-        items.push({ product_id: productId, title: null, status: "skipped", reason: getCoupangPartnersLinkIssue(affiliateUrl) ?? "INVALID_AFFILIATE_URL", affiliate_url: affiliateUrl });
+        items.push({ product_id: productId ?? sourceProductId ?? "UNKNOWN", title: null, status: "skipped", reason: getCoupangPartnersLinkIssue(affiliateUrl) ?? "INVALID_AFFILIATE_URL", affiliate_url: affiliateUrl });
         continue;
       }
 
-      const product = await getProductById(productId);
-      if (!product) {
+      const resolved = findAffiliateImportProduct(products, { productId, sourceProductId, affiliateUrl });
+      const product = resolved.product;
+      const matchedBy = resolved.matchedBy;
+      if (resolved.ambiguous) {
         skippedCount += 1;
-        items.push({ product_id: productId, title: null, status: "skipped", reason: "PRODUCT_NOT_FOUND", affiliate_url: affiliateUrl });
+        items.push({ product_id: sourceProductId ?? "UNKNOWN", title: null, status: "skipped", reason: "AMBIGUOUS_SOURCE_PRODUCT_ID", affiliate_url: affiliateUrl });
         continue;
       }
+      if (!product) {
+        skippedCount += 1;
+        items.push({ product_id: productId ?? sourceProductId ?? "UNKNOWN", title: null, status: "skipped", reason: "PRODUCT_NOT_FOUND", affiliate_url: affiliateUrl });
+        continue;
+      }
+
+      if (seenProductIds.has(product.id)) {
+        skippedCount += 1;
+        items.push({ product_id: product.id, title: product.title, matched_by: matchedBy, status: "skipped", reason: "DUPLICATE_PRODUCT_ID", affiliate_url: affiliateUrl });
+        continue;
+      }
+      seenProductIds.add(product.id);
+
+      const resolvedProductId = product.id;
 
       const affiliateIdentity = getAffiliateIdentityReadiness({ ...product, affiliate_url: affiliateUrl });
       if (affiliateIdentity.status === "MISMATCH") {
         skippedCount += 1;
-        items.push({ product_id: productId, title: product.title, status: "skipped", reason: "AFFILIATE_TARGET_MISMATCH", affiliate_url: affiliateUrl });
+        items.push({ product_id: resolvedProductId, title: product.title, matched_by: matchedBy, status: "skipped", reason: "AFFILIATE_TARGET_MISMATCH", affiliate_url: affiliateUrl });
         continue;
       }
 
@@ -106,17 +106,18 @@ export async function POST(request: Request) {
           validCount += 1;
           const reason = publish && !affiliateIdentity.ready ? "AFFILIATE_IDENTITY_VERIFICATION_REQUIRED" : undefined;
           if (reason) identityPendingCount += 1;
-          items.push({ product_id: productId, title: product.title, status: "valid", reason, affiliate_url: affiliateUrl });
+          items.push({ product_id: resolvedProductId, title: product.title, matched_by: matchedBy, status: "valid", reason, affiliate_url: affiliateUrl });
           continue;
         }
 
         if (publish && !affiliateIdentity.ready) {
-          await updateProduct(productId, { affiliate_url: affiliateUrl });
+          await updateProduct(resolvedProductId, { affiliate_url: affiliateUrl });
           updatedCount += 1;
           identityPendingCount += 1;
           items.push({
-            product_id: productId,
+            product_id: resolvedProductId,
             title: product.title,
+            matched_by: matchedBy,
             status: "updated",
             reason: "AFFILIATE_IDENTITY_VERIFICATION_REQUIRED",
             affiliate_url: affiliateUrl
@@ -127,12 +128,13 @@ export async function POST(request: Request) {
         if (publish) {
           const readiness = getCustomerPublishReadiness({ ...product, affiliate_url: affiliateUrl });
           if (!readiness.ready) {
-            await updateProduct(productId, { affiliate_url: affiliateUrl });
+            await updateProduct(resolvedProductId, { affiliate_url: affiliateUrl });
             updatedCount += 1;
             publishBlockedCount += 1;
             items.push({
-              product_id: productId,
+              product_id: resolvedProductId,
               title: product.title,
+              matched_by: matchedBy,
               status: "updated",
               reason: `PUBLISH_BLOCKED_PUBLIC_QUALITY: ${readiness.blockers.slice(0, 3).join(", ")}`,
               affiliate_url: affiliateUrl
@@ -142,7 +144,7 @@ export async function POST(request: Request) {
         }
 
         await updateProduct(
-          productId,
+          resolvedProductId,
           publish
             ? {
                 affiliate_url: affiliateUrl,
@@ -155,11 +157,11 @@ export async function POST(request: Request) {
         );
         updatedCount += 1;
         if (publish) publishedCount += 1;
-        items.push({ product_id: productId, title: product.title, status: "updated", reason: publish ? "PUBLISHED" : undefined, affiliate_url: affiliateUrl });
+        items.push({ product_id: resolvedProductId, title: product.title, matched_by: matchedBy, status: "updated", reason: publish ? "PUBLISHED" : undefined, affiliate_url: affiliateUrl });
       } catch (error) {
         errorCount += 1;
         const reason = error instanceof Error && error.message ? error.message.slice(0, 160) : "UPDATE_FAILED";
-        items.push({ product_id: productId, title: product.title, status: "error", reason, affiliate_url: affiliateUrl });
+        items.push({ product_id: resolvedProductId, title: product.title, matched_by: matchedBy, status: "error", reason, affiliate_url: affiliateUrl });
       }
     }
 

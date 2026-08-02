@@ -6,6 +6,8 @@ const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const route = read("app/api/admin/products/link-intake/bulk/route.ts");
 const singleRoute = read("app/api/admin/products/link-intake/route.ts");
+const importRoute = read("app/api/admin/affiliate-links/import/route.ts");
+const importMatcher = read("lib/affiliateImport.ts");
 const ui = read("components/AdminAffiliateLinkIntake.tsx");
 const packageJson = read("package.json");
 
@@ -18,6 +20,13 @@ assert.match(route, /batch\.map\(async \(item, offset\)/, "items must be process
 assert.match(route, /await Promise\.all\(/, "bulk intake should reduce timeout risk with bounded parallel checks");
 assert.equal(route.includes('redirect: "follow"'), false, "bulk intake must not add redirects");
 assert.match(singleRoute, /sourcing_status: "needs_review"[\s\S]*is_published: false/, "single-item gate remains review-only");
+assert.match(importRoute, /listProducts/, "affiliate link import resolves against the current product catalog");
+assert.match(importRoute, /parseAffiliateImportLine/, "affiliate link import uses the shared line parser");
+assert.match(importRoute, /findAffiliateImportProduct/, "affiliate link import uses the shared product matcher");
+assert.match(importRoute, /AMBIGUOUS_SOURCE_PRODUCT_ID/, "ambiguous external product IDs must not be applied");
+assert.match(importMatcher, /coupangProductUrlPattern/, "bulk import accepts a Coupang product URL as an external key");
+assert.match(importMatcher, /numericProductIdPattern/, "bulk import accepts a bounded numeric Coupang product ID");
+assert.match(importMatcher, /coupang_product_id/, "external matches retain their provenance");
 assert.match(route, /score_error_count/, "bulk intake exposes score persistence warnings separately from insert errors");
 assert.match(route, /score_error/, "bulk intake retains per-item score persistence warnings");
 assert.match(ui, /점수 재계산 필요/, "admin UI distinguishes saved candidates that need score recalculation");

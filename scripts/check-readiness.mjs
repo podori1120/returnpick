@@ -210,6 +210,7 @@ const requiredFiles = [
   "components/TelegramPreview.tsx",
   "lib/affiliateLinkBackfill.ts",
   "lib/affiliateIdentity.ts",
+  "lib/affiliateImport.ts",
   "lib/bootstrapCatalog.ts",
   "lib/demoIdentity.ts",
   "lib/coupangAffiliateLinkVerifier.ts",
@@ -4019,7 +4020,10 @@ if (fileExists("app/api/admin/affiliate-links/import/route.ts")) {
     "admin api: bulk affiliate link import route",
     affiliateImportRoute.includes("requireAdmin") &&
       affiliateImportRoute.includes("BULK_AFFILIATE_LINK_IMPORT_FAILED") &&
-      affiliateImportRoute.includes("getProductById") &&
+      affiliateImportRoute.includes("listProducts") &&
+      affiliateImportRoute.includes("parseAffiliateImportLine") &&
+      affiliateImportRoute.includes("findAffiliateImportProduct") &&
+      affiliateImportRoute.includes("AMBIGUOUS_SOURCE_PRODUCT_ID") &&
       affiliateImportRoute.includes("updateProduct") &&
       affiliateImportRoute.includes("isUsableAffiliateUrl") &&
       affiliateImportRoute.includes("isApprovalSampleAffiliateUrl") &&
@@ -4039,7 +4043,7 @@ if (fileExists("app/api/admin/affiliate-links/import/route.ts")) {
     affiliateImportRoute.includes("getCustomerPublishReadiness") &&
       affiliateImportRoute.includes("PUBLISH_BLOCKED_PUBLIC_QUALITY") &&
       affiliateImportRoute.includes("readiness.blockers") &&
-      affiliateImportRoute.includes('await updateProduct(productId, { affiliate_url: affiliateUrl })') &&
+      affiliateImportRoute.includes('await updateProduct(resolvedProductId, { affiliate_url: affiliateUrl })') &&
       affiliateImportRoute.includes("publishBlockedCount") &&
       affiliateImportRoute.includes("publishedCount += 1"),
     "bulk link import saves valid links but does not publish products before identity or public quality checks",
