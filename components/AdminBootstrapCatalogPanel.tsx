@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Database, PackageCheck, RefreshCw, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Copy, Database, PackageCheck, RefreshCw, ShieldCheck } from "lucide-react";
 
 type ExportResult = {
   status: "ready" | "empty" | "too_large" | "error";
@@ -15,6 +15,8 @@ type ExportResult = {
   skipped_count?: number;
   skipped_by_reason?: Record<string, number>;
   product_ids?: string[];
+  storage_mode?: "supabase" | "memory_fallback";
+  storage_message?: string;
   error?: string;
   message?: string;
 };
@@ -87,6 +89,9 @@ export default function AdminBootstrapCatalogPanel() {
             Vercel Production Key: <code className="break-all text-ink">{BOOTSTRAP_CATALOG_ENV_LABEL}</code>
           </p>
           <p className="mt-2 text-xs font-semibold leading-5 text-steel">자동 관측 상품은 수집 시각을, 수동 상품은 관리자 공개 검토 시각을 보존합니다. 수동 검토는 7일이 지나면 다시 확인해야 합니다.</p>
+          <p className="mt-2 text-xs font-semibold leading-5 text-steel">
+            이 도구가 만든 JSON은 Vercel Production 환경변수에 넣고 재배포해야 유지됩니다. 후보 등록·수정·클릭 집계까지 계속 운영하려면 <a className="font-black text-pine underline" href="#admin-api-readiness">Supabase 운영 DB</a>가 필요합니다.
+          </p>
         </div>
         <button
           className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-4 py-2.5 text-sm font-black text-white hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60"
@@ -103,6 +108,17 @@ export default function AdminBootstrapCatalogPanel() {
         <p className="mt-4 rounded-lg border border-line bg-mist px-3 py-2 text-sm font-bold text-steel" role="status" aria-live="polite">
           {notice}
         </p>
+      ) : null}
+
+      {result?.storage_mode ? (
+        <div className={`mt-4 flex items-start gap-3 rounded-lg border p-3 text-sm ${result.storage_mode === "supabase" ? "border-pine/30 bg-pine/5 text-pine" : "border-lemon/50 bg-lemon/15 text-ink"}`} role="status">
+          {result.storage_mode === "supabase" ? <Database className="mt-0.5 shrink-0" size={18} aria-hidden /> : <AlertTriangle className="mt-0.5 shrink-0" size={18} aria-hidden />}
+          <div>
+            <p className="font-black">{result.storage_mode === "supabase" ? "영속 저장소: Supabase" : "임시 저장소: 메모리 fallback"}</p>
+            <p className="mt-1 font-semibold leading-5">{result.storage_message}</p>
+            {result.storage_mode === "memory_fallback" ? <a className="mt-1 inline-block font-black text-pine underline" href="#admin-api-readiness">Supabase 준비도 점검으로 이동</a> : null}
+          </div>
+        </div>
       ) : null}
 
       {result?.status === "ready" && result.env_name && result.env_value ? (

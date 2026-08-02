@@ -562,6 +562,9 @@ if (
     "admin: bootstrap catalog export",
     route.includes("requireAdmin") &&
       route.includes("createBootstrapCatalog") &&
+      route.includes("hasSupabaseConfig") &&
+      route.includes('"memory_fallback"') &&
+      panel.includes("임시 저장소: 메모리 fallback") &&
       route.includes('"Cache-Control": "no-store, max-age=0"') &&
       panel.includes("승인 대기용 출시 카탈로그") &&
       panel.includes("/api/admin/bootstrap-catalog") &&
