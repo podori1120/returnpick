@@ -2961,8 +2961,8 @@ if (fileExists("components/AdminLaunchStatusBar.tsx")) {
   );
   check(
     "admin: post-approval fast path",
-    launchStatusBar.includes("빠른 출시 동선") &&
-      launchStatusBar.includes("admin-manual-product-bulk") &&
+      launchStatusBar.includes("빠른 출시 동선") &&
+      launchStatusBar.includes("admin-affiliate-link-intake") &&
       launchStatusBar.includes("admin-affiliate-links") &&
       launchStatusBar.includes("admin-candidate-review") &&
       launchStatusBar.includes("admin-telegram-distribution"),

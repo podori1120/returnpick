@@ -204,11 +204,11 @@ export default function AdminLaunchStatusBar({ password }: { password: string })
         <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <button
             className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2.5 text-left text-xs font-black text-ink hover:border-pine hover:bg-mist"
-            onClick={() => scrollToAdminAnchor("admin-manual-product-bulk")}
+            onClick={() => scrollToAdminAnchor("admin-affiliate-link-intake")}
             type="button"
           >
             <ClipboardPlus className="shrink-0 text-pine" size={16} aria-hidden />
-            <span><span className="block text-[10px] font-bold text-steel">1단계</span>상품 여러 개 추가</span>
+            <span><span className="block text-[10px] font-bold text-steel">1단계</span>파트너스 링크로 후보 추가</span>
           </button>
           <button
             className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2.5 text-left text-xs font-black text-ink hover:border-pine hover:bg-mist"
