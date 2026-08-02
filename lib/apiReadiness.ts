@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { extractCoupangProductId } from "@/lib/affiliateIdentity";
 import { isCoupangPartnersLink, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { createCoupangDeeplink, searchCoupangProducts } from "@/lib/providers/coupangPartnersProvider";
 import { searchNaverShopping } from "@/lib/providers/naverShoppingProvider";
@@ -1382,12 +1383,18 @@ async function runAnonPublicRlsSmokeCheck(client: NonNullable<ReturnType<typeof 
   };
 }
 
-async function fetchWithTimeout(url: string, timeoutMs = 8000, headers: Record<string, string> = {}) {
+async function fetchWithTimeout(
+  url: string,
+  timeoutMs = 8000,
+  headers: Record<string, string> = {},
+  redirect: "follow" | "error" | "manual" = "follow"
+) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, {
       cache: "no-store",
+      redirect,
       signal: controller.signal,
       headers: {
         "user-agent": "ReturnPick-Readiness/1.0",
@@ -1505,7 +1512,35 @@ async function runPublicSiteLiveCheck(): Promise<ApiConnectionCheck> {
     const hasNotice = body.includes("쿠팡 파트너스 활동의 일환");
     const hasDisclosure = body.includes("/disclosure");
     const hasApprovalUrl = approvalUrl ? body.includes(approvalUrl) : false;
-    const ok = response.ok && hasCta && hasNotice && hasDisclosure && (!approvalUrl || hasApprovalUrl);
+    let approvalRedirect: Record<string, JsonValue> | null = null;
+    if (approvalUrl && isCoupangPartnersLink(approvalUrl)) {
+      try {
+        const redirectResponse = await fetchWithTimeout(approvalUrl, 8000, {}, "manual");
+        const location = redirectResponse.headers.get("location");
+        let destination: URL | null = null;
+        try {
+          destination = location ? new URL(location, approvalUrl) : null;
+        } catch {
+          destination = null;
+        }
+        const productId = extractCoupangProductId(destination?.toString());
+        approvalRedirect = {
+          checked: true,
+          http_status: redirectResponse.status,
+          location_host: destination?.hostname ?? null,
+          product_id: productId,
+          resolves_to_product: Boolean(productId)
+        };
+      } catch {
+        approvalRedirect = {
+          checked: true,
+          error: "AFFILIATE_REDIRECT_CHECK_FAILED",
+          resolves_to_product: false
+        };
+      }
+    }
+    const approvalRedirectOk = !approvalUrl || approvalRedirect?.resolves_to_product === true;
+    const ok = response.ok && hasCta && hasNotice && hasDisclosure && (!approvalUrl || hasApprovalUrl) && approvalRedirectOk;
 
     return {
       id: "site_live",
@@ -1521,7 +1556,8 @@ async function runPublicSiteLiveCheck(): Promise<ApiConnectionCheck> {
         has_affiliate_notice: hasNotice,
         has_disclosure_link: hasDisclosure,
         has_approval_affiliate_url: hasApprovalUrl,
-        approval_url_configured: Boolean(approvalUrl)
+        approval_url_configured: Boolean(approvalUrl),
+        approval_redirect: approvalRedirect
       }
     };
   } catch (error) {

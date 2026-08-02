@@ -2856,6 +2856,16 @@ if (fileExists("lib/apiReadiness.ts")) {
   );
   check("readiness: public approval live check", readiness.includes("runPublicSiteLiveCheck") && readiness.includes("\uCFE0\uD321\uC5D0\uC11C \uAC00\uACA9 \uD655\uC778") && readiness.includes("has_approval_affiliate_url"), "admin readiness verifies public approval page and affiliate disclosure", "required");
   check(
+    "readiness: approval redirect product check",
+    readiness.includes("extractCoupangProductId") &&
+      readiness.includes("redirect,") &&
+      readiness.includes('{}, "manual"') &&
+      readiness.includes("approval_redirect") &&
+      readiness.includes("resolves_to_product"),
+    "admin readiness verifies that the approval Partners link resolves to a Coupang product destination",
+    "required"
+  );
+  check(
     "readiness: cron endpoint probe",
     readiness.includes("runCronProbeCheck") &&
       readiness.includes("/api/cron/sourcing?probe=1") &&
