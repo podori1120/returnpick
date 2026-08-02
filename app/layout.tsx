@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Search } from "lucide-react";
 import CompareDock from "@/components/CompareDock";
+import SearchSuggest from "@/components/SearchSuggest";
 import { getSiteUrl } from "@/lib/siteUrl";
 import "./globals.css";
 
@@ -45,20 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <span className="block text-xs font-semibold text-steel">리턴픽</span>
               </span>
             </Link>
-            <form className="order-2 flex w-full min-w-0 max-w-xl items-center gap-1 rounded-lg border border-line bg-mist p-1 sm:order-none sm:mx-5 sm:flex-1" action="/deals" role="search">
-              <label className="relative min-w-0 flex-1">
-                <span className="sr-only">상품 검색</span>
-                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-steel" size={17} aria-hidden />
-                <input
-                  className="focus-ring h-9 w-full rounded-md bg-transparent pl-9 pr-2 text-sm font-bold text-ink placeholder:text-steel"
-                  name="search"
-                  placeholder="상품명·브랜드·모델명 검색"
-                />
-              </label>
-              <button className="focus-ring flex size-9 shrink-0 items-center justify-center rounded-md bg-ink text-white hover:bg-pine" type="submit" aria-label="상품 검색" title="상품 검색">
-                <Search size={17} aria-hidden />
-              </button>
-            </form>
+            <SearchSuggest />
             <nav aria-label="주요 메뉴" className="order-3 -mx-4 grid grid-cols-4 gap-1 px-4 pb-1 text-xs font-semibold text-steel sm:order-none sm:mx-0 sm:flex sm:flex-wrap sm:gap-2 sm:px-0 sm:pb-0 sm:text-sm">
               <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/deals">
                 딜 보기

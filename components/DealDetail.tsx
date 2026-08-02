@@ -8,6 +8,7 @@ import SavedDealButton from "@/components/SavedDealButton";
 import DealQualityCard from "@/components/DealQualityCard";
 import PriceComparison from "@/components/PriceComparison";
 import PriceHistory from "@/components/PriceHistory";
+import ProductSpecSummary from "@/components/ProductSpecSummary";
 import PurchaseDecisionPanel from "@/components/PurchaseDecisionPanel";
 import RelatedDeals from "@/components/RelatedDeals";
 import RiskFlags from "@/components/RiskFlags";
@@ -106,6 +107,8 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
           </div>
 
           <PurchaseDecisionPanel product={product} />
+
+          <ProductSpecSummary product={product} />
 
           <section className="space-y-3">
             <h2 className="text-lg font-black">가격 비교</h2>

@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { categoryOptions } from "@/lib/category";
+import { useCaseOptions } from "@/lib/dealIntelligence";
 
 type SavedFilter = {
   label: string;
@@ -21,8 +23,10 @@ export default function SavedFilterBar() {
   function saveCurrentFilter() {
     const href = `${window.location.pathname}${window.location.search}`;
     const params = new URLSearchParams(window.location.search);
+    const useCaseLabel = useCaseOptions.find((option) => option.id === params.get("useCase"))?.label;
+    const categoryLabel = categoryOptions.find((option) => option.value === params.get("category"))?.label;
     const label =
-      [params.get("useCase"), params.get("category"), params.get("minScore") ? `${params.get("minScore")}점+` : null, params.get("minDiscount") ? `${params.get("minDiscount")}%+` : null]
+      [useCaseLabel, categoryLabel, params.get("minScore") ? `${params.get("minScore")}점 이상` : null, params.get("minDiscount") ? `${params.get("minDiscount")} 할인 이상` : null]
         .filter(Boolean)
         .join(" · ") || "전체 딜";
     const next = [{ label, href, savedAt: new Date().toISOString() }, ...items.filter((item) => item.href !== href)].slice(0, 8);

@@ -8,6 +8,7 @@ import AffiliateNotice from "@/components/AffiliateNotice";
 import { getStoredJsonArray, setStoredJsonArray } from "@/lib/clientTracking";
 import { getCoupangOutboundLink } from "@/lib/coupangLink";
 import { formatPercent, formatPrice } from "@/lib/format";
+import { formatProductSpecSummary } from "@/lib/productSpecs";
 import type { PublicDeal } from "@/lib/publicDeal";
 
 type StoredCompareItem = {
@@ -283,6 +284,7 @@ export default function CompareBoard() {
                 ["기준가", (product: PublicDeal) => formatPrice(product.reference_price)],
                 ["할인율", (product: PublicDeal) => formatPercent(product.discount_rate)],
                 ["반품등급", (product: PublicDeal) => product.condition_grade],
+                ["핵심 사양", (product: PublicDeal) => formatProductSpecSummary(product) || "상품명에서 확인할 사양 없음"],
                 ["검수", (product: PublicDeal) => `${product.quality.label} ${product.quality.confidence}`],
                 ["위험 플래그", (product: PublicDeal) => `${product.risk_flags.length}개`],
                 ["제휴 링크", (product: PublicDeal) => (getCoupangOutboundLink(product).isAffiliate ? "준비됨" : "확인필요")]
