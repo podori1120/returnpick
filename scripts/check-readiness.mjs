@@ -513,6 +513,7 @@ if (fileExists("lib/discoveryUpdates.ts") && fileExists("components/VerifiedUpda
 if (
   fileExists("package.json") &&
   fileExists("lib/bootstrapCatalog.ts") &&
+  fileExists("lib/manualCatalogReview.ts") &&
   fileExists("lib/dataStore.ts") &&
   fileExists("scripts/verify-bootstrap-catalog-runtime.mjs") &&
   fileExists("app/api/admin/bootstrap-catalog/route.ts") &&
@@ -520,6 +521,7 @@ if (
 ) {
   const packageJson = readText("package.json");
   const catalog = readText("lib/bootstrapCatalog.ts");
+  const manualCatalogReview = readText("lib/manualCatalogReview.ts");
   const dataStore = readText("lib/dataStore.ts");
   const runtimeCheck = readText("scripts/verify-bootstrap-catalog-runtime.mjs");
   const route = readText("app/api/admin/bootstrap-catalog/route.ts");
@@ -544,12 +546,15 @@ if (
       catalog.includes("BOOTSTRAP_CATALOG_MAX_PRODUCTS = 40") &&
       catalog.includes("isSyntheticSource") &&
       catalog.includes("identityBoundToCurrentProduct") &&
-      catalog.includes("LAST_OBSERVED_AT_REQUIRED") &&
+       catalog.includes("CATALOG_PROVENANCE_REQUIRED") &&
+       catalog.includes("MANUAL_CATALOG_REVIEW_STALE") &&
+       manualCatalogReview.includes("MANUAL_CATALOG_REVIEW_MAX_AGE_MS") &&
+       manualCatalogReview.includes("createManualCatalogReview") &&
       catalog.includes("isPublicDealReady") &&
       dataStore.includes("hydrateBootstrapCatalog") &&
       dataStore.includes("snapshot.observed_at = product.last_observed_at") &&
       runtimeCheck.includes("stale or forged affiliate identity rejection"),
-    "preapproval catalog only restores fresh, non-demo, public-ready products whose exact affiliate destination remains bound to the candidate",
+    "preapproval catalog only restores fresh, non-demo, public-ready products whose exact affiliate destination remains bound to the candidate, including explicit fresh manual reviews",
     "required"
   );
   check(

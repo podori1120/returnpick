@@ -3,6 +3,7 @@ import { getProductById, updateProduct } from "@/lib/dataStore";
 import { getCoupangPartnersLinkIssue, isApprovalSampleAffiliateUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { getCustomerPublishReadiness } from "@/lib/quality";
 import { getAffiliateIdentityReadiness } from "@/lib/affiliateIdentity";
+import { createManualCatalogReview, isManualCatalogSource } from "@/lib/manualCatalogReview";
 import { requireAdmin } from "@/lib/validators";
 
 type ImportItem = {
@@ -143,7 +144,13 @@ export async function POST(request: Request) {
         await updateProduct(
           productId,
           publish
-            ? { affiliate_url: affiliateUrl, sourcing_status: "published", is_published: true, is_rejected: false }
+            ? {
+                affiliate_url: affiliateUrl,
+                ...(isManualCatalogSource(product.source) ? { raw_json: createManualCatalogReview(product.raw_json) } : {}),
+                sourcing_status: "published",
+                is_published: true,
+                is_rejected: false
+              }
             : { affiliate_url: affiliateUrl }
         );
         updatedCount += 1;

@@ -8,6 +8,7 @@ import { getAffiliateIdentityReadiness } from "@/lib/affiliateIdentity";
 import { getCoupangPartnersLinkIssue, isApprovalSampleAffiliateUrl, isGenericCoupangLandingUrl, isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
 import { getProductImageUrlIssue } from "@/lib/productImageUrl";
 import { getNaverPriceTrust, mergeManualNaverPriceEvidence } from "@/lib/naverPriceTrust";
+import { createManualCatalogReview, isManualCatalogSource } from "@/lib/manualCatalogReview";
 import { isConditionGrade, isSourcingStatus, requireAdmin, sanitizeText } from "@/lib/validators";
 import type { ConditionGrade, ProductWithScore, SourcedProduct, SourcingStatus } from "@/lib/types";
 
@@ -213,7 +214,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         { status: 400 }
       );
     }
-    const publishPatch = { ...patch, sourcing_status: "published" as const, is_published: true, is_rejected: false };
+    const publishPatch = {
+      ...patch,
+      raw_json: isManualCatalogSource(current.source)
+        ? createManualCatalogReview({ ...(current.raw_json ?? {}), ...(patch.raw_json ?? {}) })
+        : patch.raw_json ?? current.raw_json,
+      sourcing_status: "published" as const,
+      is_published: true,
+      is_rejected: false
+    };
     const qualityBlock = publicQualityBlockResponse(projectProductForPublishCheck(current, publishPatch));
     if (qualityBlock) return qualityBlock;
     patch = publishPatch;

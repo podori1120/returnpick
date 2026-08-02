@@ -14,7 +14,14 @@ if (!fs.existsSync(buildIdPath) && !fs.existsSync(buildManifestPath)) {
   throw new Error("NEXT_BUILD_REQUIRED: run npm run build before bootstrap-catalog:check");
 }
 
-function catalogValue({ resolvedProductId = "9200000001", identityStatus, includeReturnEvidence = true } = {}) {
+function catalogValue({
+  resolvedProductId = "9200000001",
+  identityStatus,
+  includeReturnEvidence = true,
+  source = "public_web",
+  includeObservation = true,
+  manualReviewAt = null
+} = {}) {
   const now = new Date().toISOString();
   return JSON.stringify({
     version: 1,
@@ -22,7 +29,7 @@ function catalogValue({ resolvedProductId = "9200000001", identityStatus, includ
     products: [
       {
         id: productId,
-        source: "public_web",
+        source,
         source_product_id: "bootstrap-verified-9200000001",
         category: "monitor",
         keyword: "QHD 모니터",
@@ -50,7 +57,16 @@ function catalogValue({ resolvedProductId = "9200000001", identityStatus, includ
             resolution_code: "RESOLVED_PRODUCT",
             checked_at: now,
             method: "automatic"
-          }
+          },
+          ...(manualReviewAt
+            ? {
+                manual_catalog_review: {
+                  status: "approved",
+                  method: "manual",
+                  reviewed_at: manualReviewAt
+                }
+              }
+            : {})
         },
         sourcing_status: "published",
         is_published: true,
@@ -58,7 +74,7 @@ function catalogValue({ resolvedProductId = "9200000001", identityStatus, includ
         rejection_reason: null,
         admin_memo: null,
         public_note: "로컬 통합 검증용 상품입니다.",
-        last_observed_at: now,
+        last_observed_at: includeObservation ? now : null,
         created_at: now,
         updated_at: now
       }
@@ -157,5 +173,28 @@ await withServer(3219, catalogValue({ includeReturnEvidence: false }), async (ba
   assert.match(detailHtml, /현재 판매가/);
   assert.match(detailHtml, /반품 정보가 확인되지 않은 항목은 쿠팡 상품 페이지에서 최종 확인하세요/);
 });
+
+await withServer(3220, catalogValue({ source: "manual_admin", includeObservation: false, manualReviewAt: new Date().toISOString() }), async (baseUrl) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.match(dealsHtml, new RegExp(productTitle));
+});
+
+await withServer(
+  3221,
+  catalogValue({
+    source: "manual_affiliate_link",
+    includeObservation: false,
+    manualReviewAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1_000).toISOString()
+  }),
+  async (baseUrl, logs) => {
+    const deals = await fetch(`${baseUrl}/deals`);
+    const dealsHtml = await deals.text();
+    assert.equal(deals.status, 200);
+    assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+    assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+  }
+);
 
 console.log("Bootstrap catalog runtime checks passed: verified product hydration, price-only publication, and stale or forged affiliate identity rejection.");

@@ -11,6 +11,7 @@ import {
 import { isUsableProductImageUrl } from "@/lib/productImageUrl";
 import { isDemoProduct, isPublicDealReady } from "@/lib/publicDeal";
 import { calculateDealScore } from "@/lib/scoring";
+import { getManualCatalogReviewAt, isFreshManualCatalogReview, isManualCatalogSource } from "@/lib/manualCatalogReview";
 import type {
   Category,
   ConditionGrade,
@@ -41,7 +42,8 @@ const rawJsonKeys = [
   "naver_price_manual",
   "naver_price_backfill",
   "naver_price_lookup",
-  "web_return_info"
+  "web_return_info",
+  "manual_catalog_review"
 ] as const;
 
 type BootstrapCatalogPayload = {
@@ -167,8 +169,12 @@ function normalizeProduct(value: unknown, index: number): { product: SourcedProd
   if (!imageUrl || !isUsableProductImageUrl(imageUrl)) {
     issue("PRODUCT_IMAGE_INVALID", "공개 가능한 HTTPS 상품 이미지가 필요합니다.");
   }
-  if (!validDateOrNull(value.last_observed_at)) {
-    issue("LAST_OBSERVED_AT_REQUIRED", "자동 수집으로 확인한 마지막 관측 시각이 필요합니다.");
+  const automaticObservationAt = validDateOrNull(value.last_observed_at);
+  const manualReviewAt = isManualCatalogSource(source) ? getManualCatalogReviewAt(rawJson) : null;
+  if (!automaticObservationAt && !manualReviewAt) {
+    issue("CATALOG_PROVENANCE_REQUIRED", "자동 수집 관측 시각 또는 관리자 수동 공개 검토 시각이 필요합니다.");
+  } else if (!automaticObservationAt && manualReviewAt && !isFreshManualCatalogReview(rawJson)) {
+    issue("MANUAL_CATALOG_REVIEW_STALE", "관리자 수동 공개 검토 시각이 7일을 넘어 다시 검수해야 합니다.");
   }
 
   const stamp = new Date().toISOString();

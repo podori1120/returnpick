@@ -29,7 +29,9 @@ const reasonLabels: Record<string, string> = {
   public_quality_blocked: "공개 품질 기준 미달",
   last_observed_at_required: "자동 수집 시각 없음",
   catalog_limit: "카탈로그 개수 제한",
-  catalog_size_limit: "환경변수 용량 제한"
+  catalog_size_limit: "환경변수 용량 제한",
+  catalog_provenance_required: "자동 관측 또는 수동 공개 검토 근거 없음",
+  manual_catalog_review_stale: "수동 공개 검토 7일 경과"
 };
 
 function formatBytes(value = 0) {
@@ -78,13 +80,13 @@ export default function AdminBootstrapCatalogPanel() {
           <p className="text-sm font-black text-pine">Preapproval Catalog</p>
           <h2 className="mt-1 text-xl font-black text-ink">승인 대기용 출시 카탈로그</h2>
           <p className="mt-2 text-sm font-semibold leading-6 text-steel">
-            Supabase 연결 전에도 검수 완료 상품을 Vercel 재배포 뒤 그대로 공개하기 위한 임시 보존 수단입니다. 목업 상품, 승인용 샘플 링크,
-            상품번호 불일치, 공개 품질 미달 상품은 자동으로 제외합니다.
+            Supabase 연결 전에도 검수 완료 상품을 Vercel 재배포 뒤 그대로 공개하기 위한 임시 보존 수단입니다. 자동 관측 상품이나 게시 시점에 관리자가
+            직접 확인한 수동 상품만 포함하며, 목업 상품, 승인용 샘플 링크, 상품번호 불일치, 공개 품질 미달 상품은 자동으로 제외합니다.
           </p>
           <p className="mt-2 text-xs font-bold text-steel">
             Vercel Production Key: <code className="break-all text-ink">{BOOTSTRAP_CATALOG_ENV_LABEL}</code>
           </p>
-          <p className="mt-2 text-xs font-semibold leading-5 text-steel">검증을 통과한 상품을 용량 한도 안에서 최대 40개까지 보존합니다.</p>
+          <p className="mt-2 text-xs font-semibold leading-5 text-steel">자동 관측 상품은 수집 시각을, 수동 상품은 관리자 공개 검토 시각을 보존합니다. 수동 검토는 7일이 지나면 다시 확인해야 합니다.</p>
         </div>
         <button
           className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-4 py-2.5 text-sm font-black text-white hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60"
@@ -180,7 +182,7 @@ export default function AdminBootstrapCatalogPanel() {
       ) : null}
 
       <p className="mt-4 text-xs font-semibold leading-5 text-steel">
-        이 카탈로그는 공개 상품 보존만 담당합니다. 클릭 집계, 관리자 수정, 자동 소싱 실행 기록을 영구 보존하려면 Supabase 운영 DB 연결이 여전히 필요합니다.
+        검증을 통과한 상품을 용량 한도 안에서 최대 40개까지 보존합니다. 이 카탈로그는 공개 상품 보존만 담당하며 클릭 집계, 관리자 수정, 자동 소싱 실행 기록을 영구 보존하려면 Supabase 운영 DB 연결이 여전히 필요합니다.
       </p>
     </section>
   );
