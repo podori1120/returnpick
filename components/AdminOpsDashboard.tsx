@@ -183,7 +183,14 @@ function surfaceLabel(context: string) {
     editorial_pick: "편집 추천",
     editorial_home_card: "홈 추천 카드",
     editorial_deals_card: "딜 목록 추천 카드",
-    editorial_picks_card: "검수 추천 모음 카드"
+    editorial_picks_card: "검수 추천 모음 카드",
+    deal_detail: "딜 상세 페이지",
+    deal_card: "딜 목록 카드",
+    deals_index: "딜 목록 노출",
+    category_index: "카테고리 목록 노출",
+    editorial_index: "편집 추천 목록 노출",
+    compare: "비교 화면",
+    saved: "찜한 상품 화면"
   };
   return labels[context] ?? context.replace(/_/g, " ");
 }

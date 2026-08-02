@@ -207,6 +207,7 @@ export default function CompareBoard() {
                   disabledLabel="링크 확인필요 · 구매 전 확인"
                   sponsored={recommendedOutboundLink?.isAffiliate}
                   channel="compare"
+                  context="compare"
                   className="focus-ring inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink sm:w-auto"
                 />
               </div>
@@ -287,6 +288,7 @@ export default function CompareBoard() {
                 disabledLabel="링크 확인필요 · 구매 전 확인"
                 sponsored={outboundLink.isAffiliate}
                 channel="compare"
+                context="compare"
               />
             </div>
           </article>

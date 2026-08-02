@@ -129,6 +129,7 @@ export default function DealCard({ product }: { product: ProductWithScore }) {
               href={outboundLink.href}
               label="쿠팡에서 가격 확인"
               placement="deal_card"
+              context="deal_card"
               className="focus-ring inline-flex w-full items-center justify-center gap-2 rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink"
             />
             <p className="mt-2 text-[11px] font-semibold leading-4 text-steel">

@@ -141,7 +141,7 @@ export function trackAffiliateEvent(input: {
   eventType: AffiliateEventType;
   channel?: string;
   utmSource?: string | null;
-  context?: ManualAffiliateEventContext;
+  context?: string | null;
 }) {
   if (typeof window === "undefined") return;
   try {

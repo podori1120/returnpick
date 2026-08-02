@@ -43,7 +43,7 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
 
   return (
     <main className="mx-auto max-w-7xl px-4 pb-28 pt-8 sm:px-6 lg:pb-8">
-      <DealViewTracker productId={product.id} title={product.title} />
+      <DealViewTracker productId={product.id} title={product.title} context="deal_detail" />
       {demoProduct ? <DemoModeNotice count={1} /> : null}
       <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
         <section className="space-y-6">
@@ -98,6 +98,7 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
                   label={buyLabel}
                   disabledLabel={demoProduct ? "데모 상품 · 구매 링크 없음" : "링크 확인필요"}
                   placement="detail_hero"
+                  context="deal_detail"
                   sponsored={outboundLink.isAffiliate}
                   className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-pine px-4 py-2 text-sm font-black text-white hover:bg-ink"
                 />
@@ -134,6 +135,7 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
                   label={buyLabel}
                   disabledLabel={demoProduct ? "데모 상품 · 구매 링크 없음" : "링크 확인필요"}
                   placement="detail_price"
+                  context="deal_detail"
                   sponsored={outboundLink.isAffiliate}
                   className="focus-ring inline-flex min-w-[180px] items-center justify-center gap-2 rounded-lg bg-ink px-4 py-3 text-sm font-black text-white hover:bg-pine"
                 />
@@ -215,6 +217,7 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
               label={buyLabel}
               disabledLabel={demoProduct ? "데모 상품 · 구매 링크 없음" : "링크 확인필요"}
               placement="detail_sidebar"
+              context="deal_detail"
               sponsored={outboundLink.isAffiliate}
             />
             <p className="mt-3 text-xs font-semibold leading-5 text-steel">
@@ -236,6 +239,7 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
             label={buyLabel}
             disabledLabel={demoProduct ? "데모 상품 · 구매 링크 없음" : "링크 확인필요"}
             placement="detail_mobile_sticky"
+            context="deal_detail"
             sponsored={outboundLink.isAffiliate}
           />
           <p className="mt-1 text-center text-[11px] font-semibold text-steel">

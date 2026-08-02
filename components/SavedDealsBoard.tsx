@@ -231,7 +231,7 @@ export default function SavedDealsBoard() {
                   })()}
                   <div className="flex flex-wrap gap-2">
                     <Link className="focus-ring min-w-[140px] flex-1 rounded-lg border border-line px-3 py-2.5 text-center text-sm font-black hover:bg-mist" href={product.detail_url}>상세 확인</Link>
-                    <AffiliateButton productId={product.id} href={outboundLink.href} label={outboundLink.label} sponsored={outboundLink.isAffiliate} channel="saved" className="focus-ring min-w-[160px] flex-1 rounded-lg bg-pine px-3 py-2.5 text-center text-sm font-black text-white hover:bg-ink" />
+                    <AffiliateButton productId={product.id} href={outboundLink.href} label={outboundLink.label} sponsored={outboundLink.isAffiliate} channel="saved" context="saved" className="focus-ring min-w-[160px] flex-1 rounded-lg bg-pine px-3 py-2.5 text-center text-sm font-black text-white hover:bg-ink" />
                   </div>
                 </div>
               </article>

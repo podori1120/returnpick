@@ -338,7 +338,7 @@ export default async function DealsPage({
   return (
     <main className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(dealListJsonLd) }} />
-      <ProductImpressionTracker productIds={products.map((product) => product.id)} />
+      <ProductImpressionTracker productIds={products.map((product) => product.id)} channel="web_deals_index" context="deals_index" />
       <div>
         <p className="text-sm font-black text-pine">ReturnPick Deals</p>
         <h1 className="text-3xl font-black tracking-tight">검수 완료 딜</h1>

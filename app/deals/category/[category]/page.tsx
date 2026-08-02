@@ -93,7 +93,7 @@ export default async function CategoryDealPage({ params }: { params: Promise<{ c
 
   return (
     <main>
-      <ProductImpressionTracker productIds={products.map((product) => product.id)} channel={`web_category_${category}`} />
+      <ProductImpressionTracker productIds={products.map((product) => product.id)} channel={`web_category_${category}`} context="category_index" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd).replace(/</g, "\\u003c") }} />
 
       <section className="border-b border-line bg-white">

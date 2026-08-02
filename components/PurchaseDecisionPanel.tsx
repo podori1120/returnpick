@@ -63,6 +63,7 @@ export default function PurchaseDecisionPanel({ product }: { product: ProductWit
               label={demoProduct ? "데모 상품 · 구매 링크 없음" : outboundLink.isAffiliate ? "쿠팡에서 실시간 가격 확인" : "링크 확인필요"}
               disabledLabel={demoProduct ? "데모 상품 · 구매 링크 없음" : "링크 확인필요"}
               placement="detail_decision"
+              context="deal_detail"
               sponsored={outboundLink.isAffiliate}
               className="focus-ring inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink sm:w-auto sm:min-w-[220px]"
             />

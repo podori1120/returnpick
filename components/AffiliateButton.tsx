@@ -28,6 +28,7 @@ export default function AffiliateButton({
   disabledLabel = "링크 확인필요",
   channel,
   placement,
+  context,
   sponsored = true
 }: {
   productId: string;
@@ -37,6 +38,7 @@ export default function AffiliateButton({
   disabledLabel?: string;
   channel?: string;
   placement?: string;
+  context?: string;
   sponsored?: boolean;
 }) {
   const affiliateHref = typeof href === "string" ? href.trim() : "";
@@ -64,7 +66,7 @@ export default function AffiliateButton({
       onClick={() => {
         const utmSource = getUtmSource();
         const resolvedChannel = buildTrackingChannel(channel, placement, utmSource);
-        if (sponsored) trackAffiliateEvent({ productId, eventType: "affiliate_click", channel: resolvedChannel, utmSource });
+        if (sponsored) trackAffiliateEvent({ productId, eventType: "affiliate_click", channel: resolvedChannel, utmSource, context });
       }}
       rel={sponsored ? "sponsored nofollow noopener noreferrer" : "nofollow noopener noreferrer"}
       target="_blank"

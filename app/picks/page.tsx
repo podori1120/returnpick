@@ -82,7 +82,7 @@ export default async function PicksPage() {
   return (
     <main className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: buildJsonLd(featuredProducts) }} />
-      <ProductImpressionTracker productIds={featuredProducts.map((product) => product.id)} channel="web_editorial_index" />
+      <ProductImpressionTracker productIds={featuredProducts.map((product) => product.id)} channel="web_editorial_index" context="editorial_index" />
 
       <header className="border-b border-line pb-7">
         <div className="flex flex-wrap items-center gap-2 text-sm font-black text-pine">
