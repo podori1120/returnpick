@@ -6,7 +6,11 @@ import AdminProductEditor from "@/components/AdminProductEditor";
 import TelegramPreview from "@/components/TelegramPreview";
 import ScoreBadge from "@/components/ScoreBadge";
 import VerdictBadge from "@/components/VerdictBadge";
-import { ADMIN_CANDIDATE_QUEUE_EVENT, type AdminCandidateQueue } from "@/lib/adminNavigation";
+import {
+  ADMIN_CANDIDATE_QUEUE_EVENT,
+  type AdminCandidateQueue,
+  type AdminCandidateQueueEventDetail
+} from "@/lib/adminNavigation";
 import { categoryOptions, getCategoryLabel } from "@/lib/category";
 import { isApprovalSampleAffiliateUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { formatDate, formatPercent, formatPrice } from "@/lib/format";
@@ -85,6 +89,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
   const [publicBlockedOnly, setPublicBlockedOnly] = useState(false);
   const [naverPriceNeedsReviewOnly, setNaverPriceNeedsReviewOnly] = useState(false);
   const [sort, setSort] = useState<SortKey>("score");
+  const [focusProductIds, setFocusProductIds] = useState<string[]>([]);
 
   async function loadProducts() {
     setLoading(true);
@@ -127,7 +132,8 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
     void loadProducts();
   }, [password, refreshToken]);
 
-  const applyCandidateQueue = useCallback((queue: AdminCandidateQueue) => {
+  const applyCandidateQueue = useCallback((queue: AdminCandidateQueue, productIds: string[] = []) => {
+    setFocusProductIds(Array.from(new Set(productIds.filter(Boolean))));
     setCategory("all");
     setQuery("");
     setMinScore("");
@@ -170,9 +176,10 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
 
   useEffect(() => {
     function handleCandidateQueueEvent(event: Event) {
-      const queue = (event as CustomEvent<{ queue?: AdminCandidateQueue }>).detail?.queue;
+      const detail = (event as CustomEvent<Partial<AdminCandidateQueueEventDetail>>).detail;
+      const queue = detail?.queue;
       if (!queue) return;
-      applyCandidateQueue(queue);
+      applyCandidateQueue(queue, detail.productIds ?? []);
     }
 
     window.addEventListener(ADMIN_CANDIDATE_QUEUE_EVENT, handleCandidateQueueEvent);
@@ -186,6 +193,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
 
     return products
       .filter((product) => (status === "all" ? true : product.sourcing_status === status))
+      .filter((product) => !focusProductIds.length || focusProductIds.includes(product.id))
       .filter((product) => (category === "all" ? true : product.category === category))
       .filter((product) => (conditionUnknownOnly ? product.condition_grade === "확인필요" || product.condition_grade === "알수없음" : true))
       .filter((product) => (missingAffiliateOnly ? !isProductPublishReady(product) : true))
@@ -208,7 +216,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
         if (sort === "price") return (b.return_price ?? b.source_price ?? 0) - (a.return_price ?? a.source_price ?? 0);
         return b.created_at.localeCompare(a.created_at);
       });
-  }, [products, status, category, conditionUnknownOnly, missingAffiliateOnly, publishReadyOnly, publicBlockedOnly, naverPriceNeedsReviewOnly, query, minScore, minPrice, maxPrice, sort]);
+  }, [products, status, category, conditionUnknownOnly, missingAffiliateOnly, publishReadyOnly, publicBlockedOnly, naverPriceNeedsReviewOnly, query, minScore, minPrice, maxPrice, sort, focusProductIds]);
 
   const reviewStats = useMemo(() => {
     const needsReview = products.filter((product) => product.sourcing_status === "needs_review");
@@ -242,6 +250,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
   }
 
   function showNaverPriceQueue() {
+    setFocusProductIds([]);
     setStatus("all");
     setCategory("all");
     setQuery("");
@@ -392,6 +401,18 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
           <p className={`mb-4 rounded-lg border px-3 py-2 text-sm font-bold ${noticeClassName(notice.type)}`} role="status" aria-live="polite">
             {notice.message}
           </p>
+        ) : null}
+        {focusProductIds.length ? (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-pine/30 bg-pine/5 px-3 py-3 text-sm font-bold text-pine" role="status">
+            <span>방금 일괄 등록한 후보 {focusProductIds.length.toLocaleString("ko-KR")}개만 표시 중입니다. 각 상품의 공개 품질 blocker를 확인하세요.</span>
+            <button
+              className="focus-ring rounded-lg border border-pine/30 bg-white px-3 py-2 text-xs font-black text-pine hover:bg-pine/10"
+              onClick={() => setFocusProductIds([])}
+              type="button"
+            >
+              전체 검토 큐 보기
+            </button>
+          </div>
         ) : null}
         {publishedActionCount > 0 ? (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-pine/30 bg-pine/5 px-3 py-3 text-sm font-bold text-pine">

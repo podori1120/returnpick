@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, FileCheck2, Upload } from "lucide-react";
+import { ArrowRight, Copy, FileCheck2, Upload } from "lucide-react";
+import { openAdminCandidateQueue } from "@/lib/adminNavigation";
 
 const BULK_FIELD_ORDER = "상품명\t카테고리\t쿠팡 상품 URL\t상품별 파트너스 링크\t브랜드\t모델명\t이미지 URL\t수집 당시 가격\t반품가\t새상품가\t네이버 최저가\t반품등급\t재고 수량\t공개 메모";
 
@@ -81,6 +82,7 @@ export default function AdminManualProductBulkForm({ password, onCreated }: { pa
   const [entries, setEntries] = useState("");
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<BulkCandidateResult | null>(null);
+  const [recentProductIds, setRecentProductIds] = useState<string[]>([]);
   const [notice, setNotice] = useState<{ type: "info" | "success" | "error"; message: string } | null>(null);
 
   async function importCandidates() {
@@ -91,6 +93,7 @@ export default function AdminManualProductBulkForm({ password, onCreated }: { pa
 
     setRunning(true);
     setResult(null);
+    setRecentProductIds([]);
     setNotice({ type: "info", message: "실제 상품 URL과 파트너스 링크를 행별로 검증하고 있습니다." });
     try {
       const response = await fetch("/api/admin/products/import", {
@@ -104,6 +107,14 @@ export default function AdminManualProductBulkForm({ password, onCreated }: { pa
         return;
       }
       setResult(data);
+      const importedIds = Array.from(
+        new Set(
+          (data.items ?? [])
+            .filter((item) => (item.status === "inserted" || item.status === "updated") && item.product_id)
+            .map((item) => item.product_id as string)
+        )
+      );
+      setRecentProductIds(importedIds);
       const scoreWarning = data.score_error_count ? ` · 점수 재계산 필요 ${data.score_error_count}개` : "";
       const message = `확인 ${data.scanned_count}줄 · 추가 ${data.inserted_count}개 · 갱신 ${data.updated_count}개 · 건너뜀 ${data.skipped_count}개 · 오류 ${data.error_count}개${scoreWarning}`;
       setNotice({ type: data.status === "ok" ? "success" : data.status === "partial" ? "info" : "error", message });
@@ -181,6 +192,18 @@ export default function AdminManualProductBulkForm({ password, onCreated }: { pa
             </p>
           ) : null}
           <p className="font-black text-ink">일괄 등록 결과 · 새 후보는 검토 대기와 비공개 상태로 추가됩니다.</p>
+          {recentProductIds.length ? (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-pine/30 bg-white px-3 py-3">
+              <p className="text-xs font-black text-pine">방금 추가한 {recentProductIds.length.toLocaleString("ko-KR")}개 후보의 가격·등급·이미지·파트너스 링크를 바로 검토하세요.</p>
+              <button
+                className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-3 py-2 text-xs font-black text-white hover:bg-ink"
+                onClick={() => openAdminCandidateQueue("review", recentProductIds)}
+                type="button"
+              >
+                <ArrowRight size={14} aria-hidden /> 등록 후보 검토
+              </button>
+            </div>
+          ) : null}
           {result.items?.slice(0, 8).length ? (
             <ul className="mt-3 space-y-1 text-xs">
               {result.items.slice(0, 8).map((item, index) => (

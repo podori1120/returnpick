@@ -8,6 +8,8 @@ const singleRoute = fs.readFileSync(path.join(process.cwd(), "app", "api", "admi
 const bulkRoute = fs.readFileSync(path.join(process.cwd(), "app", "api", "admin", "products", "import", "route.ts"), "utf8");
 const singleUi = fs.readFileSync(path.join(process.cwd(), "components", "AdminManualProductForm.tsx"), "utf8");
 const bulkUi = fs.readFileSync(path.join(process.cwd(), "components", "AdminManualProductBulkForm.tsx"), "utf8");
+const candidateUi = fs.readFileSync(path.join(process.cwd(), "components", "AdminCandidateTable.tsx"), "utf8");
+const navigation = fs.readFileSync(path.join(process.cwd(), "lib", "adminNavigation.ts"), "utf8");
 const ts = require("typescript");
 const source = fs.readFileSync(path.join(process.cwd(), "lib", "manualImportIdentity.ts"), "utf8");
 const output = ts.transpileModule(source, {
@@ -42,5 +44,10 @@ assert.match(bulkRoute, /score_error_count/, "bulk intake returns score persiste
 assert.match(bulkRoute, /SOURCING_SCORE_SAVE_FAILED/, "bulk intake exposes a bounded score retry state");
 assert.match(singleUi, /operator_next_action/, "single intake renders the next operator action");
 assert.match(bulkUi, /SOURCING_SCORE_SAVE_FAILED/, "bulk intake labels score persistence warnings");
+assert.match(bulkUi, /openAdminCandidateQueue\("review", recentProductIds\)/, "bulk intake hands imported rows to the focused review queue");
+assert.match(navigation, /productIds\?: string\[\]/, "admin candidate navigation carries imported product IDs");
+assert.match(navigation, /productIds: Array\.from\(new Set\(productIds\.filter\(Boolean\)\)\)/, "admin candidate navigation de-duplicates focused IDs");
+assert.match(candidateUi, /focusProductIds/, "candidate table supports a focused imported-candidate view");
+assert.match(candidateUi, /방금 일괄 등록한 후보/, "candidate table labels the focused imported-candidate view");
 
 console.log("Manual import safety checks passed: cross-source product IDs, normalized title/category conflicts, distinct categories, and retry-safe score persistence for single and bulk intake.");
