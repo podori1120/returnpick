@@ -299,6 +299,12 @@ curl -X POST http://localhost:3000/api/admin/sourcing/run \
 
 자동 재수집은 이미 `approved` 또는 `published`인 상품의 게시 상태를 임의로 낮추지 않습니다. 가격, 재고, 네이버 최저가, 반품등급 같은 관찰값만 갱신하고, 변동 내역은 `product_snapshots`에 기록합니다.
 
+홈과 `/picks`의 `최근 검증된 상품` 피드, `/deals?sort=latest`의 `최근 검증순` 정렬은 관리자 수정 시각을 자동 수집 시각으로 오인하지 않도록 운영 출처를 분리합니다. 소싱·네이버 재검증으로 생성된 스냅샷에는 `raw_json.observation_origin=sourcing`을 남기고, 관리자 수정은 `admin`, 수동 후보 등록은 `manual`로 기록합니다. 따라서 실제 관찰 시각이 없는 수동 상품이나 데모 상품은 최근 검증 피드에 섞이지 않습니다. 이 계약은 아래 명령으로 독립 검증할 수 있습니다.
+
+```bash
+npm run discovery-updates:check
+```
+
 사이트의 구매 전환은 강제 이동이나 숨은 리다이렉트가 아니라 사용자가 명확히 누른 `쿠팡에서 가격 확인` 버튼으로만 발생합니다. 클릭 이벤트는 `affiliate_events`에 익명 세션 기준으로 저장하며, IP나 개인정보는 저장하지 않습니다. 유입 referrer는 출처 분석에 필요한 origin/path만 저장하고 쿼리스트링과 해시는 제거합니다. `channel`과 `utm_source`는 영문/숫자/점/하이픈/언더스코어 라벨만 저장하고, 익명 세션은 브라우저가 만든 UUID 형식만 받습니다. 이벤트는 `published` 상태이고 상품별 쿠팡 파트너스 링크가 준비된 공개 상품에 대해서만 저장합니다. 브라우저가 localStorage나 sendBeacon을 막아도 추적만 조용히 실패하고 쿠팡 이동은 계속 진행되도록 구성했습니다. `sendBeacon`이 큐에 넣지 못한 경우에는 `keepalive` fetch로 한 번 더 시도하지만, 이 실패도 구매 이동을 막지 않습니다.
 
 상세 페이지의 구매 버튼은 위치별로 `web_detail_hero`, `web_detail_decision`, `web_detail_price`, `web_detail_sidebar`, `web_detail_mobile_sticky` 같은 안전한 `channel` 라벨을 붙여 기록합니다. 텔레그램 유입이면 같은 위치에 `telegram_` 접두가 붙습니다. `telegram_detail_click`은 현재 상세 페이지 URL에 `utm_source=telegram`이 직접 붙어 들어온 경우에만 기록하고, 이후 둘러본 다른 딜은 일반 `detail_view`로 세되 저장된 UTM은 구매 클릭 attribution에만 남깁니다. 관리자 수익 퍼널은 `channel`을 `CTA 위치별 클릭`으로, `utm_source`를 `유입 채널별 전환`으로, `context`를 승인 샘플·편집 추천 같은 콘텐츠별 전환으로 분리해 보여줍니다. 따라서 네이버 블로그·텔레그램·직접 방문 중 어느 유입이 쿠팡 클릭으로 이어졌는지, 어떤 버튼 배치와 콘텐츠가 클릭을 만들었는지를 섞지 않고 판단할 수 있습니다.
