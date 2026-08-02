@@ -7,6 +7,7 @@ export const maxDuration = 30;
 
 const MAX_ITEMS = 8;
 const MAX_BODY_BYTES = 64_000;
+const MAX_CONCURRENCY = 2;
 
 type IntakeItem = {
   title?: unknown;
@@ -70,28 +71,35 @@ export async function POST(request: Request) {
     const results: Array<{ index: number; status: string; product_id: string | null; error: string | null; message: string | null; operator_next_action: string | null }> = [];
 
     // Reuse the single-item gate so batch intake never gets a weaker identity or publishing rule.
-    for (const [index, item] of items.entries()) {
-      const response = await intakeOne(
-        new Request(request.url, {
-          method: "POST",
-          headers: childHeaders,
-          body: JSON.stringify(item)
+    // Two in-flight checks keep onboarding quick without turning a pasted batch into a burst.
+    for (let start = 0; start < items.length; start += MAX_CONCURRENCY) {
+      const batch = items.slice(start, start + MAX_CONCURRENCY);
+      const batchResults = await Promise.all(
+        batch.map(async (item, offset) => {
+          const response = await intakeOne(
+            new Request(request.url, {
+              method: "POST",
+              headers: childHeaders,
+              body: JSON.stringify(item)
+            })
+          );
+          const data = (await response.json().catch(() => ({}))) as {
+            error?: string;
+            message?: string;
+            operator_next_action?: string;
+            product?: { id?: string };
+          };
+          return {
+            index: start + offset + 1,
+            status: resultStatus(response.status),
+            product_id: data.product?.id ?? null,
+            error: data.error ?? null,
+            message: data.message ?? null,
+            operator_next_action: data.operator_next_action ?? null
+          };
         })
       );
-      const data = (await response.json().catch(() => ({}))) as {
-        error?: string;
-        message?: string;
-        operator_next_action?: string;
-        product?: { id?: string };
-      };
-      results.push({
-        index: index + 1,
-        status: resultStatus(response.status),
-        product_id: data.product?.id ?? null,
-        error: data.error ?? null,
-        message: data.message ?? null,
-        operator_next_action: data.operator_next_action ?? null
-      });
+      results.push(...batchResults);
     }
 
     const insertedCount = results.filter((item) => item.status === "inserted").length;

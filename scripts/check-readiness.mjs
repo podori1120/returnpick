@@ -447,6 +447,7 @@ if (fileExists("package.json") && fileExists("app/api/admin/products/link-intake
       bulkRoute.includes("POST as intakeOne") &&
       bulkRoute.includes("MAX_ITEMS = 8") &&
       bulkRoute.includes("MAX_BODY_BYTES = 64_000") &&
+      bulkRoute.includes("MAX_CONCURRENCY = 2") &&
       bulkCheck.includes("review-only persistence") &&
       intakeUi.includes("/api/admin/products/link-intake/bulk"),
     "bulk Partners-link intake is authenticated, bounded, and delegates every row to the strict single-item review gate",
