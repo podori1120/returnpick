@@ -105,6 +105,7 @@ type AffiliateLinkVerificationResponse = {
 };
 
 const MAX_BULK_LINK_CHECKS = 8;
+const MAX_BULK_TEMPLATE_LINES = 80;
 const LINK_QUEUE_PAGE_SIZE = 24;
 
 type CheckedAffiliateLinkVerification = AffiliateLinkVerification & {
@@ -492,14 +493,16 @@ export default function AdminAffiliateLinkQueue({
     }
   }
 
-  function buildBulkTemplate() {
-    return visibleProducts
+  function buildBulkTemplate(products: ProductWithScore[]) {
+    return products
+      .slice(0, MAX_BULK_TEMPLATE_LINES)
       .map((product) => `${product.id}\t${product.title}\t${buildCoupangSearchUrl(product)}`)
       .join("\n");
   }
 
-  async function copyBulkTemplate() {
-    const template = buildBulkTemplate();
+  async function copyBulkTemplate(scope: "page" | "all") {
+    const sourceProducts = scope === "all" ? missingProducts : visibleProducts;
+    const template = buildBulkTemplate(sourceProducts);
     if (!template) {
       setNotice({ type: "info", message: "현재 복사할 링크 보강 대상이 없습니다." });
       return;
@@ -507,7 +510,9 @@ export default function AdminAffiliateLinkQueue({
     setBulkText(template);
     try {
       await navigator.clipboard.writeText(template);
-      setNotice({ type: "success", message: "대량 입력 템플릿을 복사했습니다. 각 줄의 상품 ID 옆에 상품별 파트너스 링크를 붙여넣으세요." });
+      const copiedCount = template.split(/\r?\n/g).length;
+      const truncated = sourceProducts.length > copiedCount ? ` · 전체 ${sourceProducts.length}개 중 ${copiedCount}개` : "";
+      setNotice({ type: "success", message: `대량 입력 템플릿 ${copiedCount}개를 복사했습니다${truncated}. 각 줄의 상품 ID 옆에 상품별 파트너스 링크를 붙여넣으세요.` });
     } catch {
       setNotice({ type: "info", message: "브라우저가 클립보드 복사를 막아 템플릿을 입력창에만 채웠습니다." });
     }
@@ -749,14 +754,26 @@ export default function AdminAffiliateLinkQueue({
               각 줄에 내부 상품 ID, 쿠팡 상품번호 또는 쿠팡 상품 상세 URL 중 하나와 상품별 파트너스 링크를 붙여넣으세요. 제목은 참고용이며, 같은 쿠팡 상품번호가 여러 후보에 있으면 저장하지 않습니다.
             </p>
           </div>
-          <button
-            className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm font-black hover:bg-mist disabled:opacity-60"
-            onClick={copyBulkTemplate}
-            disabled={!visibleProducts.length}
-            type="button"
-          >
-            <Copy size={15} aria-hidden /> 템플릿 복사
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm font-black hover:bg-mist disabled:opacity-60"
+              onClick={() => void copyBulkTemplate("page")}
+              disabled={!visibleProducts.length}
+              type="button"
+              title="현재 페이지 템플릿 복사"
+            >
+              <Copy size={15} aria-hidden /> 현재 24개 템플릿
+            </button>
+            <button
+              className="focus-ring inline-flex items-center gap-2 rounded-lg border border-pine/30 bg-pine/5 px-3 py-2 text-sm font-black text-pine hover:bg-pine/10 disabled:opacity-60"
+              onClick={() => void copyBulkTemplate("all")}
+              disabled={!missingProducts.length}
+              type="button"
+              title="대기 중인 상품을 최대 80줄까지 복사합니다."
+            >
+              <Copy size={15} aria-hidden /> 전체 대기 템플릿
+            </button>
+          </div>
         </div>
         <textarea
           className="focus-ring mt-3 min-h-28 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink"
@@ -766,7 +783,7 @@ export default function AdminAffiliateLinkQueue({
         />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <div className="space-y-2 text-xs font-bold text-steel">
-            <p>승인용 샘플 링크와 일반 쿠팡 상품 URL은 저장하지 않습니다. 한 번에 최대 80줄까지 처리합니다.</p>
+            <p>승인용 샘플 링크와 일반 쿠팡 상품 URL은 저장하지 않습니다. 한 번에 최대 80줄까지 처리하며, 전체 템플릿도 최대 80개까지 복사합니다.</p>
             <label className="inline-flex items-center gap-2">
               <input checked={bulkPublish} onChange={(event) => setBulkPublish(event.target.checked)} type="checkbox" />
               저장한 상품을 바로 게시 상태로 전환

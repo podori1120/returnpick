@@ -3842,6 +3842,9 @@ if (fileExists("components/AdminAffiliateLinkQueue.tsx")) {
     "admin: bulk affiliate link import UI",
     linkQueue.includes("대량 링크 입력") &&
       linkQueue.includes("템플릿 복사") &&
+      linkQueue.includes("MAX_BULK_TEMPLATE_LINES = 80") &&
+      linkQueue.includes("전체 대기 템플릿") &&
+      linkQueue.includes('copyBulkTemplate("all")') &&
       linkQueue.includes("/api/admin/affiliate-links/import") &&
       linkQueue.includes("검증만") &&
       linkQueue.includes("대량 저장 후 게시") &&
