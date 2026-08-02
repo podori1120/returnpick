@@ -27,7 +27,16 @@ type BulkIntakeResult = {
   scanned_count: number;
   inserted_count: number;
   error_count: number;
-  items?: Array<{ index: number; status: string; product_id: string | null; error: string | null; message: string | null }>;
+  score_error_count?: number;
+  items?: Array<{
+    index: number;
+    status: string;
+    product_id: string | null;
+    error: string | null;
+    message: string | null;
+    operator_next_action?: string | null;
+    score_error?: string | null;
+  }>;
 };
 
 function parseBulkRows(value: string): BulkIntakeRow[] {
@@ -49,7 +58,7 @@ function parseBulkRows(value: string): BulkIntakeRow[] {
 export default function AdminAffiliateLinkIntake({ password, onCreated }: { password: string; onCreated: () => void }) {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [notice, setNotice] = useState<{ type: "success" | "info" | "error"; message: string } | null>(null);
   const [nextAction, setNextAction] = useState<string | null>(null);
   const [bulkText, setBulkText] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
@@ -68,13 +77,19 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
     setNextAction(null);
     try {
       const response = await fetch("/api/admin/products/link-intake", { method: "POST", headers: headers(password), body: JSON.stringify(form) });
-      const data = (await response.json().catch(() => ({}))) as { error?: string; message?: string; product?: { id?: string }; operator_next_action?: string };
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+        product?: { id?: string };
+        operator_next_action?: string;
+        score_error?: string | null;
+      };
       setNextAction(data.operator_next_action ?? null);
       if (!response.ok) {
         setNotice({ type: "error", message: data.message ?? data.error ?? "후보를 저장하지 않았습니다." });
         return;
       }
-      setNotice({ type: "success", message: `검수 대기 후보를 저장했습니다${data.product?.id ? `: ${data.product.id}` : ""}.` });
+      setNotice({ type: data.score_error ? "info" : "success", message: data.message ?? `검수 대기 후보를 저장했습니다${data.product?.id ? `: ${data.product.id}` : ""}.` });
       setForm(emptyForm);
       onCreated();
     } catch {
@@ -102,9 +117,10 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
         return;
       }
       setBulkResult(data);
+      const scoreWarning = data.score_error_count ? ` 점수 재계산 필요 ${data.score_error_count}개.` : "";
       setNotice({
-        type: data.status === "ok" ? "success" : "error",
-        message: `총 ${data.scanned_count}개 중 ${data.inserted_count}개를 검수 대기 후보로 저장했습니다. 오류 ${data.error_count}개.`
+        type: data.status === "ok" ? "success" : data.status === "partial" ? "info" : "error",
+        message: `총 ${data.scanned_count}개 중 ${data.inserted_count}개를 검수 대기 후보로 저장했습니다. 오류 ${data.error_count}개.${scoreWarning}`
       });
       if (data.inserted_count) onCreated();
     } catch {
@@ -120,7 +136,7 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
         <div className="max-w-3xl"><p className="text-sm font-black text-pine">Affiliate Link Intake</p><h2 className="mt-1 text-xl font-black">파트너스 링크로 빠른 후보 등록</h2><p className="mt-2 text-sm font-semibold leading-6 text-steel">링크로 상품번호를 확인해 검수 대기 후보만 저장합니다. 가격·반품등급·재고는 추정하지 않으며 자동 게시하지 않습니다.</p></div>
         <Link2 className="text-pine" size={24} aria-hidden />
       </div>
-      {notice ? <p className={`mt-4 rounded-lg border px-3 py-2 text-sm font-bold ${notice.type === "success" ? "border-pine/30 bg-pine/10 text-pine" : "border-coral/30 bg-coral/10 text-coral"}`} role="status">{notice.message}</p> : null}
+      {notice ? <p className={`mt-4 rounded-lg border px-3 py-2 text-sm font-bold ${notice.type === "success" ? "border-pine/30 bg-pine/10 text-pine" : notice.type === "info" ? "border-lemon/50 bg-lemon/15 text-ink" : "border-coral/30 bg-coral/10 text-coral"}`} role="status">{notice.message}</p> : null}
       {nextAction ? <p className="mt-3 rounded-lg border border-lemon/40 bg-lemon/15 px-3 py-2 text-sm font-bold text-ink">다음 행동: {nextAction}</p> : null}
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <label className="text-sm font-bold text-steel sm:col-span-2">상품명<span className="text-coral">*</span><input className="focus-ring mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink" value={form.title} onChange={(event) => update("title", event.target.value)} /></label>
@@ -155,7 +171,7 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
         </div>
         {bulkResult?.items?.length ? (
           <ul className="mt-3 space-y-1 rounded-lg border border-line bg-mist p-3 text-xs font-bold text-steel">
-            {bulkResult.items.map((item) => <li key={`${item.index}-${item.product_id ?? item.error ?? "result"}`}><span className={item.status === "inserted" ? "font-black text-pine" : "font-black text-coral"}>{item.status === "inserted" ? "저장" : "확인 필요"}</span> · {item.index}번 {item.product_id ?? item.error ?? item.message ?? "처리 결과 없음"}</li>)}
+            {bulkResult.items.map((item) => <li key={`${item.index}-${item.product_id ?? item.error ?? "result"}`}><span className={item.status === "inserted" ? "font-black text-pine" : "font-black text-coral"}>{item.status === "inserted" ? "저장" : "확인 필요"}</span> · {item.index}번 {item.product_id ?? item.error ?? item.message ?? "처리 결과 없음"}{item.operator_next_action ? <span className="text-ink"> · 다음 조치: {item.operator_next_action}</span> : null}</li>)}
           </ul>
         ) : null}
       </div>

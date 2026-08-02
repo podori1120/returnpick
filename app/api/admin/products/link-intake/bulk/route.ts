@@ -68,7 +68,15 @@ export async function POST(request: Request) {
     childHeaders.set("content-type", "application/json");
     childHeaders.delete("content-length");
     childHeaders.delete("transfer-encoding");
-    const results: Array<{ index: number; status: string; product_id: string | null; error: string | null; message: string | null; operator_next_action: string | null }> = [];
+    const results: Array<{
+      index: number;
+      status: string;
+      product_id: string | null;
+      error: string | null;
+      message: string | null;
+      operator_next_action: string | null;
+      score_error: string | null;
+    }> = [];
 
     // Reuse the single-item gate so batch intake never gets a weaker identity or publishing rule.
     // Two in-flight checks keep onboarding quick without turning a pasted batch into a burst.
@@ -87,6 +95,7 @@ export async function POST(request: Request) {
             error?: string;
             message?: string;
             operator_next_action?: string;
+            score_error?: string | null;
             product?: { id?: string };
           };
           return {
@@ -95,7 +104,8 @@ export async function POST(request: Request) {
             product_id: data.product?.id ?? null,
             error: data.error ?? null,
             message: data.message ?? null,
-            operator_next_action: data.operator_next_action ?? null
+            operator_next_action: data.operator_next_action ?? null,
+            score_error: data.score_error ?? null
           };
         })
       );
@@ -104,11 +114,13 @@ export async function POST(request: Request) {
 
     const insertedCount = results.filter((item) => item.status === "inserted").length;
     const errorCount = results.length - insertedCount;
+    const scoreErrorCount = results.filter((item) => item.score_error).length;
     return NextResponse.json({
-      status: errorCount === 0 ? "ok" : insertedCount > 0 ? "partial" : "error",
+      status: errorCount === 0 ? (scoreErrorCount > 0 ? "partial" : "ok") : insertedCount > 0 ? "partial" : "error",
       scanned_count: results.length,
       inserted_count: insertedCount,
       error_count: errorCount,
+      score_error_count: scoreErrorCount,
       items: results
     });
   } catch (error) {

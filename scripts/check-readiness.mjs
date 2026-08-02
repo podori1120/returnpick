@@ -451,8 +451,12 @@ if (fileExists("package.json") && fileExists("app/api/admin/products/link-intake
       bulkRoute.includes("MAX_ITEMS = 8") &&
       bulkRoute.includes("MAX_BODY_BYTES = 64_000") &&
       bulkRoute.includes("MAX_CONCURRENCY = 2") &&
+      bulkRoute.includes("score_error_count") &&
+      bulkRoute.includes("score_error") &&
       bulkCheck.includes("review-only persistence") &&
-      intakeUi.includes("/api/admin/products/link-intake/bulk"),
+      intakeUi.includes("/api/admin/products/link-intake/bulk") &&
+      intakeUi.includes("점수 재계산 필요") &&
+      intakeUi.includes("operator_next_action"),
     "bulk Partners-link intake is authenticated, bounded, and delegates every row to the strict single-item review gate",
     "required"
   );
