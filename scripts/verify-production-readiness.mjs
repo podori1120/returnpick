@@ -84,6 +84,8 @@ const sitemapRequiredPaths = [
 ];
 
 const adminUiRequiredText = [
+  "\uCD9C\uC2DC \uD544\uC218 \uCC28\uB2E8 \uD56D\uBAA9",
+  "\uC2E4\uC81C \uD658\uACBD\uBCC0\uC218 \uAC12\uC740 \uC774 \uD654\uBA74\uC5D0 \uB178\uCD9C\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4",
   "상품별 링크 보강",
   "상품 이미지 URL",
   "저장 후 게시",
