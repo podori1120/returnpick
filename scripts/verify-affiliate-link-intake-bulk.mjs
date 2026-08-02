@@ -23,6 +23,8 @@ assert.match(route, /score_error/, "bulk intake retains per-item score persisten
 assert.match(ui, /점수 재계산 필요/, "admin UI distinguishes saved candidates that need score recalculation");
 assert.match(ui, /operator_next_action/, "admin UI renders the next action returned by the single-item gate");
 assert.match(ui, /\/api\/admin\/products\/link-intake\/bulk/, "admin UI must expose bulk endpoint");
-assert.match(ui, /최대 8개/, "admin UI must show the bounded batch limit");
+assert.match(ui, /BULK_BATCH_SIZE = 8/, "admin UI must keep server batches bounded");
+assert.match(ui, /MAX_BULK_ROWS = 32/, "admin UI must support a larger bounded paste batch");
+assert.match(ui, /bulkProgress/, "admin UI must show sequential bulk progress");
 assert.match(packageJson, /"affiliate-link-intake-bulk:check": "node scripts\/verify-affiliate-link-intake-bulk\.mjs"/, "bulk contract command is registered");
 console.log("Affiliate link bulk intake static contract passed: bounded batch processing reuses authenticated identity checks and review-only persistence.");

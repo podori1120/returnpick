@@ -7,6 +7,8 @@ import { isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLi
 import type { Category } from "@/lib/types";
 
 const emptyForm = { title: "", category: "laptop" as Category, affiliate_url: "", coupang_url: "", image_url: "", public_note: "", admin_memo: "" };
+const BULK_BATCH_SIZE = 8;
+const MAX_BULK_ROWS = 32;
 
 function headers(password: string) {
   return { "Content-Type": "application/json", "x-admin-password": password };
@@ -62,6 +64,7 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
   const [nextAction, setNextAction] = useState<string | null>(null);
   const [bulkText, setBulkText] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ completed: number; total: number } | null>(null);
   const [bulkResult, setBulkResult] = useState<BulkIntakeResult | null>(null);
   const affiliateReady = isUsableAffiliateUrl(form.affiliate_url.trim());
   const suppliedUrlReady = !form.coupang_url.trim() || isUsableCoupangProductUrl(form.coupang_url.trim());
@@ -100,33 +103,75 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
   }
 
   async function submitBulk() {
-    if (!bulkRows.length || bulkRows.length > 8) return;
+    if (!bulkRows.length || bulkRows.length > MAX_BULK_ROWS) return;
     setBulkSaving(true);
+    setBulkProgress({ completed: 0, total: bulkRows.length });
     setBulkResult(null);
     setNotice(null);
     setNextAction(null);
+    const aggregatedItems: NonNullable<BulkIntakeResult["items"]> = [];
+    let scannedCount = 0;
+    let insertedCount = 0;
+    let errorCount = 0;
+    let scoreErrorCount = 0;
+    let completedRows = 0;
+    let interruptedMessage: string | null = null;
     try {
-      const response = await fetch("/api/admin/products/link-intake/bulk", {
-        method: "POST",
-        headers: headers(password),
-        body: JSON.stringify({ items: bulkRows })
-      });
-      const data = (await response.json().catch(() => ({}))) as BulkIntakeResult & { error?: string; message?: string };
-      if (!response.ok) {
-        setNotice({ type: "error", message: data.message ?? data.error ?? "일괄 후보 등록에 실패했습니다." });
-        return;
+      for (let start = 0; start < bulkRows.length; start += BULK_BATCH_SIZE) {
+        const batch = bulkRows.slice(start, start + BULK_BATCH_SIZE);
+        const response = await fetch("/api/admin/products/link-intake/bulk", {
+          method: "POST",
+          headers: headers(password),
+          body: JSON.stringify({ items: batch })
+        });
+        const data = (await response.json().catch(() => ({}))) as BulkIntakeResult & { error?: string; message?: string };
+        if (!response.ok) {
+          interruptedMessage = data.message ?? data.error ?? "일괄 후보 등록에 실패했습니다.";
+          break;
+        }
+
+        completedRows += batch.length;
+        scannedCount += data.scanned_count ?? batch.length;
+        insertedCount += data.inserted_count ?? 0;
+        errorCount += data.error_count ?? 0;
+        scoreErrorCount += data.score_error_count ?? 0;
+        aggregatedItems.push(...(data.items ?? []).map((item) => ({ ...item, index: item.index + start })));
+        setBulkProgress({ completed: completedRows, total: bulkRows.length });
       }
-      setBulkResult(data);
-      const scoreWarning = data.score_error_count ? ` 점수 재계산 필요 ${data.score_error_count}개.` : "";
+
+      const result: BulkIntakeResult = {
+        status: interruptedMessage
+          ? insertedCount > 0
+            ? "partial"
+            : "error"
+          : errorCount > 0
+            ? insertedCount > 0
+              ? "partial"
+              : "error"
+            : scoreErrorCount > 0
+              ? "partial"
+              : "ok",
+        scanned_count: scannedCount,
+        inserted_count: insertedCount,
+        error_count: errorCount,
+        score_error_count: scoreErrorCount,
+        items: aggregatedItems
+      };
+      setBulkResult(result);
+      const scoreWarning = scoreErrorCount ? ` 점수 재계산 필요 ${scoreErrorCount}개.` : "";
+      const interruptedNotice = interruptedMessage
+        ? ` ${completedRows}개 처리 후 중단되었습니다: ${interruptedMessage}`
+        : "";
       setNotice({
-        type: data.status === "ok" ? "success" : data.status === "partial" ? "info" : "error",
-        message: `총 ${data.scanned_count}개 중 ${data.inserted_count}개를 검수 대기 후보로 저장했습니다. 오류 ${data.error_count}개.${scoreWarning}`
+        type: result.status === "ok" ? "success" : result.status === "partial" ? "info" : "error",
+        message: `총 ${result.scanned_count}개 중 ${result.inserted_count}개를 검수 대기 후보로 저장했습니다. 오류 ${result.error_count}개.${scoreWarning}${interruptedNotice}`
       });
-      if (data.inserted_count) onCreated();
+      if (result.inserted_count) onCreated();
     } catch {
-      setNotice({ type: "error", message: "네트워크 문제로 일괄 후보 등록을 완료하지 못했습니다." });
+      setNotice({ type: "error", message: `네트워크 문제로 일괄 후보 등록을 완료하지 못했습니다. ${completedRows}개 처리 후 멈췄습니다.` });
     } finally {
       setBulkSaving(false);
+      setBulkProgress(null);
     }
   }
 
@@ -152,9 +197,9 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="inline-flex items-center gap-2 text-sm font-black text-pine"><ListPlus size={16} aria-hidden /> 여러 링크 한 번에 등록</p>
-            <p className="mt-1 text-xs font-semibold leading-5 text-steel">한 줄에 상품명, 카테고리, 파트너스 링크, 쿠팡 상품 URL을 탭으로 구분하세요. 한 번에 최대 8개까지 같은 검증을 거쳐 저장합니다.</p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-steel">한 줄에 상품명, 카테고리, 파트너스 링크, 쿠팡 상품 URL을 탭으로 구분하세요. 최대 32개까지 붙여넣을 수 있고, 서버에는 8개씩 순차 전송해 같은 검증을 거쳐 저장합니다.</p>
           </div>
-          <span className="text-xs font-black text-steel">{bulkRows.length}/8개</span>
+          <span className="text-xs font-black text-steel">{bulkRows.length}/{MAX_BULK_ROWS}개</span>
         </div>
         <textarea
           aria-label="파트너스 링크 여러 개 입력"
@@ -165,10 +210,11 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
         />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs font-semibold leading-5 text-steel">이미지 URL, 공개 메모, 관리자 메모는 선택 입력입니다. 가격·반품등급·재고는 이 흐름에서 만들지 않습니다.</p>
-          <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-pine bg-white px-4 py-2.5 text-sm font-black text-pine hover:bg-pine hover:text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={bulkSaving || saving || bulkRows.length < 1 || bulkRows.length > 8} onClick={() => void submitBulk()} type="button">
+          <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-pine bg-white px-4 py-2.5 text-sm font-black text-pine hover:bg-pine hover:text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={bulkSaving || saving || bulkRows.length < 1 || bulkRows.length > MAX_BULK_ROWS} onClick={() => void submitBulk()} type="button">
             {bulkSaving ? <LoaderCircle className="animate-spin" size={16} /> : <ListPlus size={16} aria-hidden />} {bulkSaving ? "검수 중" : "여러 후보 검수 대기 저장"}
           </button>
         </div>
+        {bulkSaving && bulkProgress ? <p className="mt-3 rounded-lg border border-line bg-mist px-3 py-2 text-xs font-bold text-steel" role="status">검수 중 {bulkProgress.completed}/{bulkProgress.total}개 처리됨 · 서버 요청은 {BULK_BATCH_SIZE}개 단위로 순차 실행됩니다.</p> : null}
         {bulkResult?.items?.length ? (
           <ul className="mt-3 space-y-1 rounded-lg border border-line bg-mist p-3 text-xs font-bold text-steel">
             {bulkResult.items.map((item) => <li key={`${item.index}-${item.product_id ?? item.error ?? "result"}`}><span className={item.status === "inserted" ? "font-black text-pine" : "font-black text-coral"}>{item.status === "inserted" ? "저장" : "확인 필요"}</span> · {item.index}번 {item.product_id ?? item.error ?? item.message ?? "처리 결과 없음"}{item.operator_next_action ? <span className="text-ink"> · 다음 조치: {item.operator_next_action}</span> : null}</li>)}
