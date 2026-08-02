@@ -731,8 +731,12 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-readines
       productionVerifier.includes("/guide/safe-categories") &&
       productionVerifier.includes("requiredConnectionCheckIds") &&
       productionVerifier.includes("nofollow sponsored noopener noreferrer") &&
+      productionVerifier.includes("extractApprovalPartnersUrl") &&
+      productionVerifier.includes("checkApprovalRedirect") &&
+      productionVerifier.includes('redirect: "manual"') &&
+      productionVerifier.includes('"approval redirect"') &&
       productionVerifier.includes("--strict-scheduler"),
-    "production verifier checks approval-page evidence, disclosure evidence, robots/sitemap coverage, deployment headers, launch/session/manual-price API protection, deployed admin repair UI chunks, admin live checks, required cards, scheduler health, and local production env files without embedding secrets",
+    "production verifier checks approval-page evidence and destination, disclosure evidence, robots/sitemap coverage, deployment headers, launch/session/manual-price API protection, deployed admin repair UI chunks, admin live checks, required cards, scheduler health, and local production env files without embedding secrets",
     "required"
   );
   check(

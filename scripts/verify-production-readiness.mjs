@@ -211,6 +211,55 @@ function checkApprovalPage(html, status) {
   }
 }
 
+function extractApprovalPartnersUrl(html) {
+  const candidate = expectedApprovalUrl || html.match(/https:\/\/link\.coupang\.com\/a\/[A-Za-z0-9]{6,16}(?:\?[^"'<>\s]+)?/)?.[0] || "";
+
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== "https:" || url.hostname !== "link.coupang.com" || !/^\/a\/[A-Za-z0-9]{6,16}$/.test(url.pathname)) {
+      return "";
+    }
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+
+async function checkApprovalRedirect(html, status) {
+  if (status !== 200) return;
+
+  const partnersUrl = extractApprovalPartnersUrl(html);
+  if (!partnersUrl) {
+    fail("approval redirect", "could not extract a valid Coupang Partners short URL from the approval page");
+    return;
+  }
+
+  const response = await fetchWithTimeout(partnersUrl, { redirect: "manual" });
+  const location = response.headers.get("location") || "";
+  let target = null;
+
+  try {
+    if (location) target = new URL(location, partnersUrl);
+  } catch {
+    target = null;
+  }
+
+  const productId = target?.pathname.match(/^\/vp\/products\/(\d+)(?:\/|$)/)?.[1] || null;
+  const coupangHost = Boolean(target && (target.hostname === "coupang.com" || target.hostname.endsWith(".coupang.com")));
+  const isRedirect = response.status >= 300 && response.status < 400;
+  const validTarget = target?.protocol === "https:" && coupangHost && Boolean(productId);
+
+  if (!isRedirect || !validTarget) {
+    fail(
+      "approval redirect",
+      `short URL returned status=${response.status}, host=${target?.hostname || "none"}, product_id=${productId || "none"}`
+    );
+    return;
+  }
+
+  pass("approval redirect", `status=${response.status}, host=${target.hostname}, product_id=${productId}`);
+}
+
 function containsLikelyMojibake(value) {
   return /�|諛|荑|鍮|媛|援|留|湲|由|異|寃|쨌|\?뺤|\?좎|\?곹/.test(String(value ?? ""));
 }
@@ -682,6 +731,12 @@ async function main() {
   try {
     const approval = await readText("/products/approval-sample");
     checkApprovalPage(approval.text, approval.response.status);
+
+    try {
+      await checkApprovalRedirect(approval.text, approval.response.status);
+    } catch {
+      fail("approval redirect", "Coupang Partners short URL request failed");
+    }
   } catch (error) {
     fail("approval page", error instanceof Error ? error.message : "fetch failed");
   }
