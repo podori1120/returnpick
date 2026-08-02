@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, BarChart3, CheckCircle2, ExternalLink, Gauge, RefreshCw, Rocket, ShieldCheck } from "lucide-react";
+import { AlertTriangle, BarChart3, CheckCircle2, ClipboardPlus, ExternalLink, Gauge, Link2, PackageCheck, RefreshCw, Rocket, Send, ShieldCheck } from "lucide-react";
 import { scrollToAdminAnchor } from "@/lib/adminNavigation";
 
 type ApiReadinessItem = {
@@ -196,6 +196,44 @@ export default function AdminLaunchStatusBar({ password }: { password: string })
         <div className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-ink">
           <p className="font-black text-steel">선택 연동 대기</p>
           <p className="mt-1 text-base font-black text-ink">{readiness?.optionalMissingItemIds?.length ?? 0}개</p>
+        </div>
+      </div>
+
+      <div className="mt-3 border-t border-line/70 pt-3" aria-label="빠른 출시 동선">
+        <p className="text-xs font-black text-steel">빠른 출시 동선</p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <button
+            className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2.5 text-left text-xs font-black text-ink hover:border-pine hover:bg-mist"
+            onClick={() => scrollToAdminAnchor("admin-manual-product-bulk")}
+            type="button"
+          >
+            <ClipboardPlus className="shrink-0 text-pine" size={16} aria-hidden />
+            <span><span className="block text-[10px] font-bold text-steel">1단계</span>상품 여러 개 추가</span>
+          </button>
+          <button
+            className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2.5 text-left text-xs font-black text-ink hover:border-pine hover:bg-mist"
+            onClick={() => scrollToAdminAnchor("admin-affiliate-links")}
+            type="button"
+          >
+            <Link2 className="shrink-0 text-pine" size={16} aria-hidden />
+            <span><span className="block text-[10px] font-bold text-steel">2단계</span>파트너스 링크 검수</span>
+          </button>
+          <button
+            className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2.5 text-left text-xs font-black text-ink hover:border-pine hover:bg-mist"
+            onClick={() => scrollToAdminAnchor("admin-candidate-review")}
+            type="button"
+          >
+            <PackageCheck className="shrink-0 text-pine" size={16} aria-hidden />
+            <span><span className="block text-[10px] font-bold text-steel">3단계</span>승인·게시</span>
+          </button>
+          <button
+            className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2.5 text-left text-xs font-black text-ink hover:border-pine hover:bg-mist"
+            onClick={() => scrollToAdminAnchor("admin-telegram-distribution")}
+            type="button"
+          >
+            <Send className="shrink-0 text-pine" size={16} aria-hidden />
+            <span><span className="block text-[10px] font-bold text-steel">4단계</span>텔레그램 발송</span>
+          </button>
         </div>
       </div>
     </section>
