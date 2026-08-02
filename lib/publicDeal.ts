@@ -3,7 +3,14 @@ import { getDealPrice, getDiscountRate, getPrimaryUseCase, getReferencePrice } f
 import { getCustomerPublishReadiness, getDealQuality } from "@/lib/quality";
 import { getLatestScore } from "@/lib/scoring";
 import { getNaverPriceTrust, type NaverPriceTrustStatus } from "@/lib/naverPriceTrust";
-import type { Category, ConditionGrade, RiskFlag, Verdict, ProductWithScore, JsonValue } from "@/lib/types";
+import type { Category, ConditionGrade, RiskFlag, Verdict, ProductWithScore, JsonValue, ProductSnapshot, SnapshotChangeFlag } from "@/lib/types";
+
+export type PublicDealChangeSummary = {
+  observed_at: string | null;
+  flags: SnapshotChangeFlag[];
+  labels: string[];
+  has_change: boolean;
+};
 
 export type PublicDeal = {
   id: string;
@@ -42,8 +49,44 @@ export type PublicDeal = {
     score: number;
     reason: string;
   } | null;
+  change_summary: PublicDealChangeSummary;
   detail_url: string;
 };
+
+const publicChangeLabels: Record<SnapshotChangeFlag, string> = {
+  NEW_PRODUCT: "신규 관찰",
+  SOURCE_PRICE_CHANGED: "판매가 변동",
+  RETURN_PRICE_CHANGED: "반품가 변동",
+  NEW_PRICE_CHANGED: "새상품가 변동",
+  NAVER_PRICE_CHANGED: "네이버 기준가 변동",
+  STOCK_CHANGED: "재고 변동",
+  CONDITION_CHANGED: "반품등급 변동",
+  SOLD_OUT: "품절 확인",
+  BACK_IN_STOCK: "재입고 확인"
+};
+
+function getLatestPublicSnapshot(product: ProductWithScore): ProductSnapshot | null {
+  const snapshots = [
+    product.latest_snapshot,
+    ...(product.snapshots ?? []),
+    ...(product.product_snapshots ?? [])
+  ].filter((snapshot): snapshot is ProductSnapshot => Boolean(snapshot));
+
+  return snapshots.sort((a, b) => b.observed_at.localeCompare(a.observed_at))[0] ?? null;
+}
+
+function getPublicChangeSummary(product: ProductWithScore): PublicDealChangeSummary {
+  const latestSnapshot = getLatestPublicSnapshot(product);
+  const flags = Array.from(new Set(latestSnapshot?.change_flags ?? []));
+  const changedFlags = flags.filter((flag) => flag !== "NEW_PRODUCT");
+
+  return {
+    observed_at: latestSnapshot?.observed_at ?? (product.source === "manual_admin" ? null : product.last_observed_at),
+    flags,
+    labels: changedFlags.map((flag) => publicChangeLabels[flag]).filter((label): label is string => Boolean(label)),
+    has_change: changedFlags.length > 0
+  };
+}
 
 function isTruthyFlag(value: string | undefined) {
   return ["1", "true", "yes", "on"].includes(value?.trim().toLowerCase() ?? "");
@@ -125,6 +168,7 @@ export function toPublicDeal(product: ProductWithScore): PublicDeal {
       confidence: quality.confidence
     },
     primary_use_case: useCase,
+    change_summary: getPublicChangeSummary(product),
     detail_url: `/deals/${product.id}`
   };
 }

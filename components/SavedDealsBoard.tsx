@@ -8,7 +8,7 @@ import AffiliateNotice from "@/components/AffiliateNotice";
 import SavedDealButton from "@/components/SavedDealButton";
 import { getCoupangOutboundLink } from "@/lib/coupangLink";
 import { getSavedDealItems, savedDealsChangeEvent, setSavedDealItems, type SavedDealItem } from "@/lib/clientTracking";
-import { formatPercent, formatPrice } from "@/lib/format";
+import { formatDate, formatPercent, formatPrice } from "@/lib/format";
 import type { PublicDeal } from "@/lib/publicDeal";
 
 export default function SavedDealsBoard() {
@@ -77,6 +77,45 @@ export default function SavedDealsBoard() {
   }
 
   const unavailableItems = error ? [] : items.filter((item) => !products.some((product) => product.id === item.id));
+
+  function getChangeNotice(product: PublicDeal) {
+    const observedAt = product.change_summary.observed_at;
+    if (!observedAt) {
+      return {
+        className: "border-line bg-mist text-steel",
+        label: "관찰 기록 없음",
+        detail: "가격·재고 변동을 판단할 자동 관찰 기록이 없습니다. 구매 전 쿠팡에서 다시 확인하세요."
+      };
+    }
+
+    const savedAt = items.find((item) => item.id === product.id)?.savedAt;
+    const observedMs = new Date(observedAt).getTime();
+    const savedMs = savedAt ? new Date(savedAt).getTime() : Number.NaN;
+    const observedAfterSave = Number.isFinite(observedMs) && Number.isFinite(savedMs) && observedMs > savedMs;
+    const labels = product.change_summary.labels.join(", ");
+
+    if (observedAfterSave && product.change_summary.has_change) {
+      return {
+        className: "border-lemon bg-lemon/20 text-ink",
+        label: "저장 후 변동 확인",
+        detail: `${labels || "가격·재고 조건"} · ${formatDate(observedAt)} 관찰`
+      };
+    }
+
+    if (product.change_summary.has_change) {
+      return {
+        className: "border-line bg-mist text-steel",
+        label: "최근 변동 기록",
+        detail: `${labels || "조건 변동"} · ${formatDate(observedAt)} 관찰`
+      };
+    }
+
+    return {
+      className: "border-line bg-mist text-steel",
+      label: "최근 관찰",
+      detail: `${formatDate(observedAt)} 기준으로 확인된 상품입니다.`
+    };
+  }
 
   function removeUnavailableItems() {
     const unavailableIds = new Set(unavailableItems.map((item) => item.id));
@@ -181,6 +220,15 @@ export default function SavedDealsBoard() {
                     <div><p className="text-xs font-bold text-steel">할인율</p><p className="font-black">{formatPercent(product.discount_rate)}</p></div>
                     <div><p className="text-xs font-bold text-steel">점수</p><p className="font-black">{product.score ?? 0}점</p></div>
                   </div>
+                  {(() => {
+                    const notice = getChangeNotice(product);
+                    return (
+                      <div className={`rounded-md border px-3 py-2 text-xs font-bold leading-5 ${notice.className}`} role="status">
+                        <p className="font-black">{notice.label}</p>
+                        <p className="mt-0.5">{notice.detail}</p>
+                      </div>
+                    );
+                  })()}
                   <div className="flex flex-wrap gap-2">
                     <Link className="focus-ring min-w-[140px] flex-1 rounded-lg border border-line px-3 py-2.5 text-center text-sm font-black hover:bg-mist" href={product.detail_url}>상세 확인</Link>
                     <AffiliateButton productId={product.id} href={outboundLink.href} label={outboundLink.label} sponsored={outboundLink.isAffiliate} channel="saved" className="focus-ring min-w-[160px] flex-1 rounded-lg bg-pine px-3 py-2.5 text-center text-sm font-black text-white hover:bg-ink" />
