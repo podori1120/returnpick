@@ -25,7 +25,8 @@ const emptyForm = {
 export default function AdminManualProductForm({ password, onCreated }: { password: string; onCreated: () => void }) {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [notice, setNotice] = useState<{ type: "success" | "info" | "error"; message: string } | null>(null);
+  const [nextAction, setNextAction] = useState<string | null>(null);
   const [createdProductId, setCreatedProductId] = useState<string | null>(null);
   const [existingProductId, setExistingProductId] = useState<string | null>(null);
   const urlReady = isUsableCoupangProductUrl(form.coupang_url.trim());
@@ -39,6 +40,7 @@ export default function AdminManualProductForm({ password, onCreated }: { passwo
   async function submit() {
     setSaving(true);
     setNotice(null);
+    setNextAction(null);
     setCreatedProductId(null);
     setExistingProductId(null);
     try {
@@ -52,13 +54,16 @@ export default function AdminManualProductForm({ password, onCreated }: { passwo
         error?: string;
         existing_product_id?: string | null;
         product?: { id?: string | null };
+        operator_next_action?: string | null;
+        score_error?: string | null;
       };
       if (!response.ok) {
         setExistingProductId(data.existing_product_id ?? null);
         setNotice({ type: "error", message: data.message ?? data.error ?? "후보를 추가하지 못했습니다." });
         return;
       }
-      setNotice({ type: "success", message: data.message ?? "검토 대기 후보를 추가했습니다." });
+      setNextAction(data.operator_next_action ?? null);
+      setNotice({ type: data.score_error ? "info" : "success", message: data.message ?? "검토 대기 후보를 추가했습니다." });
       setCreatedProductId(data.product?.id ?? null);
       setForm(emptyForm);
       onCreated();
@@ -83,10 +88,12 @@ export default function AdminManualProductForm({ password, onCreated }: { passwo
       </div>
 
       {notice ? (
-        <p className={`mt-4 rounded-lg border px-3 py-2 text-sm font-bold ${notice.type === "success" ? "border-pine/30 bg-pine/10 text-pine" : "border-coral/30 bg-coral/10 text-coral"}`} role="status">
+        <p className={`mt-4 rounded-lg border px-3 py-2 text-sm font-bold ${notice.type === "success" ? "border-pine/30 bg-pine/10 text-pine" : notice.type === "info" ? "border-lemon/50 bg-lemon/15 text-ink" : "border-coral/30 bg-coral/10 text-coral"}`} role="status">
           {notice.message}
         </p>
       ) : null}
+
+      {nextAction ? <p className="mt-3 rounded-lg border border-lemon/40 bg-lemon/15 px-3 py-2 text-sm font-bold text-ink">다음 행동: {nextAction}</p> : null}
 
       {existingProductId ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-lemon/50 bg-lemon/15 px-3 py-3 text-sm font-bold text-ink">

@@ -867,6 +867,10 @@ if (
       adminProductsRoute.includes("insertSourcedProduct") &&
       adminProductsRoute.includes("findManualImportConflict") &&
       adminProductsRoute.includes("EXISTING_PRODUCT_CONFLICT") &&
+      adminProductsRoute.includes("let scoreError: string | null = null") &&
+      adminProductsRoute.includes("SOURCING_SCORE_SAVE_FAILED") &&
+      adminProductsRoute.includes("score_error") &&
+      adminProductsRoute.includes("후보는 저장됐지만 점수 저장에 실패했습니다") &&
       !adminProductsRoute.includes("upsertSourcedProduct") &&
       manualProductForm.includes("쿠팡 상품 상세 URL") &&
       manualProductForm.includes("반품등급, 반품가, 네이버 가격과 파트너스 링크는 추정하지 않고") &&
@@ -919,6 +923,10 @@ if (
       adminProductsImportRoute.includes("findManualImportConflict") &&
       adminProductsImportRoute.includes("existingConflict.code") &&
       adminProductsImportRoute.includes("insertSourcedProduct") &&
+      adminProductsImportRoute.includes("let scoreError: string | null = null") &&
+      adminProductsImportRoute.includes("scoreErrorCount") &&
+      adminProductsImportRoute.includes("score_error_count") &&
+      adminProductsImportRoute.includes("SOURCING_SCORE_SAVE_FAILED") &&
       adminProductsImportRoute.includes("existing_skipped_count") &&
       manualProductBulkForm.includes("/api/admin/products/import") &&
       manualProductBulkForm.includes("최대 40줄") &&

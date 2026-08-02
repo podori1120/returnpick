@@ -66,6 +66,7 @@ export async function POST(request: Request) {
     const updatedCount = 0;
     let skippedCount = 0;
     let errorCount = 0;
+    let scoreErrorCount = 0;
     const seenSourceProductIds = new Set<string>();
     const seenTitleCategoryKeys = new Set<string>();
     const existingIdentityProducts = (await listProducts()).map((product) => ({
@@ -219,7 +220,13 @@ export async function POST(request: Request) {
           is_published: false,
           is_rejected: false
         });
-        await createDealScore(calculateDealScore(result.product));
+        let scoreError: string | null = null;
+        try {
+          await createDealScore(calculateDealScore(result.product));
+        } catch {
+          scoreError = "SOURCING_SCORE_SAVE_FAILED";
+          scoreErrorCount += 1;
+        }
 
         insertedCount += 1;
         existingIdentityProducts.push({
@@ -228,7 +235,7 @@ export async function POST(request: Request) {
           category: result.product.category,
           title: result.product.title
         });
-        items.push({ product_id: result.product.id, title: result.product.title, status: "inserted" });
+        items.push({ product_id: result.product.id, title: result.product.title, status: "inserted", reason: scoreError ?? undefined });
       } catch (error) {
         errorCount += 1;
         const reason = error instanceof Error && error.message ? error.message.slice(0, 160) : "UPSERT_FAILED";
@@ -237,12 +244,13 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({
-      status: errorCount > 0 ? (insertedCount + updatedCount > 0 ? "partial" : "error") : skippedCount > 0 ? "partial" : "ok",
+      status: errorCount > 0 ? (insertedCount + updatedCount > 0 ? "partial" : "error") : skippedCount > 0 || scoreErrorCount > 0 ? "partial" : "ok",
       scanned_count: rows.length,
       inserted_count: insertedCount,
       updated_count: updatedCount,
       skipped_count: skippedCount,
       error_count: errorCount,
+      score_error_count: scoreErrorCount,
       existing_count: existingCount,
       existing_skipped_count: existingSkippedCount,
       items

@@ -155,16 +155,27 @@ export async function POST(request: Request) {
     });
 
     const score = calculateDealScore(result.product);
-    await createDealScore(score);
+    let scoreError: string | null = null;
+    try {
+      await createDealScore(score);
+    } catch {
+      scoreError = "SOURCING_SCORE_SAVE_FAILED";
+    }
 
     return NextResponse.json(
       {
         product: result.product,
-        score,
+        score: scoreError ? null : score,
+        score_error: scoreError,
+        operator_next_action: scoreError
+          ? "후보는 저장됐지만 점수 저장에 실패했습니다. 후보 검토 화면을 새로고침한 뒤 점수 재계산을 실행하세요."
+          : null,
         inserted: true,
-        message: affiliateUrl
-          ? "실제 쿠팡 상품과 파트너스 링크를 검토 대기 후보로 추가했습니다. 링크 목적지 확인 후 게시할 수 있습니다."
-          : "실제 쿠팡 상품을 검토 대기 후보로 추가했습니다."
+        message: scoreError
+          ? "후보는 저장했지만 점수 저장에 실패했습니다. 후보 검토 화면에서 점수 재계산을 실행하세요."
+          : affiliateUrl
+            ? "실제 쿠팡 상품과 파트너스 링크를 검토 대기 후보로 추가했습니다. 링크 목적지 확인 후 게시할 수 있습니다."
+            : "실제 쿠팡 상품을 검토 대기 후보로 추가했습니다."
       },
       { status: 201 }
     );

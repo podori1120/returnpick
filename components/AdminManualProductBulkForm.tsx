@@ -24,6 +24,7 @@ type BulkCandidateResult = {
   updated_count: number;
   skipped_count: number;
   error_count: number;
+  score_error_count?: number;
   existing_count?: number;
   existing_skipped_count?: number;
   items?: BulkCandidateItem[];
@@ -64,7 +65,8 @@ function reasonLabel(reason?: string | null) {
     INVALID_NEW_PRICE: "새상품가는 숫자로 입력하세요.",
     INVALID_NAVER_PRICE: "네이버 최저가는 숫자로 입력하세요.",
     INVALID_STOCK_COUNT: "재고는 0 이상의 숫자로 입력하세요.",
-    INVALID_CONDITION_GRADE: "반품등급은 미개봉·최상·상·중·알수없음·확인필요 중 하나여야 합니다."
+    INVALID_CONDITION_GRADE: "반품등급은 미개봉·최상·상·중·알수없음·확인필요 중 하나여야 합니다.",
+    SOURCING_SCORE_SAVE_FAILED: "후보는 저장됐지만 점수 저장에 실패했습니다. 후보 검토 화면에서 점수 재계산을 실행하세요."
   };
   return labels[reason] ?? reason;
 }
@@ -102,7 +104,8 @@ export default function AdminManualProductBulkForm({ password, onCreated }: { pa
         return;
       }
       setResult(data);
-      const message = `확인 ${data.scanned_count}줄 · 추가 ${data.inserted_count}개 · 갱신 ${data.updated_count}개 · 건너뜀 ${data.skipped_count}개 · 오류 ${data.error_count}개`;
+      const scoreWarning = data.score_error_count ? ` · 점수 재계산 필요 ${data.score_error_count}개` : "";
+      const message = `확인 ${data.scanned_count}줄 · 추가 ${data.inserted_count}개 · 갱신 ${data.updated_count}개 · 건너뜀 ${data.skipped_count}개 · 오류 ${data.error_count}개${scoreWarning}`;
       setNotice({ type: data.status === "ok" ? "success" : data.status === "partial" ? "info" : "error", message });
       if (data.inserted_count || data.updated_count) onCreated();
     } catch {
