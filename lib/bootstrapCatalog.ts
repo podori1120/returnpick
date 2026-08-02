@@ -23,7 +23,7 @@ const isSyntheticSource = isDemoProduct;
 
 export const BOOTSTRAP_CATALOG_ENV = "RETURNPICK_BOOTSTRAP_CATALOG_JSON";
 export const BOOTSTRAP_CATALOG_VERSION = 1;
-export const BOOTSTRAP_CATALOG_MAX_PRODUCTS = 12;
+export const BOOTSTRAP_CATALOG_MAX_PRODUCTS = 40;
 export const BOOTSTRAP_CATALOG_MAX_BYTES = 28_000;
 
 const categories = new Set<Category>([
@@ -266,9 +266,22 @@ function skipReason(product: ProductWithScore) {
   return null;
 }
 
+function bootstrapPayload(products: SourcedProduct[], exportedAt: string): BootstrapCatalogPayload {
+  return {
+    version: BOOTSTRAP_CATALOG_VERSION,
+    exported_at: exportedAt,
+    products
+  };
+}
+
+function bootstrapPayloadByteSize(products: SourcedProduct[], exportedAt: string) {
+  return Buffer.byteLength(JSON.stringify(bootstrapPayload(products, exportedAt)), "utf8");
+}
+
 export function createBootstrapCatalog(products: ProductWithScore[], exportedAt = new Date().toISOString()): BootstrapCatalogExportResult {
   const skippedByReason: Record<string, number> = {};
   const eligible: SourcedProduct[] = [];
+  let largestRejectedByteSize = 0;
   const sorted = [...products].sort((a, b) => (b.latest_score?.total_score ?? 0) - (a.latest_score?.total_score ?? 0));
 
   for (const product of sorted) {
@@ -289,15 +302,22 @@ export function createBootstrapCatalog(products: ProductWithScore[], exportedAt 
       skippedByReason[code] = (skippedByReason[code] ?? 0) + 1;
       continue;
     }
+
+    const candidateByteSize = bootstrapPayloadByteSize([...eligible, checked.product], exportedAt);
+    if (candidateByteSize > BOOTSTRAP_CATALOG_MAX_BYTES) {
+      skippedByReason.catalog_size_limit = (skippedByReason.catalog_size_limit ?? 0) + 1;
+      largestRejectedByteSize = Math.max(largestRejectedByteSize, candidateByteSize);
+      continue;
+    }
     eligible.push(checked.product);
   }
 
   if (!eligible.length) {
     return {
-      status: "empty",
+      status: largestRejectedByteSize > 0 ? "too_large" : "empty",
       env_name: BOOTSTRAP_CATALOG_ENV,
       env_value: null,
-      byte_size: 0,
+      byte_size: largestRejectedByteSize,
       max_bytes: BOOTSTRAP_CATALOG_MAX_BYTES,
       max_products: BOOTSTRAP_CATALOG_MAX_PRODUCTS,
       eligible_count: 0,
@@ -308,11 +328,7 @@ export function createBootstrapCatalog(products: ProductWithScore[], exportedAt 
     };
   }
 
-  const payload: BootstrapCatalogPayload = {
-    version: BOOTSTRAP_CATALOG_VERSION,
-    exported_at: exportedAt,
-    products: eligible
-  };
+  const payload = bootstrapPayload(eligible, exportedAt);
   const envValue = JSON.stringify(payload);
   const byteSize = Buffer.byteLength(envValue, "utf8");
 

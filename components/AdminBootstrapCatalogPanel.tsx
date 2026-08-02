@@ -28,7 +28,8 @@ const reasonLabels: Record<string, string> = {
   affiliate_identity_unverified: "파트너스 목적지 미확인",
   public_quality_blocked: "공개 품질 기준 미달",
   last_observed_at_required: "자동 수집 시각 없음",
-  catalog_limit: "카탈로그 개수 제한"
+  catalog_limit: "카탈로그 개수 제한",
+  catalog_size_limit: "환경변수 용량 제한"
 };
 
 function formatBytes(value = 0) {
@@ -83,6 +84,7 @@ export default function AdminBootstrapCatalogPanel() {
           <p className="mt-2 text-xs font-bold text-steel">
             Vercel Production Key: <code className="break-all text-ink">{BOOTSTRAP_CATALOG_ENV_LABEL}</code>
           </p>
+          <p className="mt-2 text-xs font-semibold leading-5 text-steel">검증을 통과한 상품을 용량 한도 안에서 최대 40개까지 보존합니다.</p>
         </div>
         <button
           className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-4 py-2.5 text-sm font-black text-white hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60"

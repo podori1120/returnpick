@@ -541,7 +541,7 @@ if (
     "bootstrap catalog: verified temporary persistence",
     catalog.includes('BOOTSTRAP_CATALOG_ENV = "RETURNPICK_BOOTSTRAP_CATALOG_JSON"') &&
       catalog.includes("BOOTSTRAP_CATALOG_MAX_BYTES = 28_000") &&
-      catalog.includes("BOOTSTRAP_CATALOG_MAX_PRODUCTS = 12") &&
+      catalog.includes("BOOTSTRAP_CATALOG_MAX_PRODUCTS = 40") &&
       catalog.includes("isSyntheticSource") &&
       catalog.includes("identityBoundToCurrentProduct") &&
       catalog.includes("LAST_OBSERVED_AT_REQUIRED") &&
