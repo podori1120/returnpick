@@ -20,6 +20,9 @@ assert.match(route, /condition_grade: "확인필요"/, "condition remains unveri
 assert.match(route, /sourcing_status: "needs_review"[\s\S]*is_published: false/, "new candidates remain unpublished review items");
 assert.match(route, /findManualImportConflict/, "duplicate conflicts are checked before insert");
 assert.match(route, /calculateDealScore[\s\S]*createDealScore/, "score is saved after insert");
+assert.match(route, /let scoreError: string \| null = null/, "score persistence failures are tracked separately from product persistence");
+assert.match(route, /SOURCING_SCORE_SAVE_FAILED/, "score persistence failures expose a bounded retry state");
+assert.match(route, /후보는 저장됐지만 점수 저장에 실패했습니다/, "operators receive a truthful retry instruction when score save fails");
 assert.match(route, /identity_status: identity.status/, "access-limited identity state is retained");
 assert.match(ui, /링크로 상품번호 확인 → 검수 대기 후보 저장/, "admin quick-intake action is visible");
 assert.match(packageJson, /"affiliate-link-intake:check": "node scripts\/verify-affiliate-link-intake\.mjs"/, "package command is registered");

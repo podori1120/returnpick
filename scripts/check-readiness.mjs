@@ -429,8 +429,11 @@ if (fileExists("package.json") && fileExists("app/api/admin/products/link-intake
       intakeRoute.includes('sourcing_status: "needs_review"') &&
       intakeRoute.includes("is_published: false") &&
       intakeCheck.includes("approval sample links") &&
-      intakeCheck.includes("duplicate conflicts"),
-    "manual Partners-link intake is authenticated, strict, identity-bound, duplicate-safe, score-persisted, and review-only without secrets or network checks",
+      intakeCheck.includes("duplicate conflicts") &&
+      intakeCheck.includes("score persistence failures") &&
+      intakeRoute.includes("score_error") &&
+      intakeRoute.includes("후보는 저장됐지만 점수 저장에 실패했습니다"),
+    "manual Partners-link intake is authenticated, strict, identity-bound, duplicate-safe, review-only, and preserves candidates when score persistence needs a retry",
     "required"
   );
 }

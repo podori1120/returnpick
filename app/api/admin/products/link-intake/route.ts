@@ -136,9 +136,24 @@ export async function POST(request: Request) {
       admin_memo: boundedText(body.admin_memo, 500) || null
     });
     const score = calculateDealScore(result.product);
-    await createDealScore(score);
+    let scoreError: string | null = null;
+    try {
+      await createDealScore(score);
+    } catch {
+      scoreError = "SOURCING_SCORE_SAVE_FAILED";
+    }
 
-    return NextResponse.json({ product: result.product, score, operator_next_action: nextAction(identity.status) }, { status: 201 });
+    return NextResponse.json(
+      {
+        product: result.product,
+        score: scoreError ? null : score,
+        score_error: scoreError,
+        operator_next_action: scoreError
+          ? "후보는 저장됐지만 점수 저장에 실패했습니다. 후보 검토 화면을 새로고침한 뒤 점수 재계산을 실행하세요."
+          : nextAction(identity.status)
+      },
+      { status: 201 }
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 300) : "UNKNOWN_AFFILIATE_LINK_INTAKE_ERROR";
     return NextResponse.json({ error: "AFFILIATE_LINK_INTAKE_FAILED", message }, { status: 500 });
