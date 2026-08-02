@@ -2066,6 +2066,7 @@ if (
 
 if (fileExists("app/api/events/route.ts")) {
   const eventsRoute = readText("app/api/events/route.ts");
+  const normalizedEventsRoute = eventsRoute.replace(/\r\n/g, "\n");
   check(
     "events api: referrer privacy",
     eventsRoute.includes("cleanReferrer") &&
@@ -2093,8 +2094,8 @@ if (fileExists("app/api/events/route.ts")) {
       eventsRoute.includes("isPublicDealVisible") &&
       eventsRoute.includes("PRODUCT_ID_REQUIRED") &&
       eventsRoute.includes("PRODUCT_NOT_PUBLIC_READY") &&
-      eventsRoute.includes("product_id: productId"),
-    "affiliate event tracking stores events only for published affiliate-ready products",
+      normalizedEventsRoute.includes("product_id: productId,\n      event_type: eventType,\n      channel,\n      context,\n      anon_session_id"),
+    "affiliate event tracking stores events only for published affiliate-ready products and preserves content surface context",
     "required"
   );
 }

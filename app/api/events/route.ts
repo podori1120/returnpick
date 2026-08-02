@@ -191,6 +191,7 @@ export async function POST(request: Request) {
       product_id: productId,
       event_type: eventType,
       channel,
+      context,
       anon_session_id: cleanAnonSessionId(body.anon_session_id),
       referrer,
       utm_source: cleanTrackingLabel(body.utm_source)
