@@ -1,3 +1,4 @@
+import { getProductDiscoveryObservation } from "@/lib/discoveryUpdates";
 import type { ProductWithScore } from "@/lib/types";
 
 export type DealFreshnessStatus = "fresh" | "stale" | "unknown";
@@ -61,6 +62,11 @@ export function getDealFreshnessFromTimestamps(values: Array<string | null | und
 export function getDealFreshness(product: ProductWithScore, nowMs = Date.now()) {
   if (product.source === "manual_admin") {
     return getDealFreshnessFromTimestamps([], nowMs);
+  }
+
+  const discoveryObservation = getProductDiscoveryObservation(product);
+  if (discoveryObservation) {
+    return getDealFreshnessFromTimestamps([discoveryObservation.observedAt], nowMs);
   }
 
   if (product.last_observed_at && Number.isFinite(new Date(product.last_observed_at).getTime())) {

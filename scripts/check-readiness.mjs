@@ -484,6 +484,32 @@ if (fileExists("components/AffiliateButton.tsx") && fileExists("components/Appro
   );
 }
 
+if (fileExists("lib/discoveryUpdates.ts") && fileExists("components/VerifiedUpdatesRail.tsx")) {
+  const discoveryUpdates = readText("lib/discoveryUpdates.ts");
+  const verifiedUpdatesRail = readText("components/VerifiedUpdatesRail.tsx");
+  const dataStore = readText("lib/dataStore.ts");
+  const dealsPage = readText("app/deals/page.tsx");
+  const picksPage = readText("app/picks/page.tsx");
+  const homePage = readText("app/page.tsx");
+  check(
+    "public discovery: source-observed updates only",
+    discoveryUpdates.includes("observation_origin") &&
+      discoveryUpdates.includes('product.source === "manual_admin"') &&
+      discoveryUpdates.includes("getDiscoveryUpdates") &&
+      dataStore.includes("observationOrigin: SnapshotOrigin") &&
+      dataStore.includes('"sourcing"') &&
+      dataStore.includes('"admin"') &&
+      verifiedUpdatesRail.includes("최근 검증된 상품") &&
+      verifiedUpdatesRail.includes("자동 수집 확인") &&
+      dealsPage.includes("getProductDiscoveryObservation") &&
+      dealsPage.includes("최근 검증순") &&
+      picksPage.includes("VerifiedUpdatesRail") &&
+      homePage.includes("VerifiedUpdatesRail"),
+    "public discovery feed ranks only real non-manual observations and separates administrator edits from sourcing snapshots",
+    "required"
+  );
+}
+
 if (
   fileExists("package.json") &&
   fileExists("lib/bootstrapCatalog.ts") &&
@@ -4843,12 +4869,12 @@ if (fileExists("app/api/admin/sourcing/run/route.ts") && fileExists("lib/dataSto
   );
   check(
     "data store: product snapshot failure does not block product save",
-    dataStore.includes("createProductSnapshotSafely") &&
+      dataStore.includes("createProductSnapshotSafely") &&
       dataStore.includes("PRODUCT_SNAPSHOT_SAVE_FAILED") &&
       dataStore.includes("console.warn") &&
-      dataStore.includes("await createProductSnapshotSafely(product, getSnapshotChangeFlags(existing, product))") &&
-      dataStore.includes('await createProductSnapshotSafely(product, ["NEW_PRODUCT"])') &&
-      dataStore.includes("await createProductSnapshotSafely(product, changeFlags)"),
+      dataStore.includes('await createProductSnapshotSafely(product, getSnapshotChangeFlags(existing, product), "sourcing")') &&
+      dataStore.includes('await createProductSnapshotSafely(product, ["NEW_PRODUCT"], "sourcing")') &&
+      dataStore.includes("await createProductSnapshotSafely(product, changeFlags, options?.snapshotOrigin ?? \"admin\")"),
     "product save/update returns after core product write even if snapshot logging fails",
     "required"
   );

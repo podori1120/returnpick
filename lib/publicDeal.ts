@@ -3,7 +3,8 @@ import { getDealPrice, getDiscountRate, getPrimaryUseCase, getReferencePrice } f
 import { getCustomerPublishReadiness, getDealQuality } from "@/lib/quality";
 import { getLatestScore } from "@/lib/scoring";
 import { getNaverPriceTrust, type NaverPriceTrustStatus } from "@/lib/naverPriceTrust";
-import type { Category, ConditionGrade, RiskFlag, Verdict, ProductWithScore, JsonValue, ProductSnapshot, SnapshotChangeFlag } from "@/lib/types";
+import { getProductDiscoveryObservation } from "@/lib/discoveryUpdates";
+import type { Category, ConditionGrade, RiskFlag, Verdict, ProductWithScore, JsonValue, SnapshotChangeFlag } from "@/lib/types";
 
 export type PublicDealChangeSummary = {
   observed_at: string | null;
@@ -65,23 +66,13 @@ const publicChangeLabels: Record<SnapshotChangeFlag, string> = {
   BACK_IN_STOCK: "재입고 확인"
 };
 
-function getLatestPublicSnapshot(product: ProductWithScore): ProductSnapshot | null {
-  const snapshots = [
-    product.latest_snapshot,
-    ...(product.snapshots ?? []),
-    ...(product.product_snapshots ?? [])
-  ].filter((snapshot): snapshot is ProductSnapshot => Boolean(snapshot));
-
-  return snapshots.sort((a, b) => b.observed_at.localeCompare(a.observed_at))[0] ?? null;
-}
-
 function getPublicChangeSummary(product: ProductWithScore): PublicDealChangeSummary {
-  const latestSnapshot = getLatestPublicSnapshot(product);
-  const flags = Array.from(new Set(latestSnapshot?.change_flags ?? []));
+  const observation = getProductDiscoveryObservation(product);
+  const flags = observation?.flags ?? [];
   const changedFlags = flags.filter((flag) => flag !== "NEW_PRODUCT");
 
   return {
-    observed_at: latestSnapshot?.observed_at ?? (product.source === "manual_admin" ? null : product.last_observed_at),
+    observed_at: observation?.observedAt ?? null,
     flags,
     labels: changedFlags.map((flag) => publicChangeLabels[flag]).filter((label): label is string => Boolean(label)),
     has_change: changedFlags.length > 0

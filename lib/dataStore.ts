@@ -230,7 +230,9 @@ declare global {
   var __returnpickMemory: MemoryState | undefined;
 }
 
-function makeSnapshot(product: SourcedProduct, changeFlags: SnapshotChangeFlag[] = []): ProductSnapshot {
+type SnapshotOrigin = "bootstrap" | "manual" | "sourcing" | "admin" | "unknown";
+
+function makeSnapshot(product: SourcedProduct, changeFlags: SnapshotChangeFlag[] = [], observationOrigin: SnapshotOrigin = "unknown"): ProductSnapshot {
   return {
     id: randomUUID(),
     product_id: product.id,
@@ -245,7 +247,8 @@ function makeSnapshot(product: SourcedProduct, changeFlags: SnapshotChangeFlag[]
     raw_json: {
       source: product.source,
       source_product_id: product.source_product_id,
-      status: product.sourcing_status
+      status: product.sourcing_status,
+      observation_origin: observationOrigin
     }
   };
 }
@@ -563,8 +566,8 @@ export async function getProductById(id: string) {
   return product ? attachMemoryScore(product) : null;
 }
 
-export async function createProductSnapshot(product: SourcedProduct, changeFlags: SnapshotChangeFlag[] = []) {
-  const snapshot = makeSnapshot(product, changeFlags);
+export async function createProductSnapshot(product: SourcedProduct, changeFlags: SnapshotChangeFlag[] = [], observationOrigin: SnapshotOrigin = "manual") {
+  const snapshot = makeSnapshot(product, changeFlags, observationOrigin);
   const client = getSupabaseServiceClient();
   if (client) {
     const { data, error } = await client.from("product_snapshots").insert(snapshot).select("*").single();
@@ -581,10 +584,14 @@ function snapshotErrorMessage(error: unknown) {
   return error instanceof Error && error.message ? error.message.slice(0, 300) : "PRODUCT_SNAPSHOT_SAVE_FAILED";
 }
 
-async function createProductSnapshotSafely(product: SourcedProduct, changeFlags: SnapshotChangeFlag[] = []) {
+async function createProductSnapshotSafely(
+  product: SourcedProduct,
+  changeFlags: SnapshotChangeFlag[] = [],
+  observationOrigin: SnapshotOrigin = "manual"
+) {
   if (changeFlags.length === 0) return;
   try {
-    await createProductSnapshot(product, changeFlags);
+    await createProductSnapshot(product, changeFlags, observationOrigin);
   } catch (error) {
     console.warn("PRODUCT_SNAPSHOT_SAVE_FAILED", {
       product_id: product.id,
@@ -622,7 +629,7 @@ export async function insertSourcedProduct(input: ProductInput) {
     const { data, error } = await client.from("sourced_products").insert(insertPayload).select("*").single();
     if (error) throw error;
     const product = data as SourcedProduct;
-    await createProductSnapshotSafely(product, ["NEW_PRODUCT"]);
+    await createProductSnapshotSafely(product, ["NEW_PRODUCT"], "manual");
     return { product, inserted: true as const };
   }
 
@@ -634,7 +641,7 @@ export async function insertSourcedProduct(input: ProductInput) {
   if (existing) throw new Error("EXISTING_PRODUCT_CONFLICT");
 
   memoryProducts.unshift(payload);
-  memorySnapshots.unshift(makeSnapshot(payload, ["NEW_PRODUCT"]));
+  memorySnapshots.unshift(makeSnapshot(payload, ["NEW_PRODUCT"], "manual"));
   persistMemoryState();
   return { product: payload, inserted: true as const };
 }
@@ -686,14 +693,14 @@ export async function upsertSourcedProduct(input: ProductInput) {
         .single();
       if (error) throw error;
       const product = data as SourcedProduct;
-      await createProductSnapshotSafely(product, getSnapshotChangeFlags(existing, product));
+      await createProductSnapshotSafely(product, getSnapshotChangeFlags(existing, product), "sourcing");
       return { product, inserted: false };
     }
 
     const { data, error } = await client.from("sourced_products").insert(insertPayload).select("*").single();
     if (error) throw error;
     const product = data as SourcedProduct;
-    await createProductSnapshotSafely(product, ["NEW_PRODUCT"]);
+    await createProductSnapshotSafely(product, ["NEW_PRODUCT"], "sourcing");
     return { product, inserted: true };
   }
 
@@ -718,18 +725,18 @@ export async function upsertSourcedProduct(input: ProductInput) {
       rejection_reason: memoryProducts[existingIndex].rejection_reason,
       updated_at: now()
     };
-    memorySnapshots.unshift(makeSnapshot(memoryProducts[existingIndex], getSnapshotChangeFlags(previous, memoryProducts[existingIndex])));
+    memorySnapshots.unshift(makeSnapshot(memoryProducts[existingIndex], getSnapshotChangeFlags(previous, memoryProducts[existingIndex]), "sourcing"));
     persistMemoryState();
     return { product: memoryProducts[existingIndex], inserted: false };
   }
 
   memoryProducts.unshift(payload);
-  memorySnapshots.unshift(makeSnapshot(payload, ["NEW_PRODUCT"]));
+  memorySnapshots.unshift(makeSnapshot(payload, ["NEW_PRODUCT"], "sourcing"));
   persistMemoryState();
   return { product: payload, inserted: true };
 }
 
-export async function updateProduct(id: string, patch: Partial<SourcedProduct>) {
+export async function updateProduct(id: string, patch: Partial<SourcedProduct>, options?: { snapshotOrigin?: SnapshotOrigin }) {
   const client = getSupabaseServiceClient();
   const normalizedPatch = {
     ...patch,
@@ -743,7 +750,7 @@ export async function updateProduct(id: string, patch: Partial<SourcedProduct>) 
     if (error) throw error;
     const product = data as SourcedProduct;
     const changeFlags = getSnapshotChangeFlags(beforeData as SourcedProduct | null, product);
-    await createProductSnapshotSafely(product, changeFlags);
+    await createProductSnapshotSafely(product, changeFlags, options?.snapshotOrigin ?? "admin");
     return product;
   }
 
@@ -759,7 +766,7 @@ export async function updateProduct(id: string, patch: Partial<SourcedProduct>) 
     sourcing_status: (normalizedPatch.sourcing_status ?? memoryProducts[index].sourcing_status) as SourcingStatus
   };
   const changeFlags = getSnapshotChangeFlags(previous, memoryProducts[index]);
-  if (changeFlags.length > 0) memorySnapshots.unshift(makeSnapshot(memoryProducts[index], changeFlags));
+  if (changeFlags.length > 0) memorySnapshots.unshift(makeSnapshot(memoryProducts[index], changeFlags, options?.snapshotOrigin ?? "admin"));
   persistMemoryState();
   return memoryProducts[index];
 }

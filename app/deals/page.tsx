@@ -24,6 +24,7 @@ import {
 import { formatPercent, formatPrice } from "@/lib/format";
 import { listProducts } from "@/lib/dataStore";
 import { approvalSampleProduct } from "@/lib/approvalSample";
+import { getProductDiscoveryObservation } from "@/lib/discoveryUpdates";
 import { homeCategoryDetails } from "@/lib/homeDiscovery";
 import { isDemoProduct, isPublicDealVisible } from "@/lib/publicDeal";
 import { matchesProductSearch } from "@/lib/productSearch";
@@ -95,7 +96,11 @@ function sortProducts(products: ProductWithScore[], sort: string | undefined, us
     if (sort === "price") return (getDealPrice(b) ?? 0) - (getDealPrice(a) ?? 0);
     if (sort === "low_price") return (getDealPrice(a) ?? 0) - (getDealPrice(b) ?? 0);
     if (sort === "confidence") return getDealQuality(b).confidence - getDealQuality(a).confidence;
-    if (sort === "latest") return b.created_at.localeCompare(a.created_at);
+    if (sort === "latest") {
+      const aObservedAt = getProductDiscoveryObservation(a)?.observedAt ?? a.created_at;
+      const bObservedAt = getProductDiscoveryObservation(b)?.observedAt ?? b.created_at;
+      return bObservedAt.localeCompare(aObservedAt);
+    }
     return (b.latest_score?.total_score ?? 0) - (a.latest_score?.total_score ?? 0);
   });
 }
@@ -379,7 +384,7 @@ export default async function DealsPage({
           <option value="fit">용도 적합 순</option>
           <option value="discount">할인율 높은 순</option>
           <option value="confidence">검수 신뢰도 순</option>
-          <option value="latest">최신 게시순</option>
+          <option value="latest">최근 검증순</option>
           <option value="price">가격 높은 순</option>
           <option value="low_price">가격 낮은 순</option>
         </select>

@@ -185,7 +185,7 @@ export async function backfillNaverLowestPrices(options?: {
               updated_at: new Date().toISOString()
             }, product)
           }
-        });
+        }, { snapshotOrigin: "sourcing" });
       } catch (error) {
         error_count += 1;
         details.push({
@@ -249,7 +249,7 @@ export async function backfillNaverLowestPrices(options?: {
             updated_at: new Date().toISOString()
           }, product)
         }
-      });
+      }, { snapshotOrigin: shouldClearExistingPrice ? "sourcing" : "admin" });
       if (shouldClearExistingPrice) {
         cleared_price_count += 1;
         await createDealScore(calculateDealScore(updated));

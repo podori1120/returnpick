@@ -20,12 +20,14 @@ import DealCard from "@/components/DealCard";
 import DemoModeNotice from "@/components/DemoModeNotice";
 import PurposeDealExplorer, { type PurposeExplorerItem } from "@/components/PurposeDealExplorer";
 import RecentDealsRail from "@/components/RecentDealsRail";
+import VerifiedUpdatesRail from "@/components/VerifiedUpdatesRail";
 import { categoryOptions, getCategoryLabel } from "@/lib/category";
 import { listProducts } from "@/lib/dataStore";
+import { getDiscoveryUpdates } from "@/lib/discoveryUpdates";
 import { getUseCaseMatches } from "@/lib/dealIntelligence";
 import { approvalSampleProduct } from "@/lib/approvalSample";
 import { homeCategoryDetails, homePurposeOptions } from "@/lib/homeDiscovery";
-import { isDemoProduct, isPublicDealVisible } from "@/lib/publicDeal";
+import { isDemoProduct, isPublicDealReady, isPublicDealVisible } from "@/lib/publicDeal";
 import type { Category } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +48,7 @@ export default async function HomePage() {
     .filter(isPublicDealVisible)
     .sort((a, b) => (b.latest_score?.total_score ?? 0) - (a.latest_score?.total_score ?? 0));
   const featured = products.slice(0, 6);
+  const verifiedUpdates = getDiscoveryUpdates(products, isPublicDealReady, 4);
   const demoCount = products.filter(isDemoProduct).length;
   const hasPublishedDeals = products.length > 0;
   const counts = categoryOptions.map((category) => ({
@@ -225,6 +228,7 @@ export default async function HomePage() {
 
       {hasPublishedDeals ? (
         <section className="mx-auto max-w-7xl space-y-5 px-4 py-8 sm:px-6">
+          <VerifiedUpdatesRail updates={verifiedUpdates} title="최근 확인된 변동" description="가격·재고·반품 조건을 실제로 다시 관찰한 공개 상품을 먼저 확인하세요." />
           <RecentDealsRail />
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
