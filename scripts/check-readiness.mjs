@@ -2987,6 +2987,15 @@ if (fileExists("components/AdminApiReadinessPanel.tsx")) {
   check("admin: launch runbook", panel.includes("승인 후 첫 운영 순서") && panel.includes("목업 끄고 첫 후보 수집"), "admin shows the post-approval first-run checklist", "required");
   check("admin: launch connection checks include data quality", panel.includes("requiredConnectionCheckIds") && panel.includes("공개 상품 데이터 품질"), "admin launch checklist requires public product data quality checks", "required");
   check(
+    "admin: blocker-first readiness summary",
+    panel.includes("출시 필수 차단 항목") &&
+      panel.includes("실제 환경변수 값은 이 화면에 노출하지 않습니다") &&
+      panel.includes("blockingItemIdSet") &&
+      panel.includes("readinessItems"),
+    "admin surfaces required blockers first without exposing environment-variable values",
+    "required"
+  );
+  check(
     "admin: optional capability readiness",
     panel.includes("선택 연동 대기") &&
       panel.includes("핵심 출시와 사이트 게시는 차단하지 않습니다") &&

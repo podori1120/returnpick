@@ -577,9 +577,15 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
 
   const itemById = new Map(readiness.items.map((item) => [item.id, item]));
   const checkById = new Map(checks.map((check) => [check.id, check]));
+  const blockingItemIdSet = new Set(readiness.blockingItemIds);
   const missingEnvSet = new Set(readiness.blockingEnv);
   const optionalMissingEnvSet = new Set(readiness.optionalMissingEnv);
   const optionalItemIdSet = new Set(readiness.optionalItemIds);
+  const readinessItems = [...readiness.items].sort((left, right) => {
+    const leftIsBlocking = blockingItemIdSet.has(left.id);
+    const rightIsBlocking = blockingItemIdSet.has(right.id);
+    return Number(rightIsBlocking) - Number(leftIsBlocking);
+  });
   const configuredEnvSet = new Set(readiness.items.flatMap((item) => item.requiredEnv.filter((env) => !item.missingEnv.includes(env))));
   const requiredRuntimeReady = readiness.runtimeReady;
   const apiEnvReady = readiness.apiKeysReady;
@@ -925,19 +931,32 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
         </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        {readiness.items.map((item) => {
+      <div className="rounded-lg border border-line p-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h3 className="font-black">출시 필수 차단 항목</h3>
+            <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-steel">
+              출시를 막는 필수 항목부터 보여주고, 준비도 API가 안내하는 다음 조치를 함께 표시합니다. 실제 환경변수 값은 이 화면에 노출하지 않습니다.
+            </p>
+          </div>
+          <span className={readiness.blockingItemIds.length ? "rounded-md bg-coral/10 px-2 py-1 text-xs font-black text-coral" : "rounded-md bg-pine/10 px-2 py-1 text-xs font-black text-pine"}>
+            {readiness.blockingItemIds.length ? `차단 ${readiness.blockingItemIds.length}건` : "필수 차단 없음"}
+          </span>
+        </div>
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        {readinessItems.map((item) => {
           const isOptional = optionalItemIdSet.has(item.id) || (item.id === "coupang" && !readiness.apiKeysReady);
+          const isLaunchBlocker = blockingItemIdSet.has(item.id);
           const meta = isOptional && item.state !== "ready"
             ? { label: "선택 대기", className: "bg-lemon/30 text-ink", icon: AlertTriangle }
             : stateMeta(item.state);
           return (
-            <article key={item.id} className="min-w-0 break-words rounded-lg border border-line p-4">
+            <article key={item.id} className={`min-w-0 break-words rounded-lg border p-4 ${isLaunchBlocker ? "border-coral/40 bg-coral/5" : "border-line"}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <KeyRound className="text-pine" size={17} aria-hidden />
                   <h3 className="font-black">{item.label}</h3>
-                  <span className={isOptional ? "rounded-md bg-lemon/30 px-2 py-0.5 text-[11px] font-black text-ink" : "rounded-md bg-mist px-2 py-0.5 text-[11px] font-black text-steel"}>
+                  <span className={isLaunchBlocker ? "rounded-md bg-coral/10 px-2 py-0.5 text-[11px] font-black text-coral" : isOptional ? "rounded-md bg-lemon/30 px-2 py-0.5 text-[11px] font-black text-ink" : "rounded-md bg-mist px-2 py-0.5 text-[11px] font-black text-steel"}>
                     {isOptional ? "선택 기능" : "출시 필수"}
                   </span>
                 </div>
@@ -957,6 +976,7 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
             </article>
           );
         })}
+        </div>
       </div>
 
       {checks.length ? (

@@ -5,11 +5,12 @@ import path from "node:path";
 
 const nextBin = path.join(process.cwd(), "node_modules", "next", "dist", "bin", "next");
 const buildIdPath = path.join(process.cwd(), ".next", "BUILD_ID");
+const buildManifestPath = path.join(process.cwd(), ".next", "build-manifest.json");
 const productId = "11111111-1111-4111-8111-111111111111";
 const productTitle = "ReturnPick QA 27인치 QHD 144Hz 모니터 반품-최상";
 const affiliateUrl = "https://link.coupang.com/a/AbCd123";
 
-if (!fs.existsSync(buildIdPath)) {
+if (!fs.existsSync(buildIdPath) && !fs.existsSync(buildManifestPath)) {
   throw new Error("NEXT_BUILD_REQUIRED: run npm run build before bootstrap-catalog:check");
 }
 
