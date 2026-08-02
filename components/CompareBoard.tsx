@@ -85,6 +85,7 @@ export default function CompareBoard() {
   }, [products]);
 
   const unavailableItems = error ? [] : items.filter((item) => !products.some((product) => product.id === item.id));
+  const recommendedOutboundLink = best.byScore ? getCoupangOutboundLink(best.byScore) : null;
 
   function removeItem(id: string) {
     const next = readCompareItems().filter((item) => item.id !== id);
@@ -146,7 +147,7 @@ export default function CompareBoard() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5">
       <section className="rounded-lg border border-line bg-white p-4 shadow-soft">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -172,21 +173,48 @@ export default function CompareBoard() {
           </div>
         ) : null}
         {best.byScore ? (
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <div className="rounded-lg bg-pine/10 p-4">
-              <p className="text-xs font-black text-pine">리턴픽 추천</p>
-              <p className="mt-1 line-clamp-2 text-sm font-black">{best.byScore.title}</p>
-              <p className="mt-2 text-2xl font-black text-pine">{best.byScore.score ?? 0}점</p>
+          <div className="mt-4 space-y-3">
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-lg bg-pine/10 p-4">
+                <p className="text-xs font-black text-pine">리턴픽 추천</p>
+                <p className="mt-1 line-clamp-2 text-sm font-black">{best.byScore.title}</p>
+                <p className="mt-2 text-2xl font-black text-pine">{best.byScore.score ?? 0}점</p>
+              </div>
+              <div className="rounded-lg bg-mist p-4">
+                <p className="text-xs font-black text-steel">최저 구매가</p>
+                <p className="mt-1 line-clamp-2 text-sm font-black">{best.byPrice?.title ?? "-"}</p>
+                <p className="mt-2 text-2xl font-black">{formatPrice(best.byPrice?.deal_price)}</p>
+              </div>
+              <div className="rounded-lg bg-mist p-4">
+                <p className="text-xs font-black text-steel">최대 할인율</p>
+                <p className="mt-1 line-clamp-2 text-sm font-black">{best.byDiscount?.title ?? "-"}</p>
+                <p className="mt-2 text-2xl font-black">{formatPercent(best.byDiscount?.discount_rate)}</p>
+              </div>
             </div>
-            <div className="rounded-lg bg-mist p-4">
-              <p className="text-xs font-black text-steel">최저 구매가</p>
-              <p className="mt-1 line-clamp-2 text-sm font-black">{best.byPrice?.title ?? "-"}</p>
-              <p className="mt-2 text-2xl font-black">{formatPrice(best.byPrice?.deal_price)}</p>
-            </div>
-            <div className="rounded-lg bg-mist p-4">
-              <p className="text-xs font-black text-steel">최대 할인율</p>
-              <p className="mt-1 line-clamp-2 text-sm font-black">{best.byDiscount?.title ?? "-"}</p>
-              <p className="mt-2 text-2xl font-black">{formatPercent(best.byDiscount?.discount_rate)}</p>
+            <div className="rounded-lg border border-pine/30 bg-pine/5 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-xs font-black text-pine">비교 후 다음 단계</p>
+                  <p className="mt-1 text-sm font-black">추천 상품의 가격·재고·반품등급을 다시 확인한 뒤 구매하세요.</p>
+                  <Link className="focus-ring mt-2 inline-flex text-xs font-black text-pine underline decoration-pine/30 underline-offset-4 hover:text-ink" href={best.byScore.detail_url}>
+                    추천 이유와 확인 항목 보기
+                  </Link>
+                </div>
+                <AffiliateButton
+                  productId={best.byScore.id}
+                  href={recommendedOutboundLink?.href}
+                  label="쿠팡에서 추천 상품 가격 확인"
+                  disabledLabel="링크 확인필요 · 구매 전 확인"
+                  sponsored={recommendedOutboundLink?.isAffiliate}
+                  channel="compare"
+                  className="focus-ring inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink sm:w-auto"
+                />
+              </div>
+              <p className="mt-3 text-xs font-semibold leading-5 text-steel">
+                {recommendedOutboundLink?.isAffiliate
+                  ? <>이 페이지의 일부 링크는 제휴 링크이며, 구매가 발생하면 운영자가 수수료를 받을 수 있습니다. 가격과 재고, 반품등급은 수시로 변동될 수 있습니다. <Link className="font-black text-pine underline" href="/disclosure">제휴 안내</Link></>
+                  : <>상품별 파트너스 링크가 확인되기 전에는 구매 버튼을 활성화하지 않습니다. <Link className="font-black text-pine underline" href="/disclosure">제휴 안내</Link></>}
+              </p>
             </div>
           </div>
         ) : null}
@@ -208,7 +236,7 @@ export default function CompareBoard() {
             </Link>
             <div className="space-y-4 p-4">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs font-black text-pine">{product.category_label}</p>
                   <Link className="mt-1 line-clamp-2 font-black hover:text-pine" href={product.detail_url}>
                     {product.title}
@@ -256,6 +284,7 @@ export default function CompareBoard() {
                 productId={product.id}
                 href={outboundLink.href}
                 label={outboundLink.label}
+                disabledLabel="링크 확인필요 · 구매 전 확인"
                 sponsored={outboundLink.isAffiliate}
                 channel="compare"
               />
@@ -266,7 +295,7 @@ export default function CompareBoard() {
       </section>
 
       <section className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">
-        <div className="overflow-x-auto">
+        <div className="max-w-full overflow-x-auto overscroll-x-contain" aria-label="상품 비교표. 좌우로 밀어 더 많은 비교 항목을 확인할 수 있습니다.">
           <table className="min-w-[820px] w-full text-left text-sm">
             <thead className="bg-mist text-xs font-black text-steel">
               <tr>
