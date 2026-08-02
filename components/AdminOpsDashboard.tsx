@@ -57,11 +57,13 @@ type RevenueMetrics = {
     detail_view: number;
     affiliate_click: number;
     telegram_detail_click: number;
+    share_copy: number;
   };
   funnel: {
     impressions: number;
     detail_views: number;
     affiliate_clicks: number;
+    share_copies: number;
     detail_ctr: number;
     affiliate_ctr: number;
   };
@@ -77,6 +79,7 @@ type RevenueMetrics = {
     detail_views: number;
     affiliate_clicks: number;
     telegram_clicks: number;
+    share_copies: number;
     detail_ctr: number;
     affiliate_ctr: number;
     cta_ready: boolean;
@@ -96,11 +99,13 @@ type RevenueMetrics = {
     detail_views: number;
     affiliate_clicks: number;
     telegram_clicks: number;
+    share_copies: number;
   }>;
   sourceMetrics: Array<{
     source: string;
     detail_views: number;
     affiliate_clicks: number;
+    share_copies: number;
     affiliate_ctr: number;
   }>;
   surfaceMetrics: Array<{
@@ -109,6 +114,7 @@ type RevenueMetrics = {
     detail_views: number;
     affiliate_clicks: number;
     telegram_clicks: number;
+    share_copies: number;
     detail_ctr: number;
     affiliate_ctr: number;
   }>;
@@ -471,7 +477,7 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
               </div>
             </div>
             <p className="mt-4 text-sm font-semibold text-steel">
-              텔레그램 유입 {revenueMetrics.totals.telegram_detail_click} · CTA 준비 {revenueMetrics.ctaReady} · 링크 보강 대기 {hiddenPublishedCount}
+              텔레그램 유입 {revenueMetrics.totals.telegram_detail_click} · 공유 {revenueMetrics.totals.share_copy} · CTA 준비 {revenueMetrics.ctaReady} · 링크 보강 대기 {hiddenPublishedCount}
             </p>
             <div className="mt-5 border-t border-line pt-4">
               <div className="flex items-center justify-between gap-3">
@@ -482,7 +488,7 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
                 {topTrafficSources.map((item) => (
                   <div key={item.source} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 text-xs font-bold">
                     <span className="min-w-0 truncate">{sourceLabel(item.source)}</span>
-                    <span className="shrink-0 text-steel">상세 {item.detail_views} · 클릭 {item.affiliate_clicks}</span>
+                    <span className="shrink-0 text-steel">상세 {item.detail_views} · 클릭 {item.affiliate_clicks} · 공유 {item.share_copies}</span>
                     <span className="w-12 shrink-0 text-right font-black text-pine">{item.affiliate_ctr}%</span>
                   </div>
                 ))}
@@ -513,7 +519,7 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
                 {revenueMetrics.surfaceMetrics.slice(0, 5).map((item) => (
                   <div key={item.context} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 text-xs font-bold">
                     <span className="min-w-0 truncate">{surfaceLabel(item.context)}</span>
-                    <span className="shrink-0 text-steel">상세 {item.detail_views} · 클릭 {item.affiliate_clicks}</span>
+                    <span className="shrink-0 text-steel">상세 {item.detail_views} · 클릭 {item.affiliate_clicks} · 공유 {item.share_copies}</span>
                     <span className="w-12 shrink-0 text-right font-black text-pine">{item.affiliate_ctr}%</span>
                   </div>
                 ))}
@@ -534,7 +540,7 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
                     </span>
                   </div>
                   <p className="mt-2 text-xs font-semibold text-steel">
-                    상세 {item.detail_views} · 구매클릭 {item.affiliate_clicks} · 텔레그램 {item.telegram_clicks} · 전환 {item.affiliate_ctr}%
+                    상세 {item.detail_views} · 구매클릭 {item.affiliate_clicks} · 공유 {item.share_copies} · 텔레그램 {item.telegram_clicks} · 전환 {item.affiliate_ctr}%
                   </p>
                 </div>
               ))}

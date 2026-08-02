@@ -971,7 +971,8 @@ export async function getRevenueMetrics() {
     impression: events.filter((event) => event.event_type === "impression").length,
     detail_view: events.filter((event) => event.event_type === "detail_view").length,
     affiliate_click: events.filter((event) => event.event_type === "affiliate_click").length,
-    telegram_detail_click: events.filter((event) => event.event_type === "telegram_detail_click").length
+    telegram_detail_click: events.filter((event) => event.event_type === "telegram_detail_click").length,
+    share_copy: events.filter((event) => event.event_type === "share_copy").length
   };
 
   const allProductMetrics = publishedProducts
@@ -991,6 +992,7 @@ export async function getRevenueMetrics() {
         detail_views: detailViews,
         affiliate_clicks: affiliateClicks,
         telegram_clicks: telegramClicks,
+        share_copies: productEvents.filter((event) => event.event_type === "share_copy").length,
         detail_ctr: ratio(detailViews, impressions),
         affiliate_ctr: ratio(affiliateClicks, detailViews),
         cta_ready: getCustomerPublishReadiness(product).ready && product.is_published && product.sourcing_status === "published"
@@ -1028,7 +1030,8 @@ export async function getRevenueMetrics() {
       impressions: channelEvents.filter((event) => event.event_type === "impression").length,
       detail_views: channelEvents.filter((event) => event.event_type === "detail_view" || event.event_type === "telegram_detail_click").length,
       affiliate_clicks: channelEvents.filter((event) => event.event_type === "affiliate_click").length,
-      telegram_clicks: channelEvents.filter((event) => event.event_type === "telegram_detail_click").length
+      telegram_clicks: channelEvents.filter((event) => event.event_type === "telegram_detail_click").length,
+      share_copies: channelEvents.filter((event) => event.event_type === "share_copy").length
     };
   }).sort((a, b) => b.affiliate_clicks - a.affiliate_clicks || b.detail_views - a.detail_views || b.impressions - a.impressions);
 
@@ -1040,6 +1043,7 @@ export async function getRevenueMetrics() {
       source,
       detail_views: detailViews,
       affiliate_clicks: affiliateClicks,
+      share_copies: sourceEvents.filter((event) => event.event_type === "share_copy").length,
       affiliate_ctr: ratio(affiliateClicks, detailViews)
     };
   }).sort((a, b) => b.affiliate_clicks - a.affiliate_clicks || b.detail_views - a.detail_views);
@@ -1055,6 +1059,7 @@ export async function getRevenueMetrics() {
       detail_views: detailViews,
       affiliate_clicks: affiliateClicks,
       telegram_clicks: surfaceEvents.filter((event) => event.event_type === "telegram_detail_click").length,
+      share_copies: surfaceEvents.filter((event) => event.event_type === "share_copy").length,
       detail_ctr: ratio(detailViews, impressions),
       affiliate_ctr: ratio(affiliateClicks, detailViews)
     };
@@ -1070,6 +1075,7 @@ export async function getRevenueMetrics() {
       impressions: totals.impression,
       detail_views: totals.detail_view + totals.telegram_detail_click,
       affiliate_clicks: totals.affiliate_click,
+      share_copies: totals.share_copy,
       detail_ctr: ratio(totals.detail_view + totals.telegram_detail_click, totals.impression),
       affiliate_ctr: ratio(totals.affiliate_click, totals.detail_view + totals.telegram_detail_click)
     },

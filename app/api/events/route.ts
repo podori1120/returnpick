@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAffiliateEvent, getProductById } from "@/lib/dataStore";
-import { isCoupangPartnersLink } from "@/lib/coupangLink";
+import { getCoupangOutboundLink, isCoupangPartnersLink } from "@/lib/coupangLink";
 import { isPublicDealVisible } from "@/lib/publicDeal";
 import type { AffiliateEventType } from "@/lib/types";
 
@@ -185,6 +185,12 @@ export async function POST(request: Request) {
     const product = await getProductById(productId);
     if (!product || !isPublicDealVisible(product)) {
       return NextResponse.json({ ok: false, skipped: "PRODUCT_NOT_PUBLIC_READY" }, { status: 202 });
+    }
+
+    // The endpoint is public, so the browser cannot be trusted to label an
+    // arbitrary event as a monetizable partner click.
+    if (eventType === "affiliate_click" && !getCoupangOutboundLink(product).isAffiliate) {
+      return NextResponse.json({ ok: false, skipped: "AFFILIATE_LINK_NOT_READY" }, { status: 202 });
     }
 
     const event = await createAffiliateEvent({
