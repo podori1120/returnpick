@@ -3626,6 +3626,8 @@ if (fileExists("app/api/admin/products/[id]/route.ts")) {
 if (fileExists("components/AdminOpsDashboard.tsx")) {
   const opsDashboard = readText("components/AdminOpsDashboard.tsx");
   const dataStore = fileExists("lib/dataStore.ts") ? readText("lib/dataStore.ts") : "";
+  const revenueMetricsRoute = fileExists("app/api/admin/revenue-metrics/route.ts") ? readText("app/api/admin/revenue-metrics/route.ts") : "";
+  const candidateTable = fileExists("components/AdminCandidateTable.tsx") ? readText("components/AdminCandidateTable.tsx") : "";
   check(
     "admin: ops dashboard feedback",
     opsDashboard.includes("notice") &&
@@ -3695,6 +3697,22 @@ if (fileExists("components/AdminOpsDashboard.tsx")) {
       dataStore.includes("unique_detail_visitors") &&
       dataStore.includes("session_affiliate_ctr"),
     "admin revenue dashboard separates acquisition-source conversion from CTA placement metrics",
+    "required"
+  );
+  check(
+    "admin: revenue period filters",
+    opsDashboard.includes("revenuePeriodDays") &&
+      opsDashboard.includes("최근 7일") &&
+      opsDashboard.includes("최근 30일") &&
+      opsDashboard.includes("최근 90일") &&
+      opsDashboard.includes("전체") &&
+      dataStore.includes("RevenueMetricsPeriodDays") &&
+      dataStore.includes("periodEvents") &&
+      dataStore.includes("start_at") &&
+      revenueMetricsRoute.includes("getPeriodDays") &&
+      revenueMetricsRoute.includes("INVALID_REVENUE_METRICS_DAYS") &&
+      candidateTable.includes("/api/admin/revenue-metrics?days=30"),
+    "admin revenue metrics can switch between bounded recent windows and all-time data, while candidate review uses a clear recent window",
     "required"
   );
   check(
@@ -4425,6 +4443,14 @@ if (fileExists("lib/quality.ts") && fileExists("components/DealDetail.tsx") && f
       priceComparison.includes('target="_blank"') &&
       priceComparison.includes('rel="noopener noreferrer"'),
     "products with a verified selling price but missing return evidence can be published with explicit customer-facing warnings; products without any price remain blocked",
+    "required"
+  );
+  check(
+    "public deals: explicit sold-out gate",
+    quality.includes('if (product.stock_count === 0) blockers.push("품절 확인")') &&
+      quality.includes('if (product.stock_count == null) warnings.push("재고 확인 필요")') &&
+      readText("lib/publicDeal.ts").includes("getCustomerPublishReadiness(product).ready"),
+    "explicit stock zero is hidden from customer deal surfaces while unknown stock remains a visible review warning",
     "required"
   );
 }

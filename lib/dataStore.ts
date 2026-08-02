@@ -972,19 +972,40 @@ function attributionSource(event: AffiliateEvent) {
   return "direct";
 }
 
-export async function getRevenueMetrics() {
+export type RevenueMetricsPeriodDays = 7 | 30 | 90 | "all";
+
+type RevenueMetricsPeriod = {
+  days: number | null;
+  start_at: string | null;
+  end_at: string;
+};
+
+export async function getRevenueMetrics(periodDays: RevenueMetricsPeriodDays = "all") {
   const [products, events] = await Promise.all([listProducts({ published: true }), listAffiliateEvents()]);
+  const periodEnd = new Date();
+  const periodStart = periodDays === "all" ? null : new Date(periodEnd.getTime() - periodDays * 24 * 60 * 60 * 1000);
+  const period: RevenueMetricsPeriod = {
+    days: periodDays === "all" ? null : periodDays,
+    start_at: periodStart?.toISOString() ?? null,
+    end_at: periodEnd.toISOString()
+  };
+  const periodEvents = periodStart
+    ? events.filter((event) => {
+      const createdAt = new Date(event.created_at);
+      return Number.isFinite(createdAt.getTime()) && createdAt >= periodStart && createdAt <= periodEnd;
+    })
+    : events;
   const publishedProducts = products.filter((product) => product.sourcing_status === "published");
   const productMap = new Map(publishedProducts.map((product) => [product.id, product]));
-  const impressionEvents = events.filter((event) => event.event_type === "impression");
-  const detailEvents = events.filter((event) => event.event_type === "detail_view" || event.event_type === "telegram_detail_click");
-  const affiliateClickEvents = events.filter((event) => event.event_type === "affiliate_click");
+  const impressionEvents = periodEvents.filter((event) => event.event_type === "impression");
+  const detailEvents = periodEvents.filter((event) => event.event_type === "detail_view" || event.event_type === "telegram_detail_click");
+  const affiliateClickEvents = periodEvents.filter((event) => event.event_type === "affiliate_click");
   const totals = {
     impression: impressionEvents.length,
-    detail_view: events.filter((event) => event.event_type === "detail_view").length,
+    detail_view: periodEvents.filter((event) => event.event_type === "detail_view").length,
     affiliate_click: affiliateClickEvents.length,
-    telegram_detail_click: events.filter((event) => event.event_type === "telegram_detail_click").length,
-    share_copy: events.filter((event) => event.event_type === "share_copy").length
+    telegram_detail_click: periodEvents.filter((event) => event.event_type === "telegram_detail_click").length,
+    share_copy: periodEvents.filter((event) => event.event_type === "share_copy").length
   };
   const uniqueVisitors = uniqueSessionCount([...impressionEvents, ...detailEvents]);
   const uniqueDetailVisitors = uniqueSessionCount(detailEvents);
@@ -992,7 +1013,7 @@ export async function getRevenueMetrics() {
 
   const allProductMetrics = publishedProducts
     .map((product) => {
-      const productEvents = events.filter((event) => event.product_id === product.id);
+      const productEvents = periodEvents.filter((event) => event.product_id === product.id);
       const impressions = productEvents.filter((event) => event.event_type === "impression").length;
       const productDetailEvents = productEvents.filter((event) => event.event_type === "detail_view" || event.event_type === "telegram_detail_click");
       const productAffiliateClickEvents = productEvents.filter((event) => event.event_type === "affiliate_click");
@@ -1030,7 +1051,7 @@ export async function getRevenueMetrics() {
 
   const categoryMetrics = Array.from(new Set(publishedProducts.map((product) => product.category))).map((category) => {
     const categoryProductIds = new Set(publishedProducts.filter((product) => product.category === category).map((product) => product.id));
-    const categoryEvents = events.filter((event) => event.product_id && categoryProductIds.has(event.product_id));
+    const categoryEvents = periodEvents.filter((event) => event.product_id && categoryProductIds.has(event.product_id));
     const impressions = categoryEvents.filter((event) => event.event_type === "impression").length;
     const detailViews = categoryEvents.filter((event) => event.event_type === "detail_view" || event.event_type === "telegram_detail_click").length;
     const affiliateClicks = categoryEvents.filter((event) => event.event_type === "affiliate_click").length;
@@ -1045,8 +1066,8 @@ export async function getRevenueMetrics() {
     };
   });
 
-  const channelMetrics = Array.from(new Set(events.map((event) => event.channel ?? "unknown"))).map((channel) => {
-    const channelEvents = events.filter((event) => (event.channel ?? "unknown") === channel);
+  const channelMetrics = Array.from(new Set(periodEvents.map((event) => event.channel ?? "unknown"))).map((channel) => {
+    const channelEvents = periodEvents.filter((event) => (event.channel ?? "unknown") === channel);
     return {
       channel,
       impressions: channelEvents.filter((event) => event.event_type === "impression").length,
@@ -1057,8 +1078,8 @@ export async function getRevenueMetrics() {
     };
   }).sort((a, b) => b.affiliate_clicks - a.affiliate_clicks || b.detail_views - a.detail_views || b.impressions - a.impressions);
 
-  const sourceMetrics = Array.from(new Set(events.map(attributionSource))).map((source) => {
-    const sourceEvents = events.filter((event) => attributionSource(event) === source);
+  const sourceMetrics = Array.from(new Set(periodEvents.map(attributionSource))).map((source) => {
+    const sourceEvents = periodEvents.filter((event) => attributionSource(event) === source);
     const sourceDetailEvents = sourceEvents.filter((event) => event.event_type === "detail_view" || event.event_type === "telegram_detail_click");
     const sourceAffiliateClickEvents = sourceEvents.filter((event) => event.event_type === "affiliate_click");
     const detailViews = sourceDetailEvents.length;
@@ -1077,8 +1098,8 @@ export async function getRevenueMetrics() {
     };
   }).sort((a, b) => b.affiliate_clicks - a.affiliate_clicks || b.detail_views - a.detail_views);
 
-  const surfaceMetrics = Array.from(new Set(events.map((event) => event.context).filter((context): context is string => Boolean(context)))).map((context) => {
-    const surfaceEvents = events.filter((event) => event.context === context);
+  const surfaceMetrics = Array.from(new Set(periodEvents.map((event) => event.context).filter((context): context is string => Boolean(context)))).map((context) => {
+    const surfaceEvents = periodEvents.filter((event) => event.context === context);
     const impressions = surfaceEvents.filter((event) => event.event_type === "impression").length;
     const detailViews = surfaceEvents.filter((event) => event.event_type === "detail_view" || event.event_type === "telegram_detail_click").length;
     const affiliateClicks = surfaceEvents.filter((event) => event.event_type === "affiliate_click").length;
@@ -1099,6 +1120,7 @@ export async function getRevenueMetrics() {
   const ctaReady = publishedProducts.length - publicQualityBlocked;
 
   return {
+    period,
     totals,
     funnel: {
       impressions: totals.impression,
@@ -1121,7 +1143,7 @@ export async function getRevenueMetrics() {
     sourceMetrics,
     surfaceMetrics,
     conversionOpportunities,
-    knownProductEventCount: events.filter((event) => event.product_id && productMap.has(event.product_id)).length
+    knownProductEventCount: periodEvents.filter((event) => event.product_id && productMap.has(event.product_id)).length
   };
 }
 

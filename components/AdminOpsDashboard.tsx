@@ -52,6 +52,11 @@ type Metrics = {
 };
 
 type RevenueMetrics = {
+  period: {
+    days: number | null;
+    start_at: string | null;
+    end_at: string;
+  };
   totals: {
     impression: number;
     detail_view: number;
@@ -214,6 +219,7 @@ function surfaceLabel(context: string) {
 export default function AdminOpsDashboard({ password, refreshToken }: { password: string; refreshToken: number }) {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [revenueMetrics, setRevenueMetrics] = useState<RevenueMetrics | null>(null);
+  const [revenuePeriodDays, setRevenuePeriodDays] = useState<"7" | "30" | "90" | "all">("30");
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<{ type: "info" | "error"; message: string } | null>(null);
 
@@ -223,7 +229,7 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
     try {
       const [metricsResponse, revenueResponse] = await Promise.all([
         fetch("/api/admin/metrics", { headers: headers(password) }),
-        fetch("/api/admin/revenue-metrics", { headers: headers(password) })
+        fetch(`/api/admin/revenue-metrics?days=${revenuePeriodDays}`, { headers: headers(password) })
       ]);
       const metricsData = (await metricsResponse.json().catch(() => ({}))) as MetricsResponse;
       const revenueData = (await revenueResponse.json().catch(() => ({}))) as RevenueMetricsResponse;
@@ -254,7 +260,7 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
 
   useEffect(() => {
     void loadMetrics();
-  }, [password, refreshToken]);
+  }, [password, refreshToken, revenuePeriodDays]);
 
   if (!metrics) {
     return (
@@ -469,6 +475,24 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
             <div className="flex items-center gap-2">
               <TrendingUp className="text-pine" size={20} aria-hidden />
               <h2 className="text-lg font-black">수익 퍼널</h2>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2" aria-label="수익 퍼널 기간">
+              {[
+                ["7", "최근 7일"],
+                ["30", "최근 30일"],
+                ["90", "최근 90일"],
+                ["all", "전체"]
+              ].map(([days, label]) => (
+                <button
+                  key={days}
+                  className={`focus-ring rounded-md border px-2 py-1 text-xs font-black ${revenuePeriodDays === days ? "border-pine bg-pine text-white" : "border-line bg-white text-steel hover:bg-mist"}`}
+                  aria-pressed={revenuePeriodDays === days}
+                  onClick={() => setRevenuePeriodDays(days as "7" | "30" | "90" | "all")}
+                  type="button"
+                >
+                  {label}
+                </button>
+              ))}
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
               <div className="rounded-lg bg-mist p-3">

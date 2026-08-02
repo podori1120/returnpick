@@ -110,7 +110,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
         setSelected(nextProducts.find((product: ProductWithScore) => product.id === selected.id) ?? null);
       }
 
-      const revenueResponse = await fetch("/api/admin/revenue-metrics", { headers: headers(password) });
+      const revenueResponse = await fetch("/api/admin/revenue-metrics?days=30", { headers: headers(password) });
       const revenueData = (await revenueResponse.json().catch(() => ({}))) as RevenueMetricsResponse;
       if (!revenueResponse.ok) {
         setProductMetrics({});
@@ -604,7 +604,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
                 <th className="px-3 py-2">네이버 기준가</th>
                 <th className="px-3 py-2">할인</th>
                 <th className="px-3 py-2">상태</th>
-                <th className="px-3 py-2">수익 퍼널</th>
+                <th className="px-3 py-2">수익 퍼널 (최근 30일)</th>
                 <th className="px-3 py-2">CTA</th>
                 <th className="px-3 py-2">수집</th>
                 <th className="px-3 py-2">작업</th>

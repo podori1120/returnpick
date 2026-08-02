@@ -65,7 +65,8 @@ export function getDealQuality(product: ProductWithScore): DealQuality {
   if (!isUsableAffiliateUrl(product.affiliate_url)) warnings.push("파트너스 URL 보완 권장");
   if (referenceInfo.naverTrust.status === "unverified") warnings.push("네이버 최저가 동일 상품 검증 필요");
   if (referenceInfo.naverTrust.status === "missing") warnings.push("네이버 최저가 없음");
-  if (!product.stock_count) warnings.push("재고 확인 필요");
+  if (product.stock_count === 0) blockers.push("품절 확인");
+  if (product.stock_count == null) warnings.push("재고 확인 필요");
   if (product.stock_count === 1) warnings.push("재고 1개");
   if (riskFlags.includes("RISK_FREEDOS")) warnings.push("FreeDOS 설치 비용 확인");
   if (riskFlags.includes("RISK_USED_BATTERY")) warnings.push("배터리 상태 확인");
