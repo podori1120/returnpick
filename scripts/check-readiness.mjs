@@ -4565,6 +4565,9 @@ if (fileExists(".github/workflows/returnpick-hourly.yml")) {
       hourlyWorkflow.includes("/api/cron/telegram-digest?limit=1") &&
       hourlyWorkflow.includes("Authorization: Bearer") &&
       hourlyWorkflow.includes("--fail-with-body") &&
+      hourlyWorkflow.includes("jq -r") &&
+      hourlyWorkflow.includes("::warning::") &&
+      hourlyWorkflow.includes("::error::") &&
       hourlyWorkflow.includes("concurrency:"),
     "GitHub Actions can call protected ReturnPick Cron endpoints hourly when Vercel Hobby cannot deploy hourly Cron",
     "required"

@@ -51,11 +51,32 @@ jobs:
 
           call_returnpick() {
             local path="$1"
+            local response
+            local job_status
             echo "Calling ${site_url}${path}"
-            curl --fail-with-body --silent --show-error --location --max-time 75 \
+            response="$(curl --fail-with-body --silent --show-error --location --max-time 75 \
               -H "Authorization: Bearer ${CRON_SECRET}" \
-              "${site_url}${path}"
-            echo
+              "${site_url}${path}")"
+            printf '%s\n' "${response}"
+
+            if ! job_status="$(jq -r '.result.status // .status // empty' <<<"${response}")"; then
+              echo "::error::ReturnPick returned a response that could not be parsed as JSON."
+              return 1
+            fi
+
+            case "${job_status}" in
+              error)
+                echo "::error::ReturnPick ${path} returned status=error."
+                return 1
+                ;;
+              not_ready|waiting_for_api|partial|completed_partial)
+                echo "::warning::ReturnPick ${path} returned status=${job_status}; no complete scheduled work was performed."
+                ;;
+              "")
+                echo "::error::ReturnPick ${path} did not include a result status."
+                return 1
+                ;;
+            esac
           }
 
           call_returnpick "/api/cron/sourcing"

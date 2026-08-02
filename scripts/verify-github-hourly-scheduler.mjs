@@ -45,6 +45,7 @@ function checkWorkflow(text) {
     ["protected telegram endpoint", has(text, "/api/cron/telegram-digest?limit=1")],
     ["authorization header", has(text, "Authorization: Bearer") && has(text, "CRON_SECRET")],
     ["fail on http errors", has(text, "--fail-with-body") && has(text, "--max-time 75")],
+    ["inspect response status", has(text, "jq -r '.result.status // .status // empty'") && has(text, "::warning::") && has(text, "::error::")],
     ["https-only target", has(text, "ReturnPick site URL must start with https://")]
   ];
 
