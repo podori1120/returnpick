@@ -1218,6 +1218,7 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-env.mjs"
       envVerifier.includes("envRawEntries") &&
       envVerifier.includes("outerWhitespaceSource") &&
       envVerifier.includes("isVercelMaskedValue") &&
+      envVerifier.includes("function invalidValueStatus(check)") &&
       envVerifier.includes("Vercel env pull masks this secret locally") &&
       envVerifier.includes("leading or trailing whitespace") &&
       envVerifier.includes("validateCoupangPartnersUrl") &&
@@ -1232,6 +1233,13 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-env.mjs"
       !envVerifier.includes("console.log(value)") &&
       !envVerifier.includes("console.error(value)"),
     "production env check validates launch env formats, blank values, and raw surrounding whitespace, then prints a safe Vercel repair checklist without secret values",
+    "required"
+  );
+  check(
+    "scripts: optional launch env failures stay warnings",
+    envVerifier.includes('return launchMode && !check.required ? "WARN" : "FAIL"') &&
+      envVerifier.includes('launchMode && check.required ? "FAIL" : "WARN"'),
+    "launch mode does not block core release on malformed or masked optional provider values",
     "required"
   );
   check(

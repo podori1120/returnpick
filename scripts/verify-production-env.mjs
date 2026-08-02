@@ -184,6 +184,10 @@ function outerWhitespaceSource(name) {
   })?.source ?? "";
 }
 
+function invalidValueStatus(check) {
+  return launchMode && !check.required ? "WARN" : "FAIL";
+}
+
 function checkEnvItem(check) {
   const value = envValue(check.name);
   const blankSources = blankEnvSources(check.name);
@@ -199,7 +203,7 @@ function checkEnvItem(check) {
 
   if (isVercelMaskedValue(value)) {
     add(
-      launchMode ? "FAIL" : "WARN",
+      launchMode && check.required ? "FAIL" : "WARN",
       check.name,
       "Vercel env pull masks this secret locally; use the live Vercel readiness check or provide the real value in a local-only env file"
     );
@@ -208,12 +212,12 @@ function checkEnvItem(check) {
 
   const whitespaceSource = outerWhitespaceSource(check.name);
   if (whitespaceSource) {
-    add("FAIL", check.name, `value has leading or trailing whitespace in ${whitespaceSource}; paste the value again without spaces`);
+    add(invalidValueStatus(check), check.name, `value has leading or trailing whitespace in ${whitespaceSource}; paste the value again without spaces`);
     return;
   }
 
   if (!check.validate(value)) {
-    add("FAIL", check.name, `invalid format from ${source || "unknown source"}; expected ${check.hint}`);
+    add(invalidValueStatus(check), check.name, `invalid format from ${source || "unknown source"}; expected ${check.hint}`);
     return;
   }
 
