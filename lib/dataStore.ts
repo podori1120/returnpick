@@ -956,6 +956,15 @@ function ratio(numerator: number, denominator: number) {
   return Math.round((numerator / denominator) * 1000) / 10;
 }
 
+function uniqueSessionCount(events: AffiliateEvent[]) {
+  const sessions = new Set<string>();
+  for (const event of events) {
+    const sessionId = event.anon_session_id?.trim();
+    if (sessionId) sessions.add(sessionId);
+  }
+  return sessions.size;
+}
+
 function attributionSource(event: AffiliateEvent) {
   const utmSource = event.utm_source?.trim().toLowerCase();
   if (utmSource) return utmSource;
@@ -967,21 +976,31 @@ export async function getRevenueMetrics() {
   const [products, events] = await Promise.all([listProducts({ published: true }), listAffiliateEvents()]);
   const publishedProducts = products.filter((product) => product.sourcing_status === "published");
   const productMap = new Map(publishedProducts.map((product) => [product.id, product]));
+  const impressionEvents = events.filter((event) => event.event_type === "impression");
+  const detailEvents = events.filter((event) => event.event_type === "detail_view" || event.event_type === "telegram_detail_click");
+  const affiliateClickEvents = events.filter((event) => event.event_type === "affiliate_click");
   const totals = {
-    impression: events.filter((event) => event.event_type === "impression").length,
+    impression: impressionEvents.length,
     detail_view: events.filter((event) => event.event_type === "detail_view").length,
-    affiliate_click: events.filter((event) => event.event_type === "affiliate_click").length,
+    affiliate_click: affiliateClickEvents.length,
     telegram_detail_click: events.filter((event) => event.event_type === "telegram_detail_click").length,
     share_copy: events.filter((event) => event.event_type === "share_copy").length
   };
+  const uniqueVisitors = uniqueSessionCount([...impressionEvents, ...detailEvents]);
+  const uniqueDetailVisitors = uniqueSessionCount(detailEvents);
+  const uniqueAffiliateClickers = uniqueSessionCount(affiliateClickEvents);
 
   const allProductMetrics = publishedProducts
     .map((product) => {
       const productEvents = events.filter((event) => event.product_id === product.id);
       const impressions = productEvents.filter((event) => event.event_type === "impression").length;
-      const detailViews = productEvents.filter((event) => event.event_type === "detail_view" || event.event_type === "telegram_detail_click").length;
-      const affiliateClicks = productEvents.filter((event) => event.event_type === "affiliate_click").length;
+      const productDetailEvents = productEvents.filter((event) => event.event_type === "detail_view" || event.event_type === "telegram_detail_click");
+      const productAffiliateClickEvents = productEvents.filter((event) => event.event_type === "affiliate_click");
+      const detailViews = productDetailEvents.length;
+      const affiliateClicks = productAffiliateClickEvents.length;
       const telegramClicks = productEvents.filter((event) => event.event_type === "telegram_detail_click").length;
+      const uniqueProductDetailVisitors = uniqueSessionCount(productDetailEvents);
+      const uniqueProductAffiliateClickers = uniqueSessionCount(productAffiliateClickEvents);
       return {
         product_id: product.id,
         title: product.title,
@@ -995,6 +1014,9 @@ export async function getRevenueMetrics() {
         share_copies: productEvents.filter((event) => event.event_type === "share_copy").length,
         detail_ctr: ratio(detailViews, impressions),
         affiliate_ctr: ratio(affiliateClicks, detailViews),
+        unique_detail_visitors: uniqueProductDetailVisitors,
+        unique_affiliate_clickers: uniqueProductAffiliateClickers,
+        session_affiliate_ctr: ratio(uniqueProductAffiliateClickers, uniqueProductDetailVisitors),
         cta_ready: getCustomerPublishReadiness(product).ready && product.is_published && product.sourcing_status === "published"
       };
     })
@@ -1037,14 +1059,21 @@ export async function getRevenueMetrics() {
 
   const sourceMetrics = Array.from(new Set(events.map(attributionSource))).map((source) => {
     const sourceEvents = events.filter((event) => attributionSource(event) === source);
-    const detailViews = sourceEvents.filter((event) => event.event_type === "detail_view" || event.event_type === "telegram_detail_click").length;
-    const affiliateClicks = sourceEvents.filter((event) => event.event_type === "affiliate_click").length;
+    const sourceDetailEvents = sourceEvents.filter((event) => event.event_type === "detail_view" || event.event_type === "telegram_detail_click");
+    const sourceAffiliateClickEvents = sourceEvents.filter((event) => event.event_type === "affiliate_click");
+    const detailViews = sourceDetailEvents.length;
+    const affiliateClicks = sourceAffiliateClickEvents.length;
+    const uniqueSourceDetailVisitors = uniqueSessionCount(sourceDetailEvents);
+    const uniqueSourceAffiliateClickers = uniqueSessionCount(sourceAffiliateClickEvents);
     return {
       source,
       detail_views: detailViews,
       affiliate_clicks: affiliateClicks,
       share_copies: sourceEvents.filter((event) => event.event_type === "share_copy").length,
-      affiliate_ctr: ratio(affiliateClicks, detailViews)
+      affiliate_ctr: ratio(affiliateClicks, detailViews),
+      unique_detail_visitors: uniqueSourceDetailVisitors,
+      unique_affiliate_clickers: uniqueSourceAffiliateClickers,
+      session_affiliate_ctr: ratio(uniqueSourceAffiliateClickers, uniqueSourceDetailVisitors)
     };
   }).sort((a, b) => b.affiliate_clicks - a.affiliate_clicks || b.detail_views - a.detail_views);
 
@@ -1077,7 +1106,11 @@ export async function getRevenueMetrics() {
       affiliate_clicks: totals.affiliate_click,
       share_copies: totals.share_copy,
       detail_ctr: ratio(totals.detail_view + totals.telegram_detail_click, totals.impression),
-      affiliate_ctr: ratio(totals.affiliate_click, totals.detail_view + totals.telegram_detail_click)
+      affiliate_ctr: ratio(totals.affiliate_click, totals.detail_view + totals.telegram_detail_click),
+      unique_visitors: uniqueVisitors,
+      unique_detail_visitors: uniqueDetailVisitors,
+      unique_affiliate_clickers: uniqueAffiliateClickers,
+      session_affiliate_ctr: ratio(uniqueAffiliateClickers, uniqueDetailVisitors)
     },
     ctaReady,
     missingAffiliateUrl,

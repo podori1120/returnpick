@@ -26,6 +26,9 @@ type ProductRevenueMetric = {
   detail_views: number;
   affiliate_clicks: number;
   affiliate_ctr: number;
+  unique_detail_visitors?: number;
+  unique_affiliate_clickers?: number;
+  session_affiliate_ctr?: number;
   cta_ready: boolean;
 };
 
@@ -648,7 +651,9 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
                     <td className="px-3 py-3 text-xs font-bold text-steel">
                       상세 {revenue?.detail_views ?? 0} · 구매 {revenue?.affiliate_clicks ?? 0}
                       <br />
-                      CTA {revenue?.affiliate_ctr ?? 0}%
+                      CTA {revenue?.affiliate_ctr ?? 0}% · 세션 {revenue?.session_affiliate_ctr ?? 0}%
+                      <br />
+                      고유 방문 {revenue?.unique_detail_visitors ?? 0} · 고유 클릭 {revenue?.unique_affiliate_clickers ?? 0}
                     </td>
                     <td className="px-3 py-3">
                       <span

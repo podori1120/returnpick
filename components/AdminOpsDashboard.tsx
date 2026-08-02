@@ -66,6 +66,10 @@ type RevenueMetrics = {
     share_copies: number;
     detail_ctr: number;
     affiliate_ctr: number;
+    unique_visitors: number;
+    unique_detail_visitors: number;
+    unique_affiliate_clickers: number;
+    session_affiliate_ctr: number;
   };
   ctaReady: number;
   missingAffiliateUrl: number;
@@ -82,6 +86,9 @@ type RevenueMetrics = {
     share_copies: number;
     detail_ctr: number;
     affiliate_ctr: number;
+    unique_detail_visitors: number;
+    unique_affiliate_clickers: number;
+    session_affiliate_ctr: number;
     cta_ready: boolean;
   }>;
   categoryMetrics: Array<{
@@ -107,6 +114,9 @@ type RevenueMetrics = {
     affiliate_clicks: number;
     share_copies: number;
     affiliate_ctr: number;
+    unique_detail_visitors: number;
+    unique_affiliate_clickers: number;
+    session_affiliate_ctr: number;
   }>;
   surfaceMetrics: Array<{
     context: string;
@@ -464,20 +474,26 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
               <div className="rounded-lg bg-mist p-3">
                 <p className="font-bold text-steel">노출</p>
                 <p className="mt-1 text-xl font-black">{revenueMetrics.funnel.impressions}</p>
+                <p className="mt-1 text-xs font-bold text-steel">고유 방문 {revenueMetrics.funnel.unique_visitors}세션</p>
               </div>
               <div className="rounded-lg bg-mist p-3">
                 <p className="font-bold text-steel">상세 진입</p>
                 <p className="mt-1 text-xl font-black">{revenueMetrics.funnel.detail_views}</p>
                 <p className="mt-1 text-xs font-bold text-steel">CTR {revenueMetrics.funnel.detail_ctr}%</p>
+                <p className="mt-1 text-xs font-bold text-steel">고유 {revenueMetrics.funnel.unique_detail_visitors}세션</p>
               </div>
               <div className="rounded-lg bg-mist p-3">
                 <p className="font-bold text-steel">구매 클릭</p>
                 <p className="mt-1 text-xl font-black">{revenueMetrics.funnel.affiliate_clicks}</p>
                 <p className="mt-1 text-xs font-bold text-steel">CTA {revenueMetrics.funnel.affiliate_ctr}%</p>
+                <p className="mt-1 text-xs font-bold text-steel">고유 {revenueMetrics.funnel.unique_affiliate_clickers}세션 · 세션 CTA {revenueMetrics.funnel.session_affiliate_ctr}%</p>
               </div>
             </div>
             <p className="mt-4 text-sm font-semibold text-steel">
               텔레그램 유입 {revenueMetrics.totals.telegram_detail_click} · 공유 {revenueMetrics.totals.share_copy} · CTA 준비 {revenueMetrics.ctaReady} · 링크 보강 대기 {hiddenPublishedCount}
+            </p>
+            <p className="mt-2 text-xs font-semibold leading-5 text-steel">
+              이벤트 수는 반복 행동을 포함하고, 세션 수는 같은 익명 브라우저 ID의 중복을 합친 값입니다. IP나 개인 식별 정보는 저장하지 않습니다.
             </p>
             <div className="mt-5 border-t border-line pt-4">
               <div className="flex items-center justify-between gap-3">
@@ -488,8 +504,8 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
                 {topTrafficSources.map((item) => (
                   <div key={item.source} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 text-xs font-bold">
                     <span className="min-w-0 truncate">{sourceLabel(item.source)}</span>
-                    <span className="shrink-0 text-steel">상세 {item.detail_views} · 클릭 {item.affiliate_clicks} · 공유 {item.share_copies}</span>
-                    <span className="w-12 shrink-0 text-right font-black text-pine">{item.affiliate_ctr}%</span>
+                    <span className="shrink-0 text-steel">상세 {item.detail_views} · 클릭 {item.affiliate_clicks} · 공유 {item.share_copies} · 고유 클릭 {item.unique_affiliate_clickers}</span>
+                    <span className="w-20 shrink-0 text-right font-black text-pine">raw {item.affiliate_ctr}% · 세션 {item.session_affiliate_ctr}%</span>
                   </div>
                 ))}
                 {!topTrafficSources.length ? <p className="text-xs font-bold text-steel">아직 채널별 유입 데이터가 없습니다.</p> : null}
@@ -540,7 +556,9 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
                     </span>
                   </div>
                   <p className="mt-2 text-xs font-semibold text-steel">
-                    상세 {item.detail_views} · 구매클릭 {item.affiliate_clicks} · 공유 {item.share_copies} · 텔레그램 {item.telegram_clicks} · 전환 {item.affiliate_ctr}%
+                    상세 {item.detail_views} · 구매클릭 {item.affiliate_clicks} · 공유 {item.share_copies} · 텔레그램 {item.telegram_clicks} · raw 전환 {item.affiliate_ctr}%
+                    <br />
+                    고유 방문 {item.unique_detail_visitors} · 고유 클릭 {item.unique_affiliate_clickers} · 세션 전환 {item.session_affiliate_ctr}%
                   </p>
                 </div>
               ))}

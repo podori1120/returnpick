@@ -3681,7 +3681,10 @@ if (fileExists("components/AdminOpsDashboard.tsx")) {
       dataStore.includes("function attributionSource") &&
       dataStore.includes('return "direct"') &&
       dataStore.includes("sourceMetrics") &&
-      dataStore.includes("affiliate_ctr: ratio(affiliateClicks, detailViews)"),
+      dataStore.includes("affiliate_ctr: ratio(affiliateClicks, detailViews)") &&
+      dataStore.includes("function uniqueSessionCount") &&
+      dataStore.includes("unique_detail_visitors") &&
+      dataStore.includes("session_affiliate_ctr"),
     "admin revenue dashboard separates acquisition-source conversion from CTA placement metrics",
     "required"
   );
