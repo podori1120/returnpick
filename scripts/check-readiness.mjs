@@ -5228,6 +5228,7 @@ if (envValue("PUBLIC_WEB_CRAWL_ENABLED") === "true") {
 }
 
 const launchValueSeverity = mode === "launch" ? "required" : "warning";
+const optionalLaunchValueSeverity = "warning";
 if (hasEnv("NEXT_PUBLIC_SITE_URL")) {
   check(
     "env value: public site url",
@@ -5265,7 +5266,7 @@ if (hasEnv("COUPANG_ACCESS_KEY")) {
     "env value: coupang access key",
     isLikelyProviderSecretValue(envValue("COUPANG_ACCESS_KEY"), 8),
     "COUPANG_ACCESS_KEY must be a copied API key without whitespace or placeholder text",
-    launchValueSeverity
+    optionalLaunchValueSeverity
   );
 }
 if (hasEnv("COUPANG_SECRET_KEY")) {
@@ -5273,7 +5274,7 @@ if (hasEnv("COUPANG_SECRET_KEY")) {
     "env value: coupang secret key",
     isLikelyProviderSecretValue(envValue("COUPANG_SECRET_KEY"), 8),
     "COUPANG_SECRET_KEY must be a copied API key without whitespace or placeholder text",
-    launchValueSeverity
+    optionalLaunchValueSeverity
   );
 }
 if (hasEnv("COUPANG_PARTNER_ID")) {
@@ -5281,7 +5282,7 @@ if (hasEnv("COUPANG_PARTNER_ID")) {
     "env value: coupang partner id",
     isLikelyProviderSecretValue(envValue("COUPANG_PARTNER_ID"), 2),
     "COUPANG_PARTNER_ID must be copied without whitespace or placeholder text",
-    launchValueSeverity
+    optionalLaunchValueSeverity
   );
 }
 if (hasEnv("NAVER_CLIENT_ID")) {
@@ -5289,7 +5290,7 @@ if (hasEnv("NAVER_CLIENT_ID")) {
     "env value: naver client id",
     isLikelyProviderSecretValue(envValue("NAVER_CLIENT_ID"), 5),
     "NAVER_CLIENT_ID must be copied without whitespace or placeholder text",
-    launchValueSeverity
+    optionalLaunchValueSeverity
   );
 }
 if (hasEnv("NAVER_CLIENT_SECRET")) {
@@ -5297,7 +5298,7 @@ if (hasEnv("NAVER_CLIENT_SECRET")) {
     "env value: naver client secret",
     isLikelyProviderSecretValue(envValue("NAVER_CLIENT_SECRET"), 5),
     "NAVER_CLIENT_SECRET must be copied without whitespace or placeholder text",
-    launchValueSeverity
+    optionalLaunchValueSeverity
   );
 }
 if (hasEnv("TELEGRAM_BOT_TOKEN")) {
@@ -5305,7 +5306,7 @@ if (hasEnv("TELEGRAM_BOT_TOKEN")) {
     "env value: telegram bot token",
     isLikelyTelegramBotTokenValue(envValue("TELEGRAM_BOT_TOKEN")),
     "TELEGRAM_BOT_TOKEN must look like 123456:bot-token",
-    launchValueSeverity
+    optionalLaunchValueSeverity
   );
 }
 if (hasEnv("TELEGRAM_CHAT_ID")) {
@@ -5313,7 +5314,7 @@ if (hasEnv("TELEGRAM_CHAT_ID")) {
     "env value: telegram chat id",
     isLikelyTelegramChatIdValue(envValue("TELEGRAM_CHAT_ID")),
     "TELEGRAM_CHAT_ID must be a numeric chat id or @channel username",
-    launchValueSeverity
+    optionalLaunchValueSeverity
   );
 }
 if (hasEnv("NEXT_PUBLIC_SUPABASE_URL")) {

@@ -89,10 +89,17 @@ assert.equal(
 const apiReadinessSource = readFileSync(new URL("../lib/apiReadiness.ts", import.meta.url), "utf8");
 const schedulerSource = readFileSync(new URL("../lib/scheduler.ts", import.meta.url), "utf8");
 const launchRouteSource = readFileSync(new URL("../app/api/admin/launch/route.ts", import.meta.url), "utf8");
+const readinessCheckSource = readFileSync(new URL("./check-readiness.mjs", import.meta.url), "utf8");
 assert.match(apiReadinessSource, /evaluateLaunchReadiness\(items, publicWebEnabled\)/, "API readiness must use the shared policy");
 assert.match(schedulerSource, /TELEGRAM_NOT_READY/, "Telegram scheduling must have a capability-only wait state");
 assert.match(schedulerSource, /isCapabilityReady\(gate\.readiness\.items, "telegram"\)/, "Telegram scheduling must use the shared policy");
 assert.match(launchRouteSource, /blocking: false/, "Naver backfill errors must remain visible but non-blocking");
 assert.match(launchRouteSource, /hasBlockingLaunchError\(steps\)/, "first launch must use the shared blocking-step policy");
+assert.match(readinessCheckSource, /const optionalLaunchValueSeverity = "warning";/, "optional provider values must never become core launch blockers");
+assert.equal(
+  (readinessCheckSource.match(/optionalLaunchValueSeverity/g) ?? []).length,
+  8,
+  "Coupang, Naver, and Telegram format checks must all use the optional launch severity"
+);
 
 console.log("Launch capability policy checks passed: core launch is independent from Naver and Telegram, while optional jobs remain gated.");
