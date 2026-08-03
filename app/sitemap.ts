@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { categoryOptions } from "@/lib/category";
 import { listProducts } from "@/lib/dataStore";
 import { isPublicDealReady } from "@/lib/publicDeal";
+import { searchIntentLandings } from "@/lib/searchLandings";
 import { getSiteUrl } from "@/lib/siteUrl";
 
 export const revalidate = 300;
@@ -36,6 +37,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: "daily" as const,
     priority: 0.75
   }));
+  const searchIntentEntries: SitemapEntry[] = searchIntentLandings.map((landing) => ({
+    path: `/guide/search/${landing.slug}`,
+    changeFrequency: "weekly" as const,
+    priority: 0.68
+  }));
 
   let productEntries: SitemapEntry[] = [];
 
@@ -51,9 +57,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Keep the base sitemap available during a temporary data-store outage.
   }
 
-  return [...entries, ...categoryEntries, ...productEntries].map((entry) => ({
+  return [...entries, ...categoryEntries, ...searchIntentEntries, ...productEntries].map((entry) => ({
     url: `${siteUrl}${entry.path}`,
-    lastModified: entry.lastModified ?? now,
+    ...(entry.lastModified ? { lastModified: entry.lastModified } : {}),
     changeFrequency: entry.changeFrequency,
     priority: entry.priority
   }));

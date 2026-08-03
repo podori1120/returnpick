@@ -187,6 +187,7 @@ const requiredFiles = [
   "app/api/cron/telegram-digest/route.ts",
   "app/api/events/route.ts",
   "app/deals/category/[category]/page.tsx",
+  "app/guide/search/[slug]/page.tsx",
   "app/picks/page.tsx",
   "app/picks/novatech-s1-window-cleaner/page.tsx",
   "app/picks/novatech-s1-window-cleaner/opengraph-image.tsx",
@@ -208,6 +209,7 @@ const requiredFiles = [
   "components/AffiliateEventTracker.tsx",
   "components/EditorialShareBar.tsx",
   "components/GuideEditorialLink.tsx",
+  "components/SearchIntentRail.tsx",
   "components/TelegramPreview.tsx",
   "lib/affiliateLinkBackfill.ts",
   "lib/affiliateIdentity.ts",
@@ -221,6 +223,8 @@ const requiredFiles = [
   "lib/adminNavigation.ts",
   "lib/apiReadiness.ts",
   "lib/categoryLanding.ts",
+  "lib/searchIntentMatcher.ts",
+  "lib/searchLandings.ts",
   "lib/clientTracking.ts",
   "lib/launchCapabilityPolicy.ts",
   "lib/launchState.ts",
@@ -267,6 +271,7 @@ const requiredFiles = [
   "scripts/verify-coupang-provider.mjs",
   "scripts/verify-provider-product-merge.mjs",
   "scripts/verify-scoring-rules.mjs",
+  "scripts/verify-search-intent-landings.mjs",
   "scripts/verify-public-web-config.mjs",
   "scripts/verify-web-return-info.mjs",
   "scripts/verify-public-web-url-safety.mjs",
@@ -344,6 +349,23 @@ if (fileExists("package.json") && fileExists("scripts/verify-scoring-rules.mjs")
       scoringCheck.includes("public type contract") &&
       scoringCheck.includes("secret values") === false,
     "scoring check guards price bands, condition scores, verdict caps, risk flags, type strings, and sourcing score persistence without reading secrets",
+    "required"
+  );
+}
+
+if (fileExists("package.json") && fileExists("scripts/verify-search-intent-landings.mjs") && fileExists("lib/searchIntentMatcher.ts")) {
+  const packageJson = readText("package.json");
+  const searchIntentCheck = readText("scripts/verify-search-intent-landings.mjs");
+  const searchIntentMatcher = readText("lib/searchIntentMatcher.ts");
+  check(
+    "scripts: search intent matcher check command",
+    packageJson.includes('"search-intent:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-search-intent-landings.mjs"') &&
+      searchIntentCheck.includes("matchesSearchIntent") &&
+      searchIntentCheck.includes("MSI 사이보그 RTX 4050 게이밍 노트북") &&
+      searchIntentCheck.includes("32인치 QHD 모니터") &&
+      searchIntentMatcher.includes("excludeQueries") &&
+      searchIntentMatcher.includes("product.category !== rule.category"),
+    "search intent behavior has a runnable matcher check for positive terms, negative gaming terms, and category boundaries",
     "required"
   );
 }
@@ -1114,6 +1136,52 @@ if (
       sitemap.includes("categoryOptions.map") &&
       !sitemap.includes('/products/approval-sample'),
     "six category pages use self-canonical metadata, public-ready products, unique buying guidance, FAQ schema, honest empty states, and sitemap/home discovery",
+    "required"
+  );
+}
+
+if (
+  fileExists("app/guide/search/[slug]/page.tsx") &&
+  fileExists("lib/searchLandings.ts") &&
+  fileExists("components/SearchIntentRail.tsx") &&
+  fileExists("app/page.tsx") &&
+  fileExists("app/deals/page.tsx") &&
+  fileExists("app/picks/page.tsx") &&
+  fileExists("app/sitemap.ts")
+) {
+  const searchLandingPage = readText("app/guide/search/[slug]/page.tsx");
+  const searchLandingData = readText("lib/searchLandings.ts");
+  const searchRail = readText("components/SearchIntentRail.tsx");
+  const homePage = readText("app/page.tsx");
+  const dealsPage = readText("app/deals/page.tsx");
+  const picksPage = readText("app/picks/page.tsx");
+  const sitemap = readText("app/sitemap.ts");
+  check(
+    "public SEO: search intent guide landings",
+    searchLandingData.includes("searchIntentLandings") &&
+      searchLandingData.includes('slug: "return-laptop"') &&
+      searchLandingData.includes('slug: "qhd-monitor"') &&
+      searchLandingData.includes('slug: "robot-vacuum"') &&
+      searchLandingData.includes("getSearchIntentLanding") &&
+      searchLandingPage.includes("generateStaticParams") &&
+      searchLandingPage.includes("dynamicParams = false") &&
+      searchLandingPage.includes("generateMetadata") &&
+      searchLandingPage.includes("matchesSearchIntent") &&
+      searchLandingPage.includes("isPublicDealVisible") &&
+      searchLandingPage.includes("현재 공개된 검수 딜은 아직 없습니다") &&
+      searchLandingPage.includes("AffiliateNotice") &&
+      searchLandingPage.includes('"@type": "FAQPage"') &&
+      !searchLandingPage.includes('"@type": "Offer"') &&
+      searchRail.includes("검색 의도별 가이드") &&
+      searchRail.includes("/guide/search/${item.slug}") &&
+      homePage.includes("<SearchIntentRail />") &&
+      dealsPage.includes("<SearchIntentRail />") &&
+      picksPage.includes("<SearchIntentRail />") &&
+      searchRail.includes("searchIntentLandings.slice") &&
+      searchLandingData.includes("excludeQueries") &&
+      sitemap.includes("searchIntentLandings.map") &&
+      sitemap.includes("/guide/search/${landing.slug}"),
+    "search-intent landing pages provide indexable Korean buying guidance, honest empty states, dynamic verified products, and home/deals/picks/sitemap discovery",
     "required"
   );
 }

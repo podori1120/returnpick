@@ -21,6 +21,7 @@ import DemoModeNotice from "@/components/DemoModeNotice";
 import DiscoveryWorkbench from "@/components/DiscoveryWorkbench";
 import PurposeDealExplorer, { type PurposeExplorerItem } from "@/components/PurposeDealExplorer";
 import RecentDealsRail from "@/components/RecentDealsRail";
+import SearchIntentRail from "@/components/SearchIntentRail";
 import VerifiedUpdatesRail from "@/components/VerifiedUpdatesRail";
 import { categoryOptions, getCategoryLabel } from "@/lib/category";
 import { listProducts } from "@/lib/dataStore";
@@ -224,6 +225,8 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      <SearchIntentRail />
 
       {!hasPublishedDeals ? (
         <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">

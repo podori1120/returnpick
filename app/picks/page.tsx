@@ -7,6 +7,7 @@ import DealCard from "@/components/DealCard";
 import DemoModeNotice from "@/components/DemoModeNotice";
 import DiscoveryWorkbench from "@/components/DiscoveryWorkbench";
 import { ProductImpressionTracker } from "@/components/AffiliateEventTracker";
+import SearchIntentRail from "@/components/SearchIntentRail";
 import VerifiedUpdatesRail from "@/components/VerifiedUpdatesRail";
 import { approvalSampleProduct } from "@/lib/approvalSample";
 import { categoryOptions } from "@/lib/category";
@@ -183,6 +184,8 @@ export default async function PicksPage() {
           ))}
         </div>
       </section>
+
+      <SearchIntentRail />
 
       <section className="rounded-lg border border-line bg-mist p-5 sm:p-6" aria-labelledby="picks-faq-heading">
         <h2 id="picks-faq-heading" className="text-xl font-black">자주 확인하는 내용</h2>

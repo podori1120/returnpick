@@ -25,6 +25,7 @@
     "scheduler:check": "node scripts/verify-github-hourly-scheduler.mjs",
     "affiliate-backfill:check": "node scripts/verify-scheduled-affiliate-backfill.mjs",
     "scoring:check": "node scripts/verify-scoring-rules.mjs",
+    "search-intent:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-search-intent-landings.mjs",
     "freshness:check": "node scripts/verify-deal-freshness.mjs",
     "discovery-updates:check": "node scripts/verify-discovery-updates.mjs",
     "manual-import:check": "node scripts/verify-manual-import-safety.mjs",

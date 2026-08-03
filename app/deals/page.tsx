@@ -10,6 +10,7 @@ import DiscoveryWorkbench from "@/components/DiscoveryWorkbench";
 import { ProductImpressionTracker } from "@/components/AffiliateEventTracker";
 import RecentDealsRail from "@/components/RecentDealsRail";
 import SavedFilterBar from "@/components/SavedFilterBar";
+import SearchIntentRail from "@/components/SearchIntentRail";
 import { categoryOptions } from "@/lib/category";
 import {
   getDealPrice,
@@ -224,6 +225,8 @@ function EmptyDealsCatalog() {
           ))}
         </div>
       </section>
+
+      <SearchIntentRail />
 
       <DiscoveryWorkbench
         placement="deals"
