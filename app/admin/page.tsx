@@ -81,7 +81,7 @@ export default function AdminPage() {
     <main className="mx-auto max-w-7xl space-y-5 px-4 py-8 sm:px-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-sm font-black text-pine">ReturnPick Admin</p>
+          <p className="text-sm font-black text-pine">리턴픽 관리자</p>
           <h1 className="text-3xl font-black tracking-tight">수익형 소싱/검수</h1>
         </div>
         <button

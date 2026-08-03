@@ -178,7 +178,7 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
   return (
     <section id="admin-affiliate-link-intake" className="scroll-mt-4 rounded-lg border border-line bg-white p-5 shadow-soft">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="max-w-3xl"><p className="text-sm font-black text-pine">Affiliate Link Intake</p><h2 className="mt-1 text-xl font-black">파트너스 링크로 빠른 후보 등록</h2><p className="mt-2 text-sm font-semibold leading-6 text-steel">링크로 상품번호를 확인해 검수 대기 후보만 저장합니다. 가격·반품등급·재고는 추정하지 않으며 자동 게시하지 않습니다.</p></div>
+        <div className="max-w-3xl"><p className="text-sm font-black text-pine">파트너스 링크 등록</p><h2 className="mt-1 text-xl font-black">파트너스 링크로 빠른 후보 등록</h2><p className="mt-2 text-sm font-semibold leading-6 text-steel">링크로 상품번호를 확인해 검수 대기 후보만 저장합니다. 가격·반품등급·재고는 추정하지 않으며 자동 게시하지 않습니다.</p></div>
         <Link2 className="text-pine" size={24} aria-hidden />
       </div>
       {notice ? <p className={`mt-4 rounded-lg border px-3 py-2 text-sm font-bold ${notice.type === "success" ? "border-pine/30 bg-pine/10 text-pine" : notice.type === "info" ? "border-lemon/50 bg-lemon/15 text-ink" : "border-coral/30 bg-coral/10 text-coral"}`} role="status">{notice.message}</p> : null}

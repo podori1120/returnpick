@@ -643,7 +643,7 @@ export default function AdminAffiliateLinkQueue({
     <section id="admin-affiliate-links" className="scroll-mt-4 rounded-lg border border-line bg-white p-5 shadow-soft">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-black text-pine">Affiliate Link Queue</p>
+          <p className="text-sm font-black text-pine">파트너스 링크 보강</p>
           <h2 className="text-xl font-black">상품별 파트너스 링크 보강</h2>
           <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-steel">
             승인 대기 중에는 쿠팡 파트너스 웹에서 상품별 링크를 직접 만들고 여기에 붙여넣습니다. 링크를 저장하고 후보 상품과의 일치 확인을 마친 상품만 공개 딜과 구매 CTA에 노출됩니다.

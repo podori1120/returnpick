@@ -79,7 +79,7 @@ export default function AdminBootstrapCatalogPanel() {
     <section id="admin-bootstrap-catalog" className="scroll-mt-4 rounded-lg border border-line bg-white p-5 shadow-soft">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-3xl">
-          <p className="text-sm font-black text-pine">Preapproval Catalog</p>
+          <p className="text-sm font-black text-pine">승인 전 출시 카탈로그</p>
           <h2 className="mt-1 text-xl font-black text-ink">승인 대기용 출시 카탈로그</h2>
           <p className="mt-2 text-sm font-semibold leading-6 text-steel">
             Supabase 연결 전에도 검수 완료 상품을 Vercel 재배포 뒤 그대로 공개하기 위한 임시 보존 수단입니다. 자동 관측 상품이나 게시 시점에 관리자가

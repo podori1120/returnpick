@@ -78,7 +78,7 @@ export default function AdminManualProductForm({ password, onCreated }: { passwo
     <section id="admin-manual-product" className="scroll-mt-4 rounded-lg border border-line bg-white p-5 shadow-soft">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-3xl">
-          <p className="text-sm font-black text-pine">Manual Candidate</p>
+          <p className="text-sm font-black text-pine">수동 후보 등록</p>
           <h2 className="mt-1 text-xl font-black">실제 상품을 검토 후보로 추가</h2>
           <p className="mt-2 text-sm font-semibold leading-6 text-steel">
             자동 수집 결과가 없을 때 쿠팡 상품 상세 URL로 초안을 시작합니다. 반품등급, 반품가, 네이버 가격과 파트너스 링크는 추정하지 않고 저장 후 별도 검수 큐에서 보완합니다.

@@ -297,7 +297,7 @@ export default function AdminLaunchRunner({ password, onCompleted }: { password:
     <section id="admin-first-launch" className="scroll-mt-4 rounded-lg border border-line bg-white p-5 shadow-soft">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-black text-pine">Post Approval Launch</p>
+          <p className="text-sm font-black text-pine">승인 후 첫 가동</p>
           <h2 className="text-xl font-black">승인 후 첫 가동 실행</h2>
           <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-steel">
             Supabase·사이트·관리자·Cron 등 출시 필수 환경이 준비된 뒤 누릅니다. API 권한 전에는 수동으로 검수한 상품별 파트너스 링크 운영을 확인하고, API 권한이 열리면 목업 없이 작은 단위로 자동 후보 수집과 링크 보강을 실행합니다. 네이버 최저가는 API가 연결된 경우에만 보강합니다.
@@ -357,7 +357,7 @@ export default function AdminLaunchRunner({ password, onCompleted }: { password:
             const shouldShowSourcingCta = result.steps.some((step) => ["sourcing", "launch_data_signal"].includes(step.id) && step.status === "error");
             return (
               <div className={`rounded-lg border p-4 text-sm font-bold ${nextActionClass(nextAction.tone)}`}>
-                <p className="text-xs font-black uppercase tracking-wide opacity-80">Next Action</p>
+                <p className="text-xs font-black opacity-80">첫 가동을 위한 다음 조치</p>
                 <p className="mt-1 font-black">{nextAction.title}</p>
                 <p className="mt-1 leading-6">{nextAction.description}</p>
                 {shouldShowReviewCta || shouldShowSchedulerCta || shouldShowReadinessCta || shouldShowAffiliateCta || shouldShowPriceCta || shouldShowSourcingCta ? (

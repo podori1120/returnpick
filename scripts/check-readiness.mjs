@@ -3107,7 +3107,7 @@ if (fileExists("components/AdminLaunchStatusBar.tsx")) {
   const launchStatusBar = readText("components/AdminLaunchStatusBar.tsx");
   check(
     "admin: launch status command center",
-    launchStatusBar.includes("Launch Command Center") &&
+    launchStatusBar.includes("운영 전환 센터") &&
       launchStatusBar.includes("운영 전환 요약") &&
       launchStatusBar.includes("승인 대기") &&
       launchStatusBar.includes("첫 가동 가능") &&
@@ -3255,7 +3255,7 @@ if (fileExists("components/AdminApiReadinessPanel.tsx")) {
   check(
     "admin: next launch action card",
     panel.includes("nextLaunchAction") &&
-      panel.includes("Next Launch Action") &&
+      panel.includes("첫 가동을 위한 다음 조치") &&
       panel.includes("실제 연결 테스트") &&
       panel.includes("목업 끄고 첫 후보 수집"),
     "admin shows the single next operator action for approval wait, env setup, connection checks, or first launch",
@@ -3313,7 +3313,7 @@ if (fileExists("components/AdminApiReadinessPanel.tsx")) {
     "admin: production deploy guard copy",
     panel.includes("productionDeployRunbook") &&
       panel.includes("copyProductionDeployRunbook") &&
-      panel.includes("Production Deploy Guard") &&
+      panel.includes("운영 배포 보호") &&
       panel.includes("운영 전환 명령 복사") &&
       panel.includes("npm run doctor:production:launch:fresh") &&
       panel.includes("npm run deploy:production:launch -- confirm") &&
@@ -3727,7 +3727,7 @@ if (fileExists("components/AdminOpsDashboard.tsx")) {
   check(
     "admin: ops revenue recovery plan",
     opsDashboard.includes("수익 회복 플랜") &&
-      opsDashboard.includes("Revenue Recovery") &&
+      opsDashboard.includes("수익 회복") &&
       opsDashboard.includes("primaryRecoveryAction") &&
       opsDashboard.includes("상품별 파트너스 링크 보강") &&
       opsDashboard.includes("공개 품질 보강") &&
@@ -4335,7 +4335,7 @@ if (fileExists("components/AdminLaunchRunner.tsx")) {
   check(
     "admin: launch next action guidance",
     launchRunner.includes("getLaunchNextAction") &&
-      launchRunner.includes("Next Action") &&
+      launchRunner.includes("첫 가동을 위한 다음 조치") &&
       launchRunner.includes("setResult(null)") &&
       launchRunner.includes("다음 조치: 준비도 패널에서 누락 환경변수를 채우세요") &&
       launchRunner.includes("다음 조치: 실제 연결 테스트 실패 카드를 먼저 고치세요") &&

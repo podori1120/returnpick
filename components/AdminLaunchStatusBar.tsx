@@ -124,7 +124,7 @@ export default function AdminLaunchStatusBar({ password }: { password: string })
             <StatusIcon size={20} aria-hidden />
           </span>
           <div className="min-w-0">
-            <p className="text-xs font-black uppercase tracking-wide text-pine">Launch Command Center · {copy.label}</p>
+            <p className="text-xs font-black text-pine">운영 전환 센터 · {copy.label}</p>
             <h2 className="mt-1 text-lg font-black text-ink">{copy.title}</h2>
             <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-steel">{copy.body}</p>
             {notice ? (

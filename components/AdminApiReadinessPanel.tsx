@@ -637,7 +637,7 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
         <div>
           <div className="flex items-center gap-2">
             <PlugZap className="text-pine" size={20} aria-hidden />
-            <p className="text-xs font-black text-pine">API Launch Readiness</p>
+            <p className="text-xs font-black text-pine">API 운영 준비</p>
           </div>
           <h2 className="mt-1 text-xl font-black">승인 후 운영 즉시 가동 준비</h2>
           <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-steel">
@@ -700,7 +700,7 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
               <ListChecks size={18} aria-hidden />
             </span>
             <div>
-              <p className="text-xs font-black uppercase tracking-wide text-pine">Next Launch Action · {nextAction.stage}</p>
+              <p className="text-xs font-black text-pine">첫 가동을 위한 다음 조치 · {nextAction.stage}</p>
               <h3 className="mt-1 text-lg font-black">{nextAction.title}</h3>
               <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-steel">{nextAction.body}</p>
             </div>
@@ -733,7 +733,7 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
         <div className="rounded-lg border border-coral/30 bg-coral/10 p-4 text-coral">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-black uppercase tracking-wide">Supabase Schema Action</p>
+              <p className="text-xs font-black">Supabase SQL 적용 안내</p>
               <h3 className="mt-1 text-lg font-black">Supabase 최신 SQL 적용 필요</h3>
               <p className="mt-1 max-w-3xl text-sm font-bold leading-6">
                 Supabase SQL Editor에서 `sql/schema.sql` 전체를 다시 실행한 뒤, Vercel 재배포 후 실제 연결 테스트를 다시 누르세요.
@@ -768,7 +768,7 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
             <h3 className="font-black">승인 후 첫 운영 순서</h3>
             <p className="mt-1 text-sm font-semibold leading-6 text-steel">최종승인 후 키를 넣으면 아래 순서대로 확인하고 바로 첫 상품 수집까지 진행합니다.</p>
           </div>
-          <span className="rounded-md bg-mist px-2 py-1 text-xs font-black text-steel">Launch Runbook</span>
+          <span className="rounded-md bg-mist px-2 py-1 text-xs font-black text-steel">첫 가동 순서</span>
         </div>
         <div className="mt-3 grid gap-2 lg:grid-cols-2">
           {launchSteps.map((step, index) => (
@@ -791,7 +791,7 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
       <div className="rounded-lg border border-pine/30 bg-pine/5 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-black uppercase tracking-wide text-pine">Production Deploy Guard</p>
+            <p className="text-xs font-black text-pine">운영 배포 보호</p>
             <h3 className="mt-1 text-lg font-black">API 승인 후 운영 전환 명령</h3>
             <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-steel">
               Vercel에 실제 키를 넣은 뒤에는 아래 명령 순서로만 배포하세요. `confirm`이 없으면 실제 배포와 데이터 작업은 시작하지 않고,
@@ -900,7 +900,7 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
       <div className="rounded-lg border border-lemon/40 bg-lemon/10 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-black uppercase tracking-wide text-pine">Hourly Scheduler Readiness</p>
+            <p className="text-xs font-black text-pine">1시간 스케줄러 준비</p>
             <h3 className="mt-1 text-lg font-black">GitHub Actions 1시간 스케줄러 수동 확인</h3>
             <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-steel">
               Vercel 앱은 GitHub Repository secret 값을 직접 읽을 수 없습니다. 승인 후 1시간 자동 운영을 쓰려면 GitHub에서

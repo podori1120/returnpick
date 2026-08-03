@@ -346,7 +346,7 @@ export default function AdminSchedulerPanel({ password, refreshToken = 0, onComp
         <div>
           <div className="flex items-center gap-2">
             <Bot className="text-pine" size={20} aria-hidden />
-            <p className="text-xs font-black text-pine">Scheduler Control</p>
+            <p className="text-xs font-black text-pine">자동 운영 관리</p>
           </div>
           <h2 className="mt-1 text-xl font-black">자동 운영 센터</h2>
           <p className="mt-1 text-sm font-semibold text-steel">예약 소싱·텔레그램 후보 발송 상태를 한 번에 점검합니다.</p>

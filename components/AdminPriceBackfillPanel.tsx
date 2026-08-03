@@ -299,7 +299,7 @@ export default function AdminPriceBackfillPanel({ password, onCompleted }: { pas
     <section id="admin-price-backfill" className="scroll-mt-4 rounded-lg border border-line bg-white p-5 shadow-soft">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-black text-pine">Naver Price Backfill</p>
+          <p className="text-xs font-black text-pine">네이버 최저가 보강</p>
           <h2 className="text-lg font-black">네이버 최저가 보강</h2>
           <p className="mt-1 text-sm font-semibold leading-6 text-steel">
             비어 있거나 검증 근거가 없는 네이버 가격을 공식 쇼핑 API로 다시 검색합니다. 모델코드와 핵심 스펙이 확인되는 동일 SKU만 채택하며, API 키가 없거나 식별 근거가 부족하면 가격 판단에서 제외합니다.

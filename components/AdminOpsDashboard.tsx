@@ -384,7 +384,7 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
       <div className="rounded-lg border border-line bg-white p-5 shadow-soft">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-black text-pine">Revenue Recovery</p>
+            <p className="text-xs font-black text-pine">수익 회복</p>
             <h2 className="mt-1 text-lg font-black">수익 회복 플랜</h2>
           </div>
           <span className="rounded-md bg-mist px-2 py-1 text-xs font-black text-steel">
@@ -596,7 +596,7 @@ export default function AdminOpsDashboard({ password, refreshToken }: { password
         <section id="admin-revenue-opportunities" className="scroll-mt-4 rounded-lg border border-lemon/60 bg-lemon/20 p-5 shadow-soft">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-black text-ink">Conversion Recovery</p>
+              <p className="text-xs font-black text-ink">전환 회복</p>
               <h2 className="mt-1 text-lg font-black">상세 방문 후 멈춘 상품</h2>
               <p className="mt-2 text-sm font-semibold leading-6 text-ink">
                 관심은 확인됐지만 구매 클릭이 없는 상품입니다. 상품별 가격 근거, 반품 확인 상태와 CTA를 점검해 전환을 회복하세요.
