@@ -20,7 +20,14 @@ function catalogValue({
   includeReturnEvidence = true,
   source = "public_web",
   includeObservation = true,
-  manualReviewAt = null
+  manualReviewAt = null,
+  lastObservedAt = null,
+  sourcingStatus = "published",
+  isPublished = true,
+  demoMarkers = false,
+  identityPatch = {},
+  affiliateUrlValue = affiliateUrl,
+  productPatch = {}
 } = {}) {
   const now = new Date().toISOString();
   return JSON.stringify({
@@ -39,7 +46,7 @@ function catalogValue({
         image_url: "https://images.example.com/returnpick-qa.jpg",
         source_url: "https://www.coupang.com/vp/products/9200000001?itemId=27000000001",
         coupang_url: "https://www.coupang.com/vp/products/9200000001?itemId=27000000001",
-        affiliate_url: affiliateUrl,
+        affiliate_url: affiliateUrlValue,
         source_price: 150000,
         return_price: includeReturnEvidence ? 150000 : null,
         new_price: 220000,
@@ -49,15 +56,17 @@ function catalogValue({
         spec_json: { size: "27인치", resolution: "QHD", refresh_rate: "144Hz" },
         raw_json: {
           affiliate_verification: {
-            affiliate_url: affiliateUrl,
+            affiliate_url: affiliateUrlValue,
             status: identityStatus ?? (resolvedProductId === "9200000001" ? "MATCH" : "MISMATCH"),
             expected_product_id: "9200000001",
             expected_id_source: "coupang_url",
             resolved_product_id: resolvedProductId,
             resolution_code: "RESOLVED_PRODUCT",
             checked_at: now,
-            method: "automatic"
+            method: "automatic",
+            ...identityPatch
           },
+          ...(demoMarkers ? { provider: "demo_provider", demo_seed: true } : {}),
           ...(manualReviewAt
             ? {
                 manual_catalog_review: {
@@ -68,15 +77,16 @@ function catalogValue({
               }
             : {})
         },
-        sourcing_status: "published",
-        is_published: true,
+        sourcing_status: sourcingStatus,
+        is_published: isPublished,
         is_rejected: false,
         rejection_reason: null,
         admin_memo: null,
         public_note: "로컬 통합 검증용 상품입니다.",
-        last_observed_at: includeObservation ? now : null,
+        last_observed_at: includeObservation ? lastObservedAt ?? now : null,
         created_at: now,
-        updated_at: now
+        updated_at: now,
+        ...productPatch
       }
     ]
   });
@@ -196,5 +206,177 @@ await withServer(
     assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
   }
 );
+
+await withServer(3222, catalogValue({ sourcingStatus: "needs_review", isPublished: false }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(3223, catalogValue({ lastObservedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1_000).toISOString() }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(3224, catalogValue({ lastObservedAt: new Date(Date.now() + 60 * 60 * 1_000).toISOString() }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(3225, catalogValue({ demoMarkers: true }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(
+  3226,
+  catalogValue({ identityPatch: { expected_id_source: null, checked_at: null, method: "bogus" } }),
+  async (baseUrl, logs) => {
+    const deals = await fetch(`${baseUrl}/deals`);
+    const dealsHtml = await deals.text();
+    assert.equal(deals.status, 200);
+    assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+    assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+  }
+);
+
+await withServer(3228, catalogValue({ identityPatch: { checked_at: "1" } }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(3229, catalogValue({ identityPatch: { method: "manual" } }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(3227, catalogValue({ source: "manual_admin", includeObservation: true }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(3230, catalogValue({ productPatch: { stock_count: 0 } }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(3231, catalogValue({ productPatch: { coupang_url: "https://evil.example/vp/products/9200000001" } }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(3232, catalogValue({ productPatch: { image_url: "https://127.0.0.1/private.jpg" } }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(3233, catalogValue({ productPatch: { image_url: "https://user:pass@images.example.com/private.jpg" } }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(3234, catalogValue({ affiliateUrlValue: "https://link.coupang.com/a/dpyguokdsm" }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(3235, catalogValue({ affiliateUrlValue: "https://link.coupang.com/a/sample123" }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(3236, catalogValue({ identityPatch: { resolution_code: "" } }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(3237, catalogValue({ identityPatch: { expected_product_id: "not-numeric" } }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(3238, catalogValue({ identityPatch: { status: "MISMATCH", resolved_product_id: null } }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(3239, catalogValue({ identityPatch: { checked_at: "2026-02-30T00:00:00.000Z" } }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(3240, catalogValue({ source: " manual_admin ", includeObservation: true }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(3241, catalogValue({ productPatch: { coupang_url: "https://www.coupang.com/vp/products/not-a-number" } }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
+
+await withServer(3242, catalogValue({ productPatch: { coupang_url: "https://www.coupang.com/vp/products/9200000001/extra" } }), async (baseUrl, logs) => {
+  const deals = await fetch(`${baseUrl}/deals`);
+  const dealsHtml = await deals.text();
+  assert.equal(deals.status, 200);
+  assert.doesNotMatch(dealsHtml, new RegExp(productTitle));
+  assert.match(logs.join(""), /RETURNPICK_BOOTSTRAP_CATALOG_REJECTED/);
+});
 
 console.log("Bootstrap catalog runtime checks passed: verified product hydration, price-only publication, and stale or forged affiliate identity rejection.");

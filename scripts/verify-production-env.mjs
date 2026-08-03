@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import assert from "node:assert/strict";
 import { blankEnvSources, envRawEntries, envSource, envValue, loadEnvFiles } from "./load-env-files.mjs";
 
 const args = process.argv.slice(2);
@@ -82,6 +83,458 @@ function validateBooleanString(value) {
   return value === "true" || value === "false";
 }
 
+const BOOTSTRAP_CATALOG_MAX_BYTES = 28_000;
+const BOOTSTRAP_CATALOG_MAX_PRODUCTS = 40;
+const BOOTSTRAP_CATALOG_CATEGORIES = new Set(["laptop", "monitor", "robot_vacuum", "cordless_vacuum", "air_purifier", "dehumidifier"]);
+const BOOTSTRAP_CATALOG_CONDITION_GRADES = new Set(["미개봉", "최상", "상", "중", "알수없음", "확인필요"]);
+const BOOTSTRAP_CATALOG_GENERIC_PARTNER_CODES = new Set(["dpyguokdsm"]);
+const BOOTSTRAP_CATALOG_SUSPICIOUS_PARTNER_CODE_PATTERN = /(test|sample|example|fake|dummy|dryrun|safecheck|nonexisting|readiness)/i;
+const BOOTSTRAP_CATALOG_MANUAL_REVIEW_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
+const BOOTSTRAP_CATALOG_AUTOMATIC_OBSERVATION_MAX_AGE_MS = 24 * 60 * 60 * 1_000;
+const BOOTSTRAP_CATALOG_NAVER_SKU_REASONS = new Set(["EXACT_MODEL_CODE", "EXACT_MODEL_NAME", "SPEC_IDENTITY"]);
+const BOOTSTRAP_CATALOG_IDENTITY_TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})$/;
+
+function isCoupangHostname(hostname) {
+  const host = hostname.trim().toLowerCase();
+  return host === "coupang.com" || host.endsWith(".coupang.com");
+}
+
+function isPrivateIpv4(hostname) {
+  const parts = hostname.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
+  const [a, b] = parts;
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    a >= 224
+  );
+}
+
+function isPublicImageHostname(hostname) {
+  const host = hostname.trim().toLowerCase();
+  if (!host || !host.includes(".") || host.includes(":")) return false;
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".lan")) {
+    return false;
+  }
+  return !isPrivateIpv4(host);
+}
+
+function isApprovalSampleProductAffiliateUrl(value) {
+  const approval = envValue("NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL");
+  if (!approval || !validateCoupangPartnersUrl(approval)) return false;
+  try {
+    const url = new URL(value);
+    const approvalUrl = new URL(approval);
+    return url.hostname === approvalUrl.hostname && url.pathname === approvalUrl.pathname;
+  } catch {
+    return false;
+  }
+}
+
+function isUsableBootstrapAffiliateUrl(value) {
+  try {
+    const url = new URL(value);
+    const match = url.pathname.match(/^\/a\/([A-Za-z0-9]{6,16})$/);
+    if (url.protocol !== "https:" || url.hostname !== "link.coupang.com" || url.username || url.password || url.port || !match) return false;
+    if (BOOTSTRAP_CATALOG_GENERIC_PARTNER_CODES.has(match[1].toLowerCase())) return false;
+    if (BOOTSTRAP_CATALOG_SUSPICIOUS_PARTNER_CODE_PATTERN.test(match[1])) return false;
+    return !isApprovalSampleProductAffiliateUrl(value);
+  } catch {
+    return false;
+  }
+}
+
+function isUsableBootstrapProductUrl(value) {
+  try {
+    const url = new URL(value);
+    return Boolean(
+      url.protocol === "https:" &&
+        !url.username &&
+        !url.password &&
+        !url.port &&
+        isCoupangHostname(url.hostname) &&
+        /^\/vp\/products\/\d+\/?$/.test(url.pathname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isUsableBootstrapImageUrl(value) {
+  try {
+    const url = new URL(value);
+    return Boolean(url.protocol === "https:" && !url.username && !url.password && !url.port && isPublicImageHostname(url.hostname));
+  } catch {
+    return false;
+  }
+}
+
+function bootstrapRecordOf(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+}
+
+function bootstrapPositivePrice(value) {
+  const price = Number(value);
+  return Number.isFinite(price) && price > 0 ? Math.round(price) : null;
+}
+
+function bootstrapProductId(value) {
+  return typeof value === "string" && /^\d+$/.test(value.trim()) ? value.trim() : null;
+}
+
+function bootstrapNormalizedText(value) {
+  return typeof value === "string" ? value.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim() : "";
+}
+
+function bootstrapStableJson(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(bootstrapStableJson).join(",")}]`;
+  return `{${Object.keys(value)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${bootstrapStableJson(value[key])}`)
+    .join(",")}}`;
+}
+
+function bootstrapNaverProductFingerprint(product) {
+  const identity = bootstrapStableJson({
+    category: product.category,
+    title: bootstrapNormalizedText(product.title),
+    brand: bootstrapNormalizedText(product.brand),
+    model_name: bootstrapNormalizedText(product.model_name),
+    spec_json: product.spec_json ?? {}
+  });
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < identity.length; index += 1) {
+    hash ^= identity.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `v1:${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+function isBootstrapNaverPriceTrusted(product) {
+  const price = bootstrapPositivePrice(product.naver_lowest_price);
+  if (price == null) return false;
+  const fingerprint = bootstrapNaverProductFingerprint(product);
+  const candidates = [
+    { record: bootstrapRecordOf(product.raw_json?.naver_price_manual), manual: true },
+    { record: bootstrapRecordOf(product.raw_json?.naver_price_backfill), manual: false },
+    { record: bootstrapRecordOf(product.raw_json?.naver_price_lookup), manual: false }
+  ];
+  for (const candidate of candidates) {
+    const record = candidate.record;
+    if (!record || bootstrapPositivePrice(record.price) !== price || record.product_fingerprint !== fingerprint) continue;
+    if (candidate.manual && record.status === "confirmed") return true;
+    if (!candidate.manual && record.status === "ok") {
+      const match = bootstrapRecordOf(record.match);
+      if (
+        match &&
+        (match.sku_confidence === "strong" || match.sku_confidence === "moderate") &&
+        typeof match.sku_reason_code === "string" &&
+        BOOTSTRAP_CATALOG_NAVER_SKU_REASONS.has(match.sku_reason_code) &&
+        Number(match.sku_score) > 0
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function isFreshBootstrapObservation(value, nowMs = Date.now()) {
+  if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) return false;
+  const observationMs = Date.parse(value);
+  return observationMs <= nowMs && nowMs - observationMs <= BOOTSTRAP_CATALOG_AUTOMATIC_OBSERVATION_MAX_AGE_MS;
+}
+
+function isBootstrapIdentityTimestamp(value) {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim();
+  const match = normalized.match(BOOTSTRAP_CATALOG_IDENTITY_TIMESTAMP_PATTERN);
+  if (!match) return false;
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, , offsetText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  const offsetMatch = offsetText === "Z" ? null : offsetText.match(/^[+-](\d{2}):(\d{2})$/);
+  const offsetHour = offsetMatch ? Number(offsetMatch[1]) : 0;
+  const offsetMinute = offsetMatch ? Number(offsetMatch[2]) : 0;
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1] ?? 0;
+  return (
+    month >= 1 &&
+    month <= 12 &&
+    day >= 1 &&
+    day <= daysInMonth &&
+    hour <= 23 &&
+    minute <= 59 &&
+    second <= 59 &&
+    (!offsetMatch || (offsetHour <= 23 && offsetMinute <= 59)) &&
+    Number.isFinite(Date.parse(normalized))
+  );
+}
+
+function extractBootstrapProductId(value) {
+  try {
+    const url = new URL(value);
+    if (!isUsableBootstrapProductUrl(value)) return null;
+    return url.pathname.match(/^\/vp\/products\/(\d+)(?:\/|$)/)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function inspectBootstrapProductShape(product, index) {
+  if (!product || typeof product !== "object" || Array.isArray(product)) return `product ${index + 1} is not an object`;
+
+  const requiredTextFields = ["id", "source", "source_product_id", "title", "category", "condition_grade", "affiliate_url", "coupang_url", "image_url"];
+  const missingField = requiredTextFields.find((field) => typeof product[field] !== "string" || !product[field].trim());
+  if (missingField) return `product ${index + 1} is missing ${missingField}`;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(product.id)) return `product ${index + 1} has an invalid UUID`;
+  if (!BOOTSTRAP_CATALOG_CATEGORIES.has(product.category)) return `product ${index + 1} has an unsupported category`;
+  if (!BOOTSTRAP_CATALOG_CONDITION_GRADES.has(product.condition_grade)) return `product ${index + 1} has an invalid condition grade`;
+  if (!isUsableBootstrapAffiliateUrl(product.affiliate_url)) return `product ${index + 1} has an invalid or unbound affiliate URL`;
+  if (!isUsableBootstrapProductUrl(product.coupang_url)) return `product ${index + 1} has an invalid Coupang product URL`;
+  if (!isUsableBootstrapImageUrl(product.image_url)) return `product ${index + 1} has an invalid public image URL`;
+  const source = product.source.trim().toLowerCase();
+  const provider = typeof product.raw_json?.provider === "string" ? product.raw_json.provider.toLowerCase() : "";
+  if (source === "mock" || source.includes("mock") || source.includes("demo") || provider.includes("mock") || provider.includes("demo") || product.source_product_id.trim().toLowerCase().startsWith("seed-") || product.raw_json?.demo_seed === true || typeof product.raw_json?.demo_seed === "string") {
+    return `product ${index + 1} is synthetic or demo data`;
+  }
+  if (product.sourcing_status !== "published" || product.is_published !== true) return `product ${index + 1} is not marked published`;
+  const dealPrice = [product.return_price, product.source_price, product.new_price].find((value) => Number.isFinite(value) && value > 0);
+  if (!dealPrice) return `product ${index + 1} is missing a usable selling price`;
+  if (product.stock_count === 0) return `product ${index + 1} is explicitly sold out`;
+  if (Number.isFinite(product.naver_lowest_price) && product.naver_lowest_price > 0 && isBootstrapNaverPriceTrusted(product) && dealPrice > product.naver_lowest_price) {
+    return `product ${index + 1} is priced above the trusted Naver reference`;
+  }
+  if (product.condition_grade === "중" && dealPrice >= 1_000_000) return `product ${index + 1} is a high-price grade-middle return`;
+  if (!product.raw_json || typeof product.raw_json !== "object" || Array.isArray(product.raw_json)) return `product ${index + 1} is missing raw evidence`;
+  if (!product.raw_json.affiliate_verification || typeof product.raw_json.affiliate_verification !== "object" || Array.isArray(product.raw_json.affiliate_verification)) {
+    return `product ${index + 1} is missing affiliate identity evidence`;
+  }
+  const identity = product.raw_json.affiliate_verification;
+  const expectedProductId = extractBootstrapProductId(product.coupang_url);
+  const validIdentityStatuses = new Set(["MATCH", "MANUAL_CONFIRMED"]);
+  if (
+    typeof identity.affiliate_url !== "string" ||
+    identity.affiliate_url !== product.affiliate_url ||
+    typeof identity.status !== "string" ||
+    !validIdentityStatuses.has(identity.status) ||
+    bootstrapProductId(identity.expected_product_id) !== expectedProductId ||
+    identity.expected_id_source !== "coupang_url" ||
+    (identity.status === "MATCH" && bootstrapProductId(identity.resolved_product_id) !== expectedProductId) ||
+    (identity.status === "MANUAL_CONFIRMED" && identity.resolved_product_id !== null && bootstrapProductId(identity.resolved_product_id) !== expectedProductId) ||
+    typeof identity.resolution_code !== "string" ||
+    !identity.resolution_code.trim() ||
+    typeof identity.checked_at !== "string" ||
+    !isBootstrapIdentityTimestamp(identity.checked_at) ||
+    !["automatic", "manual"].includes(identity.method) ||
+    (identity.status === "MANUAL_CONFIRMED" ? identity.method !== "manual" : identity.method !== "automatic")
+  ) {
+    return `product ${index + 1} has unverified affiliate identity binding`;
+  }
+  const hasObservationTimestamp = typeof product.last_observed_at === "string" && Number.isFinite(Date.parse(product.last_observed_at));
+  if (hasObservationTimestamp && !isFreshBootstrapObservation(product.last_observed_at)) return `product ${index + 1} has stale or future catalog observation`;
+  const hasObservation = isFreshBootstrapObservation(product.last_observed_at);
+  const manualReview = product.raw_json.manual_catalog_review;
+  const reviewedAt = typeof manualReview?.reviewed_at === "string" ? Date.parse(manualReview.reviewed_at) : NaN;
+  const normalizedSource = source;
+  const hasManualReview =
+    (normalizedSource === "manual_admin" || normalizedSource === "manual_affiliate_link") &&
+    manualReview &&
+    typeof manualReview === "object" &&
+    !Array.isArray(manualReview) &&
+    manualReview.status === "approved" &&
+    manualReview.method === "manual" &&
+    Number.isFinite(reviewedAt) &&
+    reviewedAt <= Date.now() &&
+    Date.now() - reviewedAt <= BOOTSTRAP_CATALOG_MANUAL_REVIEW_MAX_AGE_MS;
+  const requiresManualReview = normalizedSource === "manual_admin" || normalizedSource === "manual_affiliate_link";
+  if ((requiresManualReview && !hasManualReview) || (!requiresManualReview && !hasObservation)) {
+    return requiresManualReview
+      ? `product ${index + 1} is missing a fresh manual catalog review`
+      : `product ${index + 1} is missing fresh catalog provenance`;
+  }
+  return null;
+}
+
+function inspectBootstrapCatalog(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return { status: "missing", detail: "not set; optional temporary catalog bridge" };
+  if (isVercelMaskedValue(raw)) return { status: "masked", detail: "Vercel env pull masked the catalog value; use the live readiness card" };
+
+  const byteSize = Buffer.byteLength(raw, "utf8");
+  if (byteSize > BOOTSTRAP_CATALOG_MAX_BYTES) {
+    return { status: "invalid", detail: `JSON is ${byteSize} bytes; maximum is ${BOOTSTRAP_CATALOG_MAX_BYTES} bytes` };
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { status: "invalid", detail: "value is not valid JSON" };
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || parsed.version !== 1 || !Array.isArray(parsed.products)) {
+    return { status: "invalid", detail: "expected {version:1, exported_at, products:[]}" };
+  }
+  if (parsed.products.length > BOOTSTRAP_CATALOG_MAX_PRODUCTS) {
+    return { status: "invalid", detail: `catalog has ${parsed.products.length} products; maximum is ${BOOTSTRAP_CATALOG_MAX_PRODUCTS}` };
+  }
+  if (!parsed.products.length) return { status: "empty", detail: "valid JSON but products is empty" };
+  const invalidProduct = parsed.products.map(inspectBootstrapProductShape).find(Boolean);
+  if (invalidProduct) return { status: "invalid", detail: `${invalidProduct}; full runtime validation would reject this catalog` };
+  const productIds = new Set();
+  const sourceKeys = new Set();
+  for (const product of parsed.products) {
+    const sourceKey = `${product.source.trim().toLowerCase()}::${product.source_product_id.trim().toLowerCase()}`;
+    if (productIds.has(product.id) || sourceKeys.has(sourceKey)) {
+      return { status: "invalid", detail: "catalog contains duplicate product or source-product identities" };
+    }
+    productIds.add(product.id);
+    sourceKeys.add(sourceKey);
+  }
+  if (typeof parsed.exported_at !== "string" || !Number.isFinite(Date.parse(parsed.exported_at))) {
+    return { status: "invalid", detail: "exported_at must be a valid timestamp" };
+  }
+  return { status: "valid", detail: `${parsed.products.length} products, ${byteSize} bytes; full product validation runs at runtime` };
+}
+
+function runBootstrapCatalogSelfTest() {
+  const approvalPath = (() => {
+    try {
+      return new URL(envValue("NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL")).pathname;
+    } catch {
+      return "";
+    }
+  })();
+  const affiliateUrl = approvalPath === "/a/AbCd123" ? "https://link.coupang.com/a/ZyXw987" : "https://link.coupang.com/a/AbCd123";
+  const now = new Date().toISOString();
+  const baseProduct = {
+    id: "11111111-1111-4111-8111-111111111111",
+    source: "public_web",
+    source_product_id: "preflight-9200000001",
+    title: "ReturnPick preflight monitor",
+    category: "monitor",
+    condition_grade: "최상",
+    affiliate_url: affiliateUrl,
+    coupang_url: "https://www.coupang.com/vp/products/9200000001?itemId=27000000001",
+    image_url: "https://images.example.com/returnpick-preflight.jpg",
+    source_price: 150000,
+    stock_count: 2,
+    sourcing_status: "published",
+    is_published: true,
+    last_observed_at: now,
+    raw_json: {
+      affiliate_verification: {
+        affiliate_url: affiliateUrl,
+        status: "MATCH",
+        expected_product_id: "9200000001",
+        expected_id_source: "coupang_url",
+        resolved_product_id: "9200000001",
+        resolution_code: "RESOLVED_PRODUCT",
+        checked_at: now,
+        method: "automatic"
+      }
+    }
+  };
+  const inspect = (product) => inspectBootstrapCatalog(JSON.stringify({ version: 1, exported_at: now, products: [product] }));
+  const inspectWithApprovalEnv = (product) => {
+    const previous = process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL;
+    process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL = product.affiliate_url;
+    try {
+      return inspect(product);
+    } finally {
+      if (previous === undefined) delete process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL;
+      else process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL = previous;
+    }
+  };
+
+  assert.equal(inspect(baseProduct).status, "valid");
+  assert.equal(inspect(null).status, "invalid");
+  assert.equal(inspect({}).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, source_price: null }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, stock_count: 0 }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, sourcing_status: "needs_review", is_published: false }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, last_observed_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1_000).toISOString() }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, last_observed_at: new Date(Date.now() + 60 * 60 * 1_000).toISOString() }).status, "invalid");
+  assert.equal(
+    inspect({
+      ...baseProduct,
+      raw_json: { ...baseProduct.raw_json, provider: "demo_provider", demo_seed: true }
+    }).status,
+    "invalid"
+  );
+  assert.equal(
+    inspect({
+      ...baseProduct,
+      raw_json: {
+        affiliate_verification: {
+          ...baseProduct.raw_json.affiliate_verification,
+          expected_id_source: null,
+          checked_at: null,
+          method: "bogus"
+        }
+      }
+    }).status,
+    "invalid"
+  );
+  assert.equal(inspect({ ...baseProduct, raw_json: { affiliate_verification: { ...baseProduct.raw_json.affiliate_verification, checked_at: "1" } } }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, raw_json: { affiliate_verification: { ...baseProduct.raw_json.affiliate_verification, checked_at: "2026-02-30T00:00:00.000Z" } } }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, raw_json: { affiliate_verification: { ...baseProduct.raw_json.affiliate_verification, method: "manual" } } }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, raw_json: { affiliate_verification: { ...baseProduct.raw_json.affiliate_verification, expected_product_id: "not-numeric" } } }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, raw_json: { affiliate_verification: { ...baseProduct.raw_json.affiliate_verification, status: "MISMATCH", resolved_product_id: null } } }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, raw_json: { affiliate_verification: { ...baseProduct.raw_json.affiliate_verification, status: "MANUAL_CONFIRMED", method: "manual", expected_product_id: null, expected_id_source: null, resolved_product_id: null } } }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, raw_json: { affiliate_verification: { ...baseProduct.raw_json.affiliate_verification, resolution_code: "" } } }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, source: "manual_admin" }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, source: " manual_admin " }).status, "invalid");
+  const untrustedNaverProduct = { ...baseProduct, naver_lowest_price: 100000 };
+  assert.equal(inspect(untrustedNaverProduct).status, "valid");
+  const trustedNaverProduct = {
+    ...untrustedNaverProduct,
+    raw_json: {
+      ...baseProduct.raw_json,
+      naver_price_manual: {
+        status: "confirmed",
+        price: 100000,
+        product_fingerprint: bootstrapNaverProductFingerprint(untrustedNaverProduct)
+      }
+    }
+  };
+  assert.equal(inspect(trustedNaverProduct).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, last_observed_at: null, raw_json: { ...baseProduct.raw_json, manual_catalog_review: { status: "approved", method: "manual", reviewed_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1_000).toISOString() } }, source: "manual_admin" }).status, "invalid");
+  assert.equal(inspectBootstrapCatalog(JSON.stringify({ version: 1, exported_at: now, products: [] })).status, "empty");
+  assert.equal(inspectBootstrapCatalog(JSON.stringify({ version: 1, exported_at: now, products: Array.from({ length: BOOTSTRAP_CATALOG_MAX_PRODUCTS + 1 }, () => baseProduct) })).status, "invalid");
+  assert.equal(inspectBootstrapCatalog(JSON.stringify({ version: 1, exported_at: now, products: [baseProduct], padding: "x".repeat(BOOTSTRAP_CATALOG_MAX_BYTES) })).status, "invalid");
+  assert.equal(inspectBootstrapCatalog(JSON.stringify({ version: 1, exported_at: now, products: [baseProduct, { ...baseProduct, id: "22222222-2222-4222-8222-222222222222" }] })).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, coupang_url: "https://evil.example/vp/products/9200000001" }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, coupang_url: "https://www.coupang.com/vp/products/not-a-number" }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, coupang_url: "https://www.coupang.com/vp/products/9200000001/extra" }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, coupang_url: "https://user:pass@www.coupang.com/vp/products/9200000001" }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, coupang_url: "https://www.coupang.com:8443/vp/products/9200000001" }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, image_url: "https://127.0.0.1/private.jpg" }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, image_url: "https://user:pass@images.example.com/private.jpg" }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, affiliate_url: "https://link.coupang.com/a/sample123" }).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, affiliate_url: "https://link.coupang.com/a/dpyguokdsm" }).status, "invalid");
+  assert.equal(inspectWithApprovalEnv(baseProduct).status, "invalid");
+  assert.equal(inspect({ ...baseProduct, raw_json: { affiliate_verification: { ...baseProduct.raw_json.affiliate_verification, status: "MISMATCH", resolved_product_id: "9999999999" } } }).status, "invalid");
+}
+
+if (process.argv.includes("--self-test-bootstrap-catalog")) {
+  runBootstrapCatalogSelfTest();
+  console.log("Bootstrap catalog environment preflight checks passed.");
+  process.exit(0);
+}
+
 function validatePositiveInteger(value) {
   return /^\d+$/.test(value) && Number(value) > 0;
 }
@@ -160,6 +613,10 @@ const envGroups = [
     names: ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"]
   },
   {
+    label: "preapproval catalog bridge",
+    names: ["RETURNPICK_BOOTSTRAP_CATALOG_JSON"]
+  },
+  {
     label: "Coupang Partners API",
     names: ["COUPANG_ACCESS_KEY", "COUPANG_SECRET_KEY", "COUPANG_PARTNER_ID"]
   },
@@ -225,6 +682,19 @@ function checkEnvItem(check) {
 }
 
 for (const check of checks) checkEnvItem(check);
+
+const bootstrapCatalogInspection = inspectBootstrapCatalog(envValue("RETURNPICK_BOOTSTRAP_CATALOG_JSON"));
+if (bootstrapCatalogInspection.status === "valid") {
+  add("PASS", "RETURNPICK_BOOTSTRAP_CATALOG_JSON", bootstrapCatalogInspection.detail);
+} else if (bootstrapCatalogInspection.status === "missing") {
+  add("WARN", "RETURNPICK_BOOTSTRAP_CATALOG_JSON", bootstrapCatalogInspection.detail);
+} else if (bootstrapCatalogInspection.status === "empty") {
+  add("WARN", "RETURNPICK_BOOTSTRAP_CATALOG_JSON", bootstrapCatalogInspection.detail);
+} else if (bootstrapCatalogInspection.status === "masked") {
+  add("WARN", "RETURNPICK_BOOTSTRAP_CATALOG_JSON", bootstrapCatalogInspection.detail);
+} else {
+  add("WARN", "RETURNPICK_BOOTSTRAP_CATALOG_JSON", bootstrapCatalogInspection.detail);
+}
 
 const anon = envValue("NEXT_PUBLIC_SUPABASE_ANON_KEY");
 const service = envValue("SUPABASE_SERVICE_ROLE_KEY");

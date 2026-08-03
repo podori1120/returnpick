@@ -50,6 +50,7 @@ const vercelEnvRows = [
   { group: "Supabase 운영 DB", name: "NEXT_PUBLIC_SUPABASE_URL", value: "", note: "Supabase Project URL" },
   { group: "Supabase 운영 DB", name: "NEXT_PUBLIC_SUPABASE_ANON_KEY", value: "", note: "Supabase anon public key" },
   { group: "Supabase 운영 DB", name: "SUPABASE_SERVICE_ROLE_KEY", value: "", note: "서버 전용 service role key" },
+  { group: "승인 전 임시 보존", name: "RETURNPICK_BOOTSTRAP_CATALOG_JSON", value: "", note: "Supabase 연결 전 검수 완료 공개 상품을 임시 보존할 때만 사용" },
   { group: "텔레그램", name: "TELEGRAM_BOT_TOKEN", value: "", note: "BotFather에서 발급한 bot token" },
   { group: "텔레그램", name: "TELEGRAM_CHAT_ID", value: "", note: "발송 대상 채널 또는 채팅 ID" },
   { group: "운영 보호", name: "ADMIN_PASSWORD", value: "", note: "12자 이상 랜덤 관리자 로그인 비밀번호" },
@@ -945,11 +946,18 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
         </div>
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
         {readinessItems.map((item) => {
+          const isBootstrapCatalog = item.id === "bootstrap_catalog";
           const isOptional = optionalItemIdSet.has(item.id) || (item.id === "coupang" && !readiness.apiKeysReady);
           const isLaunchBlocker = blockingItemIdSet.has(item.id);
-          const meta = isOptional && item.state !== "ready"
-            ? { label: "선택 대기", className: "bg-lemon/30 text-ink", icon: AlertTriangle }
-            : stateMeta(item.state);
+          const meta = isBootstrapCatalog
+            ? item.state === "ready"
+              ? { label: "설정됨", className: "bg-pine/10 text-pine", icon: CheckCircle2 }
+              : item.state === "partial"
+                ? { label: "검증 필요", className: "bg-lemon/20 text-ink", icon: AlertTriangle }
+                : { label: "보조 경로 미설정", className: "bg-mist text-steel", icon: ShieldCheck }
+            : isOptional && item.state !== "ready"
+              ? { label: "선택 대기", className: "bg-lemon/30 text-ink", icon: AlertTriangle }
+              : stateMeta(item.state);
           return (
             <article key={item.id} className={`min-w-0 break-words rounded-lg border p-4 ${isLaunchBlocker ? "border-coral/40 bg-coral/5" : "border-line"}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -957,7 +965,7 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
                   <KeyRound className="text-pine" size={17} aria-hidden />
                   <h3 className="font-black">{item.label}</h3>
                   <span className={isLaunchBlocker ? "rounded-md bg-coral/10 px-2 py-0.5 text-[11px] font-black text-coral" : isOptional ? "rounded-md bg-lemon/30 px-2 py-0.5 text-[11px] font-black text-ink" : "rounded-md bg-mist px-2 py-0.5 text-[11px] font-black text-steel"}>
-                    {isOptional ? "선택 기능" : "출시 필수"}
+                    {isBootstrapCatalog ? "보조 경로" : isOptional ? "선택 기능" : "출시 필수"}
                   </span>
                 </div>
                 <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-black ${meta.className}`}>
@@ -966,11 +974,19 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
               </div>
               <p className="mt-2 text-sm font-semibold leading-6 text-steel">{item.message}</p>
               {item.missingEnv.length ? (
-                <p className={isOptional ? "mt-2 break-all text-xs font-black leading-5 text-ink" : "mt-2 break-all text-xs font-black leading-5 text-coral"}>
-                  {isOptional ? "선택 연동 대기" : "누락"}: {item.missingEnv.join(", ")}
+                <p className={isOptional || isBootstrapCatalog ? "mt-2 break-all text-xs font-black leading-5 text-ink" : "mt-2 break-all text-xs font-black leading-5 text-coral"}>
+                  {isBootstrapCatalog ? "보조 경로" : isOptional ? "선택 연동 대기" : "누락"}: {item.missingEnv.join(", ")}
                 </p>
               ) : (
-                <p className="mt-2 text-xs font-black leading-5 text-pine">{isOptional ? "선택 기능 연결 완료" : "필수 값 입력 완료"}</p>
+                <p className={`mt-2 text-xs font-black leading-5 ${isBootstrapCatalog && item.state === "partial" ? "text-ink" : "text-pine"}`}>
+                  {isBootstrapCatalog
+                    ? item.state === "ready"
+                      ? "보조 카탈로그 확인 완료"
+                      : "카탈로그 검증 필요"
+                    : isOptional
+                      ? "선택 기능 연결 완료"
+                      : "필수 값 입력 완료"}
+                </p>
               )}
               <p className="mt-2 text-xs font-semibold leading-5 text-steel">{item.nextAction}</p>
             </article>

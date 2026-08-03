@@ -18,7 +18,8 @@ const {
   extractCoupangProductId,
   getAffiliateIdentityReadiness,
   getExpectedCoupangProductIdentity,
-  mergeAffiliateIdentityRecord
+  mergeAffiliateIdentityRecord,
+  readAffiliateIdentityRecord
 } = loadedModule.exports;
 
 const product = {
@@ -65,6 +66,23 @@ const noExpected = assessAffiliateIdentity({
   resolutionCode: "RESOLVED_PRODUCT"
 });
 assert.equal(noExpected.status, "EXPECTED_ID_UNAVAILABLE");
+const noExpectedProduct = { ...product, coupang_url: null, raw_json: mergeAffiliateIdentityRecord(product, noExpected) };
+assert.equal(getAffiliateIdentityReadiness(noExpectedProduct).ready, false);
+const unboundManual = createManualAffiliateIdentityConfirmation({ ...product, coupang_url: null }, product.affiliate_url);
+assert.equal(unboundManual?.status, "MANUAL_CONFIRMED");
+assert.equal(getAffiliateIdentityReadiness({ ...noExpectedProduct, raw_json: mergeAffiliateIdentityRecord(noExpectedProduct, unboundManual) }).ready, false);
+assert.equal(
+  readAffiliateIdentityRecord({
+    raw_json: mergeAffiliateIdentityRecord(product, { ...match, status: "MISMATCH", resolved_product_id: null })
+  }),
+  null
+);
+assert.equal(
+  readAffiliateIdentityRecord({
+    raw_json: mergeAffiliateIdentityRecord(product, { ...match, expected_product_id: "not-numeric" })
+  }),
+  null
+);
 
 assert.equal(getAffiliateIdentityReadiness({ ...product, affiliate_url: "https://link.coupang.com/a/Changed1", raw_json: mergeAffiliateIdentityRecord(product, match) }).ready, false);
 

@@ -1,5 +1,6 @@
 ﻿import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 const root = process.cwd();
 const mode = process.argv.includes("--launch") ? "launch" : "preapproval";
@@ -527,6 +528,10 @@ if (
   const runtimeCheck = readText("scripts/verify-bootstrap-catalog-runtime.mjs");
   const route = readText("app/api/admin/bootstrap-catalog/route.ts");
   const panel = readText("components/AdminBootstrapCatalogPanel.tsx");
+  const apiReadiness = readText("lib/apiReadiness.ts");
+  const readinessPanel = readText("components/AdminApiReadinessPanel.tsx");
+  const productionEnvCheck = readText("scripts/verify-production-env.mjs");
+  const productionEnvTemplate = readText("scripts/print-production-env-template.mjs");
   check(
     "scripts: bootstrap catalog runtime check command",
     packageJson.includes('"bootstrap-catalog:check": "node scripts/verify-bootstrap-catalog-runtime.mjs"'),
@@ -547,14 +552,44 @@ if (
       catalog.includes("BOOTSTRAP_CATALOG_MAX_PRODUCTS = 40") &&
       catalog.includes("isSyntheticSource") &&
       catalog.includes("identityBoundToCurrentProduct") &&
-       catalog.includes("CATALOG_PROVENANCE_REQUIRED") &&
-       catalog.includes("MANUAL_CATALOG_REVIEW_STALE") &&
+      catalog.includes("CATALOG_PROVENANCE_REQUIRED") &&
+      catalog.includes("MANUAL_CATALOG_REVIEW_STALE") &&
+      catalog.includes("MANUAL_CATALOG_REVIEW_REQUIRED") &&
+      catalog.includes("PRODUCT_NOT_PUBLISHED") &&
+      catalog.includes("CATALOG_OBSERVATION_STALE") &&
+      catalog.includes("rawJsonInput") &&
+      catalog.includes('"provider"') &&
+      catalog.includes('"demo_seed"') &&
        manualCatalogReview.includes("MANUAL_CATALOG_REVIEW_MAX_AGE_MS") &&
        manualCatalogReview.includes("createManualCatalogReview") &&
       catalog.includes("isPublicDealReady") &&
       dataStore.includes("hydrateBootstrapCatalog") &&
       dataStore.includes("snapshot.observed_at = product.last_observed_at") &&
-      runtimeCheck.includes("stale or forged affiliate identity rejection"),
+      runtimeCheck.includes("stale or forged affiliate identity rejection") &&
+      runtimeCheck.includes("3222") &&
+      runtimeCheck.includes("3223") &&
+      runtimeCheck.includes("3224") &&
+      runtimeCheck.includes("3225") &&
+      runtimeCheck.includes("3226") &&
+      runtimeCheck.includes("3227") &&
+      runtimeCheck.includes("3228") &&
+      runtimeCheck.includes("3229") &&
+      runtimeCheck.includes("3230") &&
+      runtimeCheck.includes("3231") &&
+      runtimeCheck.includes("3232") &&
+      runtimeCheck.includes("3233") &&
+      runtimeCheck.includes("3234") &&
+      runtimeCheck.includes("3235") &&
+      runtimeCheck.includes("3236") &&
+      runtimeCheck.includes("3237") &&
+      runtimeCheck.includes("3238") &&
+      runtimeCheck.includes("3239") &&
+      runtimeCheck.includes("3240") &&
+      runtimeCheck.includes("3241") &&
+      runtimeCheck.includes("3242") &&
+      runtimeCheck.includes("demoMarkers") &&
+      runtimeCheck.includes("identityPatch") &&
+      runtimeCheck.includes('source: "manual_admin"'),
     "preapproval catalog only restores fresh, non-demo, public-ready products whose exact affiliate destination remains bound to the candidate, including explicit fresh manual reviews",
     "required"
   );
@@ -569,7 +604,11 @@ if (
       panel.includes("승인 대기용 출시 카탈로그") &&
       panel.includes("/api/admin/bootstrap-catalog") &&
       panel.includes("Value 복사") &&
-      panel.includes("Supabase 운영 DB 연결이 여전히 필요합니다"),
+      panel.includes("Supabase 운영 DB 연결이 여전히 필요합니다") &&
+      apiReadiness.includes('id: "bootstrap_catalog"') &&
+      readinessPanel.includes("RETURNPICK_BOOTSTRAP_CATALOG_JSON") &&
+      productionEnvCheck.includes("inspectBootstrapCatalog") &&
+      productionEnvTemplate.includes('["RETURNPICK_BOOTSTRAP_CATALOG_JSON"]'),
     "admin can export a bounded reviewed catalog without treating the temporary bridge as a replacement for Supabase",
     "required"
   );
@@ -1258,6 +1297,7 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-env.mjs"
     "scripts: production env check command",
     packageJson.includes('"env:check": "node scripts/verify-production-env.mjs"') &&
       packageJson.includes('"env:check:launch": "node scripts/verify-production-env.mjs --launch"') &&
+      packageJson.includes('"env:bootstrap:check": "node scripts/verify-production-env.mjs --self-test-bootstrap-catalog"') &&
       packageJson.includes('"env:repair": "node scripts/print-vercel-env-repair-plan.mjs"'),
     "package.json exposes report and launch-mode production env preflight checks",
     "required"
@@ -1280,9 +1320,30 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-env.mjs"
       envVerifier.includes("Settings > Environment Variables > Production") &&
       envVerifier.includes("npm run env:vercel:launch") &&
       envVerifier.includes("npm run doctor:production:launch") &&
+      envVerifier.includes("isUsableBootstrapProductUrl") &&
+      envVerifier.includes("isUsableBootstrapImageUrl") &&
+      envVerifier.includes("isUsableBootstrapAffiliateUrl") &&
+      envVerifier.includes("BOOTSTRAP_CATALOG_IDENTITY_TIMESTAMP_PATTERN") &&
+      envVerifier.includes("bootstrapProductId") &&
+      envVerifier.includes("^\\/vp\\/products\\/\\d+") &&
+      envVerifier.includes("resolution_code") &&
+      envVerifier.includes("product.source.trim().toLowerCase()") &&
+      envVerifier.includes("MANUAL_CONFIRMED") &&
+      envVerifier.includes("--self-test-bootstrap-catalog") &&
       !envVerifier.includes("console.log(value)") &&
       !envVerifier.includes("console.error(value)"),
     "production env check validates launch env formats, blank values, and raw surrounding whitespace, then prints a safe Vercel repair checklist without secret values",
+    "required"
+  );
+  const bootstrapPreflight = spawnSync(process.execPath, ["scripts/verify-production-env.mjs", "--self-test-bootstrap-catalog"], {
+    cwd: root,
+    env: { ...process.env, RETURNPICK_BOOTSTRAP_CATALOG_JSON: "" },
+    encoding: "utf8"
+  });
+  check(
+    "scripts: bootstrap catalog env preflight behavior",
+    bootstrapPreflight.status === 0 && bootstrapPreflight.stdout.includes("Bootstrap catalog environment preflight checks passed."),
+    "bootstrap env preflight rejects unsafe product/image URLs, suspicious affiliate links, null/empty records, and accepts one valid shape",
     "required"
   );
   check(
@@ -2032,6 +2093,9 @@ if (fileExists("lib/coupangLink.ts")) {
       coupangLink.includes('url.hostname !== "link.coupang.com"') &&
       coupangLink.includes("PARTNERS_LINK_CREDENTIALS_NOT_ALLOWED") &&
       coupangLink.includes("PARTNERS_LINK_DEFAULT_PORT_REQUIRED") &&
+      coupangLink.includes('url.protocol === "https:"') &&
+      coupangLink.includes("!url.username") &&
+      coupangLink.includes("!url.port") &&
       coupangLink.includes("isApprovalSampleAffiliateUrl") &&
       coupangLink.includes("!isApprovalSampleAffiliateUrl(value)") &&
       !coupangLink.includes('return url.hostname === "link.coupang.com" || isUsableCoupangProductUrl(value)'),
@@ -2112,6 +2176,10 @@ if (
     "affiliate link verification: central publish identity gate",
     identity.includes("getExpectedCoupangProductIdentity") &&
       identity.includes("readAffiliateIdentityRecord") &&
+      identity.includes("identityTimestampPattern") &&
+      identity.includes("productIdPattern") &&
+      identity.includes("statusInvariant") &&
+      identity.includes("record.expected_id_source !== expected.source") &&
       identity.includes("record.affiliate_url !== affiliateUrl") &&
       identity.includes("record.expected_product_id !== expected.productId") &&
       identity.includes("record.resolved_product_id !== expected.productId") &&
@@ -2597,7 +2665,7 @@ if (fileExists("lib/dealFreshness.ts") && fileExists("components/PurchaseVerific
     freshness.includes('export type DealFreshnessStatus = "fresh" | "stale" | "unknown"') &&
       freshness.includes("product.last_observed_at") &&
       freshness.includes("product.latest_snapshot?.observed_at") &&
-      freshness.includes("FRESH_WINDOW_MS = 24 * 60 * 60 * 1000") &&
+      freshness.includes("DEAL_FRESH_WINDOW_MS = 24 * 60 * 60 * 1000") &&
       !freshness.includes("product.updated_at") &&
       verificationStrip.includes('data-freshness-status={freshness.status}') &&
       verificationStrip.includes("마지막 상품 자동 수집") &&

@@ -53,7 +53,13 @@ function parseUrl(value: string | null | undefined) {
 export function isCoupangUrl(value: string | null | undefined) {
   const url = parseUrl(value);
   if (!url) return false;
-  return url.hostname === "coupang.com" || url.hostname.endsWith(".coupang.com");
+  return (
+    url.protocol === "https:" &&
+    !url.username &&
+    !url.password &&
+    !url.port &&
+    (url.hostname === "coupang.com" || url.hostname.endsWith(".coupang.com"))
+  );
 }
 
 export function isGenericCoupangLandingUrl(value: string | null | undefined) {
@@ -76,7 +82,7 @@ export function isUsableCoupangProductUrl(value: string | null | undefined) {
   const url = parseUrl(value);
   if (!url || !isCoupangUrl(value)) return false;
   if (isGenericCoupangLandingUrl(value)) return false;
-  return url.pathname.includes("/vp/products/");
+  return /^\/vp\/products\/\d+\/?$/.test(url.pathname);
 }
 
 function isUsableCoupangSearchUrl(value: string | null | undefined) {

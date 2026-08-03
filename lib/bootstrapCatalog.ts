@@ -12,6 +12,7 @@ import { isUsableProductImageUrl } from "@/lib/productImageUrl";
 import { isDemoProduct, isPublicDealReady } from "@/lib/publicDeal";
 import { calculateDealScore } from "@/lib/scoring";
 import { getManualCatalogReviewAt, isFreshManualCatalogReview, isManualCatalogSource } from "@/lib/manualCatalogReview";
+import { DEAL_FRESH_WINDOW_MS } from "@/lib/dealFreshness";
 import type {
   Category,
   ConditionGrade,
@@ -43,7 +44,9 @@ const rawJsonKeys = [
   "naver_price_backfill",
   "naver_price_lookup",
   "web_return_info",
-  "manual_catalog_review"
+  "manual_catalog_review",
+  "provider",
+  "demo_seed"
 ] as const;
 
 type BootstrapCatalogPayload = {
@@ -151,7 +154,8 @@ function normalizeProduct(value: unknown, index: number): { product: SourcedProd
   const affiliateUrl = nullableText(value.affiliate_url, 2_000);
   const coupangUrl = nullableText(value.coupang_url, 2_000);
   const imageUrl = nullableText(value.image_url, 2_000);
-  const rawJson = compactRawJson(value.raw_json);
+  const rawJsonInput = isRecord(value.raw_json) ? value.raw_json : {};
+  const rawJson = compactRawJson(rawJsonInput);
   const issues: BootstrapCatalogIssue[] = [];
   const issue = (code: string, message: string) => issues.push({ index, product_id: id || null, code, message });
 
@@ -169,12 +173,30 @@ function normalizeProduct(value: unknown, index: number): { product: SourcedProd
   if (!imageUrl || !isUsableProductImageUrl(imageUrl)) {
     issue("PRODUCT_IMAGE_INVALID", "공개 가능한 HTTPS 상품 이미지가 필요합니다.");
   }
+  if (isSyntheticSource({ source, source_product_id: sourceProductId, raw_json: rawJsonInput })) {
+    issue("SYNTHETIC_SOURCE_NOT_ALLOWED", "목업·데모 상품은 출시 카탈로그에 넣을 수 없습니다.");
+  }
+  if (value.sourcing_status !== "published" || value.is_published !== true) {
+    issue("PRODUCT_NOT_PUBLISHED", "임시 카탈로그에는 관리자 공개 승인 상태의 상품만 넣을 수 있습니다.");
+  }
   const automaticObservationAt = validDateOrNull(value.last_observed_at);
-  const manualReviewAt = isManualCatalogSource(source) ? getManualCatalogReviewAt(rawJson) : null;
-  if (!automaticObservationAt && !manualReviewAt) {
-    issue("CATALOG_PROVENANCE_REQUIRED", "자동 수집 관측 시각 또는 관리자 수동 공개 검토 시각이 필요합니다.");
-  } else if (!automaticObservationAt && manualReviewAt && !isFreshManualCatalogReview(rawJson)) {
-    issue("MANUAL_CATALOG_REVIEW_STALE", "관리자 수동 공개 검토 시각이 7일을 넘어 다시 검수해야 합니다.");
+  if (automaticObservationAt) {
+    const observationMs = Date.parse(automaticObservationAt);
+    const nowMs = Date.now();
+    if (observationMs > nowMs || nowMs - observationMs > DEAL_FRESH_WINDOW_MS) {
+      issue("CATALOG_OBSERVATION_STALE", "자동 수집 관측 시각이 24시간을 넘었거나 미래 시각입니다.");
+    }
+  }
+  const manualSource = isManualCatalogSource(source);
+  const manualReviewAt = manualSource ? getManualCatalogReviewAt(rawJson) : null;
+  if (manualSource) {
+    if (!manualReviewAt) {
+      issue("MANUAL_CATALOG_REVIEW_REQUIRED", "수동 등록 상품은 자동 관측과 별개로 7일 이내 관리자 공개 검토가 필요합니다.");
+    } else if (!isFreshManualCatalogReview(rawJson)) {
+      issue("MANUAL_CATALOG_REVIEW_STALE", "관리자 수동 공개 검토 시각이 7일을 넘어 다시 검수해야 합니다.");
+    }
+  } else if (!automaticObservationAt) {
+    issue("CATALOG_PROVENANCE_REQUIRED", "자동 수집 관측 시각이 필요합니다.");
   }
 
   const stamp = new Date().toISOString();
@@ -210,13 +232,13 @@ function normalizeProduct(value: unknown, index: number): { product: SourcedProd
     updated_at: validDateOrNull(value.updated_at) ?? stamp
   };
 
-  if (isSyntheticSource(product)) issue("SYNTHETIC_SOURCE_NOT_ALLOWED", "목업·데모 상품은 출시 카탈로그에 넣을 수 없습니다.");
   const identity = readAffiliateIdentityRecord(product);
   const expectedIdentity = getExpectedCoupangProductIdentity(product);
   const identityBoundToCurrentProduct = Boolean(
     identity &&
       expectedIdentity.productId &&
       identity.expected_product_id === expectedIdentity.productId &&
+      identity.expected_id_source === expectedIdentity.source &&
       (identity.status !== "MATCH" || identity.resolved_product_id === expectedIdentity.productId)
   );
   if (!getAffiliateIdentityReadiness(product).ready || !identityBoundToCurrentProduct) {

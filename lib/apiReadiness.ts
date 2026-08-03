@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { extractCoupangProductId } from "@/lib/affiliateIdentity";
+import {
+  BOOTSTRAP_CATALOG_ENV,
+  BOOTSTRAP_CATALOG_MAX_BYTES,
+  BOOTSTRAP_CATALOG_MAX_PRODUCTS,
+  readBootstrapCatalog
+} from "@/lib/bootstrapCatalog";
 import { isCoupangPartnersLink, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { createCoupangDeeplink, searchCoupangProducts } from "@/lib/providers/coupangPartnersProvider";
 import { searchNaverShopping } from "@/lib/providers/naverShoppingProvider";
@@ -984,6 +990,62 @@ function buildSupabaseItem(): ApiReadinessItem {
   };
 }
 
+function buildBootstrapCatalogItem(): ApiReadinessItem {
+  const requiredEnv = [BOOTSTRAP_CATALOG_ENV];
+  const catalog = readBootstrapCatalog();
+
+  if (!catalog.configured) {
+    return {
+      id: "bootstrap_catalog",
+      label: "승인 전 임시 공개 카탈로그",
+      state: "missing",
+      configured: false,
+      requiredEnv,
+      missingEnv: requiredEnv,
+      message: "Supabase가 아직 없을 때 공개 상품을 잠시 보존하는 보조 경로가 설정되지 않았습니다. 정식 운영에는 Supabase가 필요합니다.",
+      nextAction: `${BOOTSTRAP_CATALOG_ENV}는 관리자에서 검수 완료 상품을 내보낼 때만 사용하세요. 클릭 집계와 자동 수정은 Supabase에 저장해야 합니다.`
+    };
+  }
+
+  if (!catalog.ok) {
+    const issueCodes = Array.from(new Set(catalog.issues.map((issue) => issue.code))).slice(0, 3).join(", ");
+    return {
+      id: "bootstrap_catalog",
+      label: "승인 전 임시 공개 카탈로그",
+      state: "partial",
+      configured: false,
+      requiredEnv,
+      missingEnv: requiredEnv,
+      message: `카탈로그 환경변수는 있지만 검증에 실패했습니다${issueCodes ? ` (${issueCodes})` : ""}. 공개 상품 복구에 사용되지 않습니다.`,
+      nextAction: `관리자에서 새 JSON을 다시 만들어 ${BOOTSTRAP_CATALOG_ENV} 값 전체를 교체하세요. 최대 ${BOOTSTRAP_CATALOG_MAX_PRODUCTS}개·${BOOTSTRAP_CATALOG_MAX_BYTES.toLocaleString("ko-KR")}바이트입니다.`
+    };
+  }
+
+  if (!catalog.products.length) {
+    return {
+      id: "bootstrap_catalog",
+      label: "승인 전 임시 공개 카탈로그",
+      state: "partial",
+      configured: false,
+      requiredEnv,
+      missingEnv: [],
+      message: "카탈로그 JSON은 읽었지만 공개 가능한 상품이 0개입니다. 확인된 상품별 파트너스 링크와 공개 품질을 먼저 준비하세요.",
+      nextAction: "관리자에서 실제 상품을 검수·게시한 뒤 승인 전 임시 출시 카탈로그를 다시 생성하세요. 이 경로는 Supabase를 대체하지 않습니다."
+    };
+  }
+
+  return {
+    id: "bootstrap_catalog",
+    label: "승인 전 임시 공개 카탈로그",
+    state: "ready",
+    configured: true,
+    requiredEnv,
+    missingEnv: [],
+    message: `검증된 공개 상품 ${catalog.products.length.toLocaleString("ko-KR")}개를 임시 환경변수에서 복구할 수 있습니다.`,
+    nextAction: "정식 운영 전 Supabase를 연결하세요. 임시 카탈로그는 공개 상품 보존만 담당하며 클릭 집계·후보 수정·반복 소싱은 저장하지 않습니다."
+  };
+}
+
 async function runSupabaseWriteSmokeCheck(client: NonNullable<ReturnType<typeof getSupabaseServiceClient>>) {
   const runId = randomUUID();
   const eventId = randomUUID();
@@ -1582,6 +1644,7 @@ export function getApiReadinessSummary(): ApiReadinessSummary {
     readableCoupangReadinessItem(buildCoupangItem()),
     buildNaverItem(),
     buildSupabaseItem(),
+    buildBootstrapCatalogItem(),
     buildTelegramItem(),
     buildPublicSiteUrlItem(),
     buildApprovalLinkItem(),

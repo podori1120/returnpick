@@ -11,7 +11,7 @@ export type DealFreshness = {
   description: string;
 };
 
-const FRESH_WINDOW_MS = 24 * 60 * 60 * 1000;
+export const DEAL_FRESH_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function latestValidTimestamp(values: Array<string | null | undefined>) {
   let latest: { value: string; time: number } | null = null;
@@ -40,7 +40,7 @@ export function getDealFreshnessFromTimestamps(values: Array<string | null | und
 
   const ageMs = Math.max(0, nowMs - latest.time);
   const ageHours = Math.floor(ageMs / (60 * 60 * 1000));
-  if (ageMs <= FRESH_WINDOW_MS) {
+  if (ageMs <= DEAL_FRESH_WINDOW_MS) {
     return {
       status: "fresh",
       observedAt: latest.value,

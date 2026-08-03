@@ -16,6 +16,7 @@
     "env:production": "node scripts/print-production-env-template.mjs",
     "env:pull:production": "npx vercel env pull .env.production --environment=production --yes",
     "env:check": "node scripts/verify-production-env.mjs",
+    "env:bootstrap:check": "node scripts/verify-production-env.mjs --self-test-bootstrap-catalog",
     "env:check:launch": "node scripts/verify-production-env.mjs --launch",
     "env:repair": "node scripts/print-vercel-env-repair-plan.mjs",
     "env:vercel": "node scripts/verify-vercel-env-names.mjs production",
