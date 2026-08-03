@@ -6,6 +6,7 @@ import DealCard from "@/components/DealCard";
 import AffiliateNotice from "@/components/AffiliateNotice";
 import ApprovalSampleCard from "@/components/ApprovalSampleCard";
 import DemoModeNotice from "@/components/DemoModeNotice";
+import DiscoveryWorkbench from "@/components/DiscoveryWorkbench";
 import { ProductImpressionTracker } from "@/components/AffiliateEventTracker";
 import RecentDealsRail from "@/components/RecentDealsRail";
 import SavedFilterBar from "@/components/SavedFilterBar";
@@ -223,6 +224,12 @@ function EmptyDealsCatalog() {
           ))}
         </div>
       </section>
+
+      <DiscoveryWorkbench
+        placement="deals"
+        title="비교할 상품을 찾기 전에, 구매 기준부터 맞춰보세요"
+        description="공개 딜이 늘어나면 이 화면에서 같은 모델의 가격·반품 근거·사양 적합도·위험 플래그를 함께 비교할 수 있습니다. 지금은 카테고리별 기준과 검색 동선을 먼저 제공합니다."
+      />
 
       <AffiliateNotice />
     </main>

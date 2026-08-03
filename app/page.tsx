@@ -18,6 +18,7 @@ import AffiliateNotice from "@/components/AffiliateNotice";
 import ApprovalSampleCard from "@/components/ApprovalSampleCard";
 import DealCard from "@/components/DealCard";
 import DemoModeNotice from "@/components/DemoModeNotice";
+import DiscoveryWorkbench from "@/components/DiscoveryWorkbench";
 import PurposeDealExplorer, { type PurposeExplorerItem } from "@/components/PurposeDealExplorer";
 import RecentDealsRail from "@/components/RecentDealsRail";
 import VerifiedUpdatesRail from "@/components/VerifiedUpdatesRail";
@@ -223,6 +224,12 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {!hasPublishedDeals ? (
+        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+          <DiscoveryWorkbench placement="home" showCategoryRail={false} />
+        </section>
+      ) : null}
 
       <PurposeDealExplorer items={purposeItems} initialPurposeId={initialPurposeId} />
 

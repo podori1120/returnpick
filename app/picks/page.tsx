@@ -5,6 +5,7 @@ import AffiliateNotice from "@/components/AffiliateNotice";
 import ApprovalSampleCard from "@/components/ApprovalSampleCard";
 import DealCard from "@/components/DealCard";
 import DemoModeNotice from "@/components/DemoModeNotice";
+import DiscoveryWorkbench from "@/components/DiscoveryWorkbench";
 import { ProductImpressionTracker } from "@/components/AffiliateEventTracker";
 import VerifiedUpdatesRail from "@/components/VerifiedUpdatesRail";
 import { approvalSampleProduct } from "@/lib/approvalSample";
@@ -106,6 +107,14 @@ export default async function PicksPage() {
         </div>
       </header>
       {demoCount ? <DemoModeNotice count={demoCount} /> : null}
+
+      {!featuredProducts.length ? (
+        <DiscoveryWorkbench
+          placement="picks"
+          title="추천 상품이 늘어나기 전에도 비교 기준을 확인하세요"
+          description="검수 완료 상품이 들어오면 목적별 추천과 비교함으로 이어집니다. 그 전에 검색어와 카테고리를 골라 리턴픽의 구매 해석 기준을 익혀보세요."
+        />
+      ) : null}
 
       <VerifiedUpdatesRail updates={verifiedUpdates} />
 
