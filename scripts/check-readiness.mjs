@@ -1,6 +1,12 @@
 ﻿import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import {
+  commentOutRecommendationSitemapEntry,
+  getRecommendationSitemapEntries,
+  hasExactRecommendationSitemapEntry,
+  removeRecommendationSitemapEntry
+} from "./sitemapContract.mjs";
 
 const root = process.cwd();
 const mode = process.argv.includes("--launch") ? "launch" : "preapproval";
@@ -281,6 +287,7 @@ const requiredFiles = [
   "scripts/verify-home-purpose-selection.mjs",
   "scripts/verify-home-purpose-guides.mjs",
   "scripts/verify-recommendation-workflow.mjs",
+  "scripts/sitemapContract.mjs",
   "scripts/verify-keyword-coverage-api.mjs",
   "scripts/verify-public-web-config.mjs",
   "scripts/verify-web-return-info.mjs",
@@ -2706,6 +2713,10 @@ if (fileExists("app/recommend/page.tsx") && fileExists("lib/recommendation.ts") 
   const packageJson = readText("package.json");
   const homePage = readText("app/page.tsx");
   const layout = readText("app/layout.tsx");
+  const sitemap = readText("app/sitemap.ts");
+  const recommendationSitemapEntries = getRecommendationSitemapEntries(sitemap);
+  const commentedRecommendationSitemap = commentOutRecommendationSitemapEntry(sitemap);
+  const absentRecommendationSitemap = removeRecommendationSitemapEntry(sitemap);
   check(
     "recommendation workflow: public route contract",
     recommendationPage.includes('export const dynamic = "force-dynamic"') &&
@@ -2721,6 +2732,12 @@ if (fileExists("app/recommend/page.tsx") && fileExists("lib/recommendation.ts") 
       recommendationPage.includes("<SearchIntentRail limit={4} />") &&
       recommendationPage.includes('<ApprovalSampleCard placement="picks" />') &&
       recommendationPage.includes('alternates: { canonical: canonicalUrl }') &&
+      hasExactRecommendationSitemapEntry(sitemap) &&
+      recommendationSitemapEntries.length === 1 &&
+      commentedRecommendationSitemap !== sitemap &&
+      getRecommendationSitemapEntries(commentedRecommendationSitemap).length === 0 &&
+      absentRecommendationSitemap !== sitemap &&
+      getRecommendationSitemapEntries(absentRecommendationSitemap).length === 0 &&
       recommendationPage.includes('name="useCase"') &&
       recommendationPage.includes('name="category"') &&
       recommendationPage.includes('name="priceBand"') &&

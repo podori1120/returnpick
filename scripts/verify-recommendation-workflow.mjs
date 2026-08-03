@@ -7,6 +7,12 @@ import {
 } from "../lib/recommendation.ts";
 import { getProductImpressionStorageKey } from "../lib/impressionTracking.ts";
 import { matchesPriceBandValue, priceBandOptions } from "../lib/priceBand.ts";
+import {
+  commentOutRecommendationSitemapEntry,
+  getRecommendationSitemapEntries,
+  hasExactRecommendationSitemapEntry,
+  removeRecommendationSitemapEntry
+} from "./sitemapContract.mjs";
 
 const root = process.cwd();
 
@@ -145,8 +151,12 @@ const route = readText("app/recommend/page.tsx");
 const helper = readText("lib/recommendation.ts");
 const home = readText("app/page.tsx");
 const layout = readText("app/layout.tsx");
+const sitemap = readText("app/sitemap.ts");
 const packageJson = readText("package.json");
 const readiness = readText("scripts/check-readiness.mjs");
+const recommendationSitemapEntries = getRecommendationSitemapEntries(sitemap);
+const commentedRecommendationSitemap = commentOutRecommendationSitemapEntry(sitemap);
+const absentRecommendationSitemap = removeRecommendationSitemapEntry(sitemap);
 
 assert(helper.includes("matchesUseCase") && helper.includes("matchesPriceBand") && helper.includes("getUseCaseMatches"), "the pure helper should use the approved matching contracts");
 assert(helper.includes("getDealPrice") && helper.includes("getDiscountRate") && helper.includes("getQualityConfidence"), "the helper should expose deterministic price, discount, and confidence ranking inputs");
@@ -163,6 +173,9 @@ assert(eventTracker.includes("getProductImpressionStorageKey") && eventTracker.i
 assert(route.includes("<AffiliateNotice />"), "recommendation route should show the affiliate disclosure");
 assert(route.includes("<SearchIntentRail limit={4} />") && route.includes('<ApprovalSampleCard placement="picks" />'), "recommendation route should retain guide and editorial handoffs");
 assert(route.includes("alternates: { canonical: canonicalUrl }") && route.includes('const canonicalUrl = `${siteUrl}/recommend`'), "recommendation route should publish a canonical /recommend URL");
+assert(hasExactRecommendationSitemapEntry(sitemap) && recommendationSitemapEntries.length === 1, "recommendation route should appear exactly once in the executable sitemap with daily cadence and priority 0.86");
+assert(commentedRecommendationSitemap !== sitemap && getRecommendationSitemapEntries(commentedRecommendationSitemap).length === 0, "commented recommendation sitemap entries should not satisfy the sitemap contract");
+assert(absentRecommendationSitemap !== sitemap && getRecommendationSitemapEntries(absentRecommendationSitemap).length === 0, "an absent recommendation sitemap entry should fail discovery parsing");
 assert(home.includes('href="/recommend"') && home.includes("내 용도에 맞는 딜 찾기"), "home should expose the requested recommendation CTA");
 assert(layout.includes('href="/recommend"') && layout.includes("맞춤 추천"), "primary navigation should expose the recommendation route");
 assert(packageJson.includes('"recommendation:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-recommendation-workflow.mjs"'), "package.json should wire recommendation:check");
