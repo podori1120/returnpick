@@ -107,7 +107,7 @@ export default async function CategoryDealPage({ params }: { params: Promise<{ c
           </nav>
           <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_330px] lg:items-end">
             <div>
-              <p className="text-sm font-black text-pine">RETURN DEAL GUIDE</p>
+              <p className="text-sm font-black text-pine">반품 딜 안내</p>
               <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">반품 {label}, 근거부터 비교하세요</h1>
               <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-steel sm:text-base">{content.intro}</p>
               <form action="/deals" className="mt-6 flex max-w-2xl gap-2" role="search">
@@ -148,7 +148,7 @@ export default async function CategoryDealPage({ params }: { params: Promise<{ c
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-sm font-black text-pine">PUBLISHED DEALS</p>
+            <p className="text-sm font-black text-pine">게시된 딜</p>
             <h2 className="mt-1 text-2xl font-black">검수 완료 {label} 딜</h2>
           </div>
           <Link className="focus-ring inline-flex items-center gap-2 text-sm font-black text-pine hover:text-ink" href={`/deals?category=${category}`}>
@@ -178,7 +178,7 @@ export default async function CategoryDealPage({ params }: { params: Promise<{ c
       <section className="border-y border-line bg-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-2 lg:py-10">
           <div>
-            <p className="text-sm font-black text-pine">BUYING CRITERIA</p>
+            <p className="text-sm font-black text-pine">구매 기준</p>
             <h2 className="mt-1 text-2xl font-black">구매 전 비교 기준</h2>
             <div className="mt-5 grid gap-3">
               {content.dealChecks.map((item) => (
@@ -190,7 +190,7 @@ export default async function CategoryDealPage({ params }: { params: Promise<{ c
             </div>
           </div>
           <div>
-            <p className="text-sm font-black text-coral">FIRST 24 HOURS</p>
+            <p className="text-sm font-black text-coral">수령 직후</p>
             <h2 className="mt-1 text-2xl font-black">수령 직후 확인</h2>
             <div className="mt-5 grid gap-3">
               {content.receiptChecks.map((item) => (

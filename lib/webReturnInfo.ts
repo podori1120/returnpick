@@ -38,11 +38,11 @@ function standaloneKoreanTerm(term: string) {
 }
 
 const gradePatterns: Array<[ConditionGrade, RegExp[]]> = [
-  ["미개봉", [standaloneKoreanTerm("미개봉"), /새상품\s*급/i, /unopened/i]],
-  ["최상", [/반품\s*[- ]?\s*최상(?=$|[^가-힣A-Za-z0-9])/i, standaloneKoreanTerm("최상"), /like\s*new/i]],
-  ["상", [/반품\s*[- ]?\s*상(?=$|[^가-힣A-Za-z0-9])/i, /상급/i, standaloneKoreanTerm("상")]],
-  ["중", [/반품\s*[- ]?\s*중(?=$|[^가-힣A-Za-z0-9])/i, /중급/i, standaloneKoreanTerm("중")]],
-  ["알수없음", [/상태\s*미상/i, /등급\s*미상/i, /알\s*수\s*없/i]]
+  ["미개봉", [standaloneKoreanTerm("미개봉"), /새상품\s*급/i, /미사용\s*(?:품|상품)?/i, /unopened/i]],
+  ["최상", [/반품\s*[- ]?\s*최상(?:급)?(?=$|[^가-힣A-Za-z0-9])/i, standaloneKoreanTerm("최상급"), /A\+\s*급/i, /like\s*new/i]],
+  ["상", [/반품\s*[- ]?\s*상(?:급)?(?=$|[^가-힣A-Za-z0-9])/i, /상급/i, /A\s*급/i, standaloneKoreanTerm("상")]],
+  ["중", [/반품\s*[- ]?\s*중(?:급)?(?=$|[^가-힣A-Za-z0-9])/i, /중급/i, /B\s*급/i, standaloneKoreanTerm("중")]],
+  ["알수없음", [/상태\s*(?:미상|불명)/i, /등급\s*(?:미상|불명)/i, /알\s*수\s*없/i]]
 ];
 
 function cleanText(text: string) {
@@ -51,18 +51,20 @@ function cleanText(text: string) {
 
 function parseReturnPrice(text: string) {
   const moneyPattern = String.raw`([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{5,8})\s*원`;
-  const patterns = [
-    new RegExp(String.raw`(?:반품\s*(?:상품\s*)?(?:가|가격)|리퍼\s*(?:상품\s*)?(?:가|가격)|재포장\s*(?:가|가격))\s*[:：]?\s*${moneyPattern}`, "gi"),
-    new RegExp(String.raw`(?:반품\s*[-: ]?\s*(?:미개봉|최상|상|중)|(?:미개봉|최상|상|중)\s*반품)[^\n.!?。！？]{0,100}?${moneyPattern}`, "gi")
-  ];
-  const candidates = patterns
-    .flatMap((pattern) => [...text.matchAll(pattern)].map((match) => Number(match[1].replace(/,/g, ""))))
+  const tenThousandPattern = String.raw`([0-9]{1,4}(?:\.[0-9]+)?)\s*만\s*원`;
+  const returnPriceLabel = String.raw`(?:반품\s*(?:상품\s*)?(?:가|가격)|리퍼(?:브)?\s*(?:상품\s*)?(?:가|가격)|재포장\s*(?:가|가격))`;
+  const wonCandidates = [...text.matchAll(new RegExp(String.raw`${returnPriceLabel}\s*[:：]?\s*${moneyPattern}`, "gi"))]
+    .map((match) => Number(match[1].replace(/,/g, "")))
     .filter((value) => Number.isFinite(value) && value >= 10_000);
-  return candidates.length ? Math.min(...candidates) : null;
+  const tenThousandCandidates = [...text.matchAll(new RegExp(String.raw`${returnPriceLabel}\s*[:：]?\s*${tenThousandPattern}`, "gi"))]
+    .map((match) => Number(match[1]) * 10_000)
+    .filter((value) => Number.isFinite(value) && value >= 10_000);
+  const allCandidates = [...wonCandidates, ...tenThousandCandidates];
+  return allCandidates.length ? Math.min(...allCandidates) : null;
 }
 
 function parseStock(text: string) {
-  const match = text.match(/(?:재고|잔여|남은\s*수량)\s*([0-9]{1,3})\s*(?:개|대)?/);
+  const match = text.match(/(?:재고|잔여|남은\s*수량)\s*[:：]?\s*([0-9]{1,3})\s*(?:개|대)?/) ?? text.match(/([0-9]{1,3})\s*(?:개|대)\s*남(?:음|았)/);
   if (!match?.[1]) return null;
   const parsed = Number(match[1]);
   return Number.isFinite(parsed) ? parsed : null;
@@ -73,8 +75,8 @@ export function extractReturnInfoFromText(...parts: Array<string | null | undefi
   const evidence: string[] = [];
   let condition: ConditionGrade | null = null;
 
-  const isReturnCandidate = /반품|리퍼|재포장|박스\s*훼손|개봉\s*반품|return|refurb/i.test(text);
-  if (isReturnCandidate) evidence.push("제목 또는 설명에 반품/리퍼/재포장 표현이 있습니다.");
+  const isReturnCandidate = /반품|리퍼(?:브)?|재포장|박스\s*훼손|개봉\s*(?:상품|제품|반품)|전시\s*(?:상품|제품)|return|refurb/i.test(text);
+  if (isReturnCandidate) evidence.push("제목 또는 설명에 반품·리퍼·재포장·전시상품 관련 표현이 있습니다.");
 
   for (const [grade, patterns] of gradePatterns) {
     if (patterns.some((pattern) => pattern.test(text))) {

@@ -65,7 +65,7 @@ export default function PurposeDealExplorer({
       <div className="mx-auto max-w-7xl px-4 py-9 sm:px-6 lg:py-11">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-sm font-black text-lemon">PURPOSE PICK</p>
+            <p className="text-sm font-black text-lemon">용도별 추천</p>
             <h2 className="mt-1 text-2xl font-black" id="purpose-heading">어떤 용도로 찾으세요?</h2>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-white/70">
               용도를 고르면 먼저 볼 사양과 반품 위험을 알려드리고, 조건을 통과한 딜이 있으면 바로 연결합니다.

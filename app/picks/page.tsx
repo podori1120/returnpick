@@ -140,7 +140,7 @@ export default async function PicksPage() {
         <div>
           <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-4">
             <div>
-              <p className="text-sm font-black text-pine">EDITORIAL PICK</p>
+              <p className="text-sm font-black text-pine">직접 검수 추천</p>
               <h2 id="editorial-pick-heading" className="mt-1 text-2xl font-black">직접 확인한 추천 콘텐츠</h2>
               <p className="mt-1 text-sm font-semibold text-steel">현재 {featuredProducts.length.toLocaleString("ko-KR")}개의 공개 딜이 이 모음에 연결되어 있습니다.</p>
             </div>
@@ -165,7 +165,7 @@ export default async function PicksPage() {
       <section className="border-t border-line pt-7" aria-labelledby="category-pick-heading">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-sm font-black text-pine">CATEGORY CHECK</p>
+            <p className="text-sm font-black text-pine">카테고리 점검</p>
             <h2 id="category-pick-heading" className="mt-1 text-2xl font-black">카테고리별 구매 기준</h2>
             <p className="mt-2 text-sm font-semibold leading-6 text-steel">딜이 적은 카테고리도 구매 전 확인할 기준부터 볼 수 있습니다.</p>
           </div>

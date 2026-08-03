@@ -95,7 +95,7 @@ export default function ApprovalSampleProductPage() {
       <section className="mb-5 rounded-lg border border-line bg-white p-4 shadow-soft">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-black text-pine">ReturnPick 승인용 추천 상품 · Coupang Partners Review Page</p>
+            <p className="text-xs font-black text-pine">ReturnPick 승인용 추천 상품 · 쿠팡 파트너스 승인용 페이지</p>
             <h1 className="mt-1 text-2xl font-black tracking-tight">{productName}</h1>
             <p className="mt-1 text-sm font-black leading-6 text-steel">{productSubtitle}</p>
             <p className="mt-1 break-all text-xs font-semibold leading-5 text-steel">공개 페이지: {captureUrl}</p>
@@ -197,7 +197,7 @@ export default function ApprovalSampleProductPage() {
 
         <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
           <div className="rounded-lg border border-line bg-white p-5 shadow-soft">
-            <p className="text-xs font-black text-pine">Coupang Partners</p>
+            <p className="text-xs font-black text-pine">쿠팡 파트너스</p>
             <h2 className="mt-2 text-xl font-black">쿠팡에서 가격 확인</h2>
             <p className="mt-2 text-sm font-semibold leading-6 text-steel">
               버튼을 누르면 쿠팡 파트너스 링크가 새 탭으로 열립니다. 구매 전 쿠팡 페이지에서 가격, 재고, 배송 정보를 최종 확인하세요.

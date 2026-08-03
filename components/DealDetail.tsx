@@ -117,7 +117,7 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
             <div className="rounded-lg border border-line bg-white p-4 shadow-soft">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-black text-pine">Coupang Partners</p>
+                  <p className="text-sm font-black text-pine">쿠팡 파트너스</p>
                   <p className="mt-1 text-sm font-semibold text-steel">
                     {outboundLink.isAffiliate
                       ? "가격과 재고는 쿠팡에서 다시 확인하세요. 버튼을 누르면 쿠팡 파트너스 링크가 새 탭으로 열립니다."

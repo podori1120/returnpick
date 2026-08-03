@@ -193,7 +193,7 @@ export default async function HomePage() {
         <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-sm font-black text-pine">CATEGORY</p>
+              <p className="text-sm font-black text-pine">카테고리</p>
               <h2 className="mt-1 text-2xl font-black" id="category-heading">카테고리부터 골라보세요</h2>
               <p className="mt-1 text-sm font-semibold text-steel">상품이 없어도 카테고리별 반품 구매 기준을 먼저 확인할 수 있습니다.</p>
             </div>
@@ -239,7 +239,7 @@ export default async function HomePage() {
           <RecentDealsRail />
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-sm font-black text-pine">Today</p>
+              <p className="text-sm font-black text-pine">오늘의 딜</p>
               <h2 className="text-2xl font-black">오늘 볼 만한 딜</h2>
               <p className="mt-1 text-sm font-semibold text-steel">현재 공개 상품 {products.length.toLocaleString("ko-KR")}개</p>
             </div>

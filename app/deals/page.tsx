@@ -152,7 +152,7 @@ function EmptyDealsCatalog() {
   return (
     <main className="mx-auto max-w-7xl space-y-7 px-4 py-8 sm:px-6">
       <header className="border-b border-line pb-6">
-        <p className="text-sm font-black text-pine">ReturnPick Direct Review</p>
+        <p className="text-sm font-black text-pine">리턴픽 직접 검수</p>
         <h1 className="mt-1 text-3xl font-black tracking-tight">검수 기준을 통과한 상품만 공개합니다</h1>
         <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-steel">
           자동 수집 후보는 상품별 가격·반품 근거·파트너스 링크를 확인한 뒤 순차적으로 공개합니다. 지금은 실제 구매 경로가 확인된 추천과 카테고리별 구매 기준을 먼저 확인할 수 있습니다.
@@ -198,7 +198,7 @@ function EmptyDealsCatalog() {
       <section className="border-t border-line pt-7" aria-labelledby="category-guide-title">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-sm font-black text-pine">CATEGORY GUIDE</p>
+            <p className="text-sm font-black text-pine">카테고리 안내</p>
             <h2 id="category-guide-title" className="mt-1 text-2xl font-black">찾는 품목의 반품 구매 기준부터 확인하세요</h2>
             <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-steel">
               상품 수를 채우기 위해 확인되지 않은 딜을 노출하지 않습니다. 카테고리 페이지에서는 실제 딜이 들어온 뒤에도 같은 기준으로 비교합니다.
@@ -455,7 +455,7 @@ export default async function DealsPage({
         <div className="rounded-lg border border-line bg-white p-4 shadow-soft">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-xs font-black text-pine">Quick Filters</p>
+              <p className="text-xs font-black text-pine">빠른 필터</p>
               <h2 className="text-lg font-black">바로 걸러보기</h2>
             </div>
             <Link className="text-xs font-black text-steel hover:text-pine" href="/deals">
@@ -472,7 +472,7 @@ export default async function DealsPage({
           </div>
         </div>
         <div className="rounded-lg border border-line bg-white p-4 shadow-soft">
-          <p className="text-xs font-black text-pine">Review Mix</p>
+          <p className="text-xs font-black text-pine">검수 분포</p>
           <h2 className="text-lg font-black">검수 분포</h2>
           <div className="mt-3 grid grid-cols-2 gap-2">
             {qualityCounts.map((bucket) => (

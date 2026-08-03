@@ -69,7 +69,7 @@ export default function DiscoveryWorkbench({
       <div className="border-b border-line bg-mist p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-3xl">
-            <p className="text-xs font-black uppercase tracking-wide text-pine">ReturnPick Compare &amp; Interpret</p>
+            <p className="text-xs font-black text-pine">리턴픽 비교 기준</p>
             <h2 className="mt-2 text-2xl font-black tracking-tight text-ink" id={`discovery-workbench-${placement}`}>
               {title}
             </h2>
@@ -114,7 +114,7 @@ export default function DiscoveryWorkbench({
         <div className="border-b border-line p-5 sm:p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-xs font-black text-pine">CATEGORY EXPLORER</p>
+              <p className="text-xs font-black text-pine">카테고리 둘러보기</p>
               <h3 className="mt-1 text-lg font-black">찾는 품목의 기준부터 열어보세요</h3>
             </div>
             <Link className="focus-ring inline-flex items-center gap-1 text-xs font-black text-pine hover:text-ink" href="/guide/safe-categories">
@@ -147,7 +147,7 @@ export default function DiscoveryWorkbench({
 
       <div className="p-5 sm:p-6">
         <div>
-          <p className="text-xs font-black text-pine">HOW WE READ A DEAL</p>
+          <p className="text-xs font-black text-pine">리턴픽이 딜을 읽는 방법</p>
           <h3 className="mt-1 text-lg font-black">리턴픽이 상품을 해석하는 네 가지 신호</h3>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
