@@ -16,6 +16,7 @@ export interface ReturnEvidenceSource {
 }
 
 const weakConditionGrades: ReadonlySet<ConditionGrade> = new Set(["알수없음", "확인필요"]);
+const conditionGrades: ReadonlySet<ConditionGrade> = new Set(["미개봉", "최상", "상", "중", "알수없음", "확인필요"]);
 
 export function resolveConditionGrade(
   providerGrade: ConditionGrade | null | undefined,
@@ -112,5 +113,66 @@ export function toReturnInfoJson(info: WebReturnInfo): Record<string, JsonValue>
     stock_count: info.stock_count,
     evidence: info.evidence,
     confidence: info.confidence
+  };
+}
+
+function readJsonRecord(value: JsonValue | undefined) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+}
+
+export function resolveStoredWebReturnInfo(title: string, value: JsonValue | undefined): WebReturnInfo {
+  const root = readJsonRecord(value);
+  if (!root) return extractReturnInfoFromText(title);
+
+  const detailPage = readJsonRecord(root.detail_page);
+  const records = [detailPage, root].filter((record): record is Record<string, JsonValue> => Boolean(record));
+  const evidence = records.flatMap((record) =>
+    Array.isArray(record.evidence) ? record.evidence.filter((item): item is string => typeof item === "string") : []
+  );
+  const conditionCandidates = records
+    .map((record) => record.condition_grade)
+    .filter((item): item is string => typeof item === "string" && conditionGrades.has(item as ConditionGrade)) as string[];
+  const condition =
+    (conditionCandidates.find((item) => !weakConditionGrades.has(item as ConditionGrade)) as ConditionGrade | undefined) ??
+    (conditionCandidates[0] as ConditionGrade | undefined);
+  const returnPrice = records
+    .map((record) => record.return_price)
+    .find((item): item is number => typeof item === "number" && Number.isFinite(item) && item >= 0) ?? null;
+  const stockCount = records
+    .map((record) => record.stock_count)
+    .find((item): item is number => typeof item === "number" && Number.isFinite(item) && item >= 0) ?? null;
+  const hasExplicitTrue = records.some((record) => record.is_return_candidate === true);
+  const hasExplicitFalse = records.some((record) => record.is_return_candidate === false);
+  const parsed =
+    hasExplicitFalse && !hasExplicitTrue
+      ? {
+          isReturnCandidate: false,
+          condition_grade: null,
+          return_price: null,
+          stock_count: null,
+          evidence: [],
+          confidence: 0
+        }
+      : extractReturnInfoFromText(title, evidence.join(" ") || null);
+  const confidence = Math.max(
+    0,
+    ...records.map((record) => (typeof record.confidence === "number" && Number.isFinite(record.confidence) ? record.confidence : 0))
+  );
+
+  return {
+    isReturnCandidate: hasExplicitTrue ? true : hasExplicitFalse ? false : parsed.isReturnCandidate,
+    condition_grade: condition ?? parsed.condition_grade,
+    return_price: returnPrice ?? parsed.return_price,
+    stock_count: stockCount ?? parsed.stock_count,
+    evidence: Array.from(new Set([...evidence, ...parsed.evidence])),
+    confidence: Math.max(confidence, parsed.confidence)
+  };
+}
+
+export function mergeStoredWebReturnInfo(value: JsonValue | undefined, info: WebReturnInfo): Record<string, JsonValue> {
+  const root = readJsonRecord(value);
+  return {
+    ...(root ?? {}),
+    ...toReturnInfoJson(info)
   };
 }

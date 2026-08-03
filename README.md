@@ -211,7 +211,8 @@ npm run public-web-detail:check
 - robots.txt의 `Crawl-delay`를 읽어 요청 간격을 늘리고, 서버리스 수집에 너무 긴 지연이 필요한 호스트는 `CRAWL_DELAY_TOO_HIGH`로 건너뜀
 - `text/html` 또는 `application/xhtml+xml` 응답만 읽고, HTML 본문은 페이지당 750KB, robots.txt는 250KB까지만 읽음
 - 검색 URL이나 robots.txt가 리다이렉트하면 자동 추적하지 않고 `REDIRECT_BLOCKED`로 차단
-- HTML에서 공개 링크 텍스트의 반품/리퍼/재포장 문구만 참고
+- HTML에서 공개 링크 텍스트의 반품/리퍼/재포장 문구를 우선 참고하고, 반품 문구가 없는 상품형 링크도 가격·스펙 후보로 제한적으로 수집
+- 반품 문구가 없는 후보는 `candidate_kind=product_without_return_evidence`로 구분하며 `condition_grade=확인필요`, `return_price=null`을 유지합니다. JSON-LD `Product`는 공개 `offers` 가격이 있을 때만 같은 방식으로 후보화합니다.
 - 검색 결과에서 발견한 allowlist 상품 링크 중 최대 3개의 상세 페이지를 추가로 확인해 상세에만 있는 반품등급·반품가·재고 문구를 보강
 - 상세 페이지를 읽을 때도 같은 `robots.txt`, allowlist, Crawl-delay, 수동 리다이렉트 차단, 750KB 본문 제한을 다시 적용
 - 상세 페이지에서 반품 근거를 찾지 못하면 기존 값이나 `확인필요`를 유지하고 숫자를 추정하지 않으며, 보강 근거는 `raw_json.web_return_info.detail_page`에 남김
@@ -219,6 +220,8 @@ npm run public-web-detail:check
 - HTML에서 발견한 상품 후보 링크도 `http://` 또는 `https://` 공개 호스트 URL만 저장하고, `javascript:`, `mailto:`, 인증정보가 들어간 URL, localhost/private 형태의 URL은 후보에서 제외
 - 반품등급과 반품가는 근거가 있을 때만 저장
 - robots.txt가 막으면 `ROBOTS_DISALLOWED`로 기록하고 건너뜀
+
+현재 확인한 [쿠팡 robots.txt](https://www.coupang.com/robots.txt)는 일부 명시된 검색엔진 User-agent에만 상품·검색 경로를 허용하고, `User-agent: *`에는 전체 경로를 차단합니다. `ReturnPickBot`으로 쿠팡 공개 페이지를 allowlist에 넣어 수집하지 않습니다. 쿠팡 상품 후보와 파트너스 링크는 공식 Partners API 권한 또는 관리자가 직접 확인한 상품별 링크를 사용하세요.
 
 `PUBLIC_WEB_CRAWL_ENABLED=true`로 켠 경우 `/admin`의 실제 연결 테스트에 `공개 웹 참고 수집` 카드가 추가됩니다. 이 카드는 allowlist, 검색 템플릿 개수 제한, robots.txt, HTML 응답 경로를 작은 샘플 키워드로 확인하고, 호스트/템플릿이 너무 많거나 robots.txt가 없거나 막는 경우 첫 가동 전에 오류로 보여줍니다. 기본값이 `false`이면 같은 카드는 `skipped`로 남고 첫 가동 필수 조건에는 포함하지 않습니다.
 

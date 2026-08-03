@@ -297,6 +297,21 @@ function readJsonLdUrl(record: Record<string, unknown>, pageUrl: URL, allowedHos
   return safeAllowlistedPublicUrl(rawUrl, pageUrl, allowedHosts);
 }
 
+function isLikelyProductCard(pageUrl: URL, productUrl: URL, text: string) {
+  if (text.length < 8 || productUrl.pathname === "/") return false;
+  if (productUrl.origin === pageUrl.origin && productUrl.pathname === pageUrl.pathname) return false;
+
+  const pathname = productUrl.pathname.toLowerCase();
+  const collectionPath = /\/(?:search|category|categories|brand|brands|tag|login|cart|help|about)(?:\/|$)/.test(pathname);
+  if (collectionPath || ["/products", "/items", "/goods"].includes(pathname)) return false;
+
+  const pathSignal = /(?:product|item|goods|detail|sku|model)/.test(pathname) || /\d{2,}/.test(pathname);
+  const productTextSignal = /(?:갤럭시북|그램|맥북|아이디어패드|리전|빅터스|노트북|모니터|로보락|드리미|샤오미|다이슨|코드제로|삼성\s*제트|청소기|공기청정기|제습기|상품|제품)/i.test(text);
+  const priceSignal = /(?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]{5,8})\s*원|[0-9]+(?:\.[0-9]+)?\s*만\s*원/i.test(text);
+  const specSignal = /(?:[0-9]+\s*(?:gb|tb|hz|인치|형|l|리터|kg|w)|fhd|qhd|uhd|4k|rtx|core\s*i[3579]|ultra\s*[3579]|ryzen\s*[3579])/i.test(text);
+  return (pathSignal && (productTextSignal || priceSignal || specSignal)) || (productTextSignal && (priceSignal || specSignal));
+}
+
 function extractCards(html: string, category: Category, keyword: string, pageUrl: string, allowedHosts: ReadonlySet<string>): ProviderProduct[] {
   const anchorMatches = [...html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,1500}?)<\/a>/gi)];
   const base = new URL(pageUrl);
@@ -312,7 +327,7 @@ function extractCards(html: string, category: Category, keyword: string, pageUrl
     const block = match[2].replace(/<script[\s\S]*?<\/script>/gi, " ");
     const text = block.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
     const returnInfo = extractReturnInfoFromText(text, href);
-    if (!returnInfo.isReturnCandidate || text.length < 8) continue;
+    if (!returnInfo.isReturnCandidate && !isLikelyProductCard(base, productUrl, text)) continue;
     seenProductKeys.add(productKey);
     products.push({
       source: "public_web",
@@ -335,6 +350,7 @@ function extractCards(html: string, category: Category, keyword: string, pageUrl
         provider: "public_web",
         page_url: pageUrl,
         anchor_index: index,
+        candidate_kind: returnInfo.isReturnCandidate ? "return_evidence" : "product_without_return_evidence",
         web_return_info: toReturnInfoJson(returnInfo)
       }
     });
@@ -365,10 +381,10 @@ function extractCards(html: string, category: Category, keyword: string, pageUrl
           : "";
         const evidenceText = [name, readJsonLdText(record.description), additionalProperties, readJsonLdText(record.itemCondition)].filter(Boolean).join(" ");
         const returnInfo = extractReturnInfoFromText(evidenceText, href);
-        if (!returnInfo.isReturnCandidate) continue;
+        const offerPrice = readJsonLdOfferPrice(record);
+        if (!returnInfo.isReturnCandidate && offerPrice == null) continue;
 
         seenProductKeys.add(productKey);
-        const offerPrice = readJsonLdOfferPrice(record);
         products.push({
           source: "public_web",
           source_product_id: href,
@@ -389,6 +405,7 @@ function extractCards(html: string, category: Category, keyword: string, pageUrl
           raw_json: {
             provider: "public_web",
             page_url: pageUrl,
+            candidate_kind: returnInfo.isReturnCandidate ? "return_evidence" : "product_without_return_evidence",
             json_ld: {
               type: readJsonLdText(record["@type"]) || null,
               sku: readJsonLdText(record.sku) || null,

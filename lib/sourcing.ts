@@ -21,7 +21,7 @@ import { searchPublicWebProducts } from "@/lib/providers/publicWebProvider";
 import type { ProviderProduct, ProviderSearchResult } from "@/lib/providers/types";
 import { mergeProviderProductBatches } from "@/lib/providerProductMerge";
 import type { JsonValue, SourcedProduct, SourcingKeyword, SourcingStatus } from "@/lib/types";
-import { extractReturnInfoFromText, resolveWebReturnEvidence, toReturnInfoJson } from "@/lib/webReturnInfo";
+import { mergeStoredWebReturnInfo, resolveStoredWebReturnInfo, resolveWebReturnEvidence } from "@/lib/webReturnInfo";
 
 function isWithinKeywordPrice(product: ProviderProduct, keyword: SourcingKeyword) {
   const price = product.return_price ?? product.source_price ?? product.new_price;
@@ -274,10 +274,7 @@ async function enrichAndSaveProduct(product: ProviderProduct, keyword: SourcingK
           }
         } satisfies AffiliateEnrichment)
   ]);
-  const webReturnInfo = extractReturnInfoFromText(
-    product.title,
-    product.raw_json?.web_return_info ? JSON.stringify(product.raw_json.web_return_info) : null
-  );
+  const webReturnInfo = resolveStoredWebReturnInfo(product.title, product.raw_json?.web_return_info);
   const resolvedReturnInfo = resolveWebReturnEvidence(product, webReturnInfo);
 
   const { product: saved, inserted } = await upsertSourcedProduct({
@@ -291,7 +288,7 @@ async function enrichAndSaveProduct(product: ProviderProduct, keyword: SourcingK
     spec_json: specJson,
     raw_json: {
       ...(product.raw_json ?? {}),
-      web_return_info: toReturnInfoJson(webReturnInfo),
+      web_return_info: mergeStoredWebReturnInfo(product.raw_json?.web_return_info, webReturnInfo),
       naver_lowest_price: naverPrice.price,
       naver_price_lookup: naverPrice.priceLog,
       coupang_deeplink: affiliate.deeplinkLog

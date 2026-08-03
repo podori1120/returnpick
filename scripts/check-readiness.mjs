@@ -2109,10 +2109,11 @@ if (fileExists("lib/providers/publicWebProvider.ts")) {
   );
   check(
     "scripts: public web detail enrichment contract",
-    packageJson.includes('"public-web-detail:check": "node scripts/verify-public-web-detail-enrichment.mjs"') &&
+    packageJson.includes('"public-web-detail:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-public-web-detail-enrichment.mjs"') &&
       publicWebProvider.includes("detail_page") &&
       publicWebProvider.includes("web_return_info") &&
-      fileExists("scripts/verify-public-web-detail-enrichment.mjs"),
+      fileExists("scripts/verify-public-web-detail-enrichment.mjs") &&
+      fileExists("scripts/public-web-test-loader.mjs"),
     "detail-page return evidence and bounded enrichment are covered by a deterministic source contract check",
     "required"
   );

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import {
   extractReturnInfoFromText,
+  mergeStoredWebReturnInfo,
   resolveConditionGrade,
+  resolveStoredWebReturnInfo,
   resolveWebReturnEvidence
 } from "../lib/webReturnInfo.ts";
 
@@ -91,6 +93,65 @@ assert.deepEqual(providerValuesWin, {
   condition_grade: "상",
   return_price: 700000,
   stock_count: 2
+});
+
+const productWithoutReturnEvidence = resolveStoredWebReturnInfo("LG 그램 16GB 512GB", {
+  is_return_candidate: false,
+  condition_grade: "확인필요",
+  return_price: null,
+  stock_count: null,
+  evidence: [],
+  confidence: 0
+});
+assert.equal(productWithoutReturnEvidence.isReturnCandidate, false);
+assert.equal(productWithoutReturnEvidence.condition_grade, "확인필요");
+assert.equal(productWithoutReturnEvidence.return_price, null);
+
+const explicitFalseWithReturnWord = resolveStoredWebReturnInfo("반품 노트북 반품-최상", {
+  is_return_candidate: false,
+  condition_grade: "확인필요",
+  return_price: null,
+  stock_count: null,
+  evidence: [],
+  confidence: 0
+});
+assert.equal(explicitFalseWithReturnWord.isReturnCandidate, false);
+assert.equal(explicitFalseWithReturnWord.condition_grade, "확인필요");
+assert.equal(explicitFalseWithReturnWord.return_price, null);
+
+const returnEvidenceInDetail = resolveStoredWebReturnInfo("로보락 S8", {
+  is_return_candidate: false,
+  evidence: [],
+  detail_page: {
+    is_return_candidate: true,
+    condition_grade: "최상",
+    return_price: 599000,
+    stock_count: 1,
+    evidence: ["상세 페이지에서 반품 등급과 반품가 확인"],
+    confidence: 90
+  }
+});
+assert.equal(returnEvidenceInDetail.isReturnCandidate, true);
+assert.equal(returnEvidenceInDetail.condition_grade, "최상");
+assert.equal(returnEvidenceInDetail.return_price, 599000);
+assert.equal(returnEvidenceInDetail.stock_count, 1);
+
+const preservedStoredInfo = mergeStoredWebReturnInfo(
+  {
+    candidate_kind: "product_without_return_evidence",
+    detail_page: {
+      is_return_candidate: true,
+      return_price: 599000,
+      evidence: ["detail evidence"]
+    }
+  },
+  returnEvidenceInDetail
+);
+assert.equal(preservedStoredInfo.candidate_kind, "product_without_return_evidence");
+assert.deepEqual(preservedStoredInfo.detail_page, {
+  is_return_candidate: true,
+  return_price: 599000,
+  evidence: ["detail evidence"]
 });
 
 console.log("Web return evidence checks passed: Korean grade parsing, weak-grade fallback, and no inferred return price.");
