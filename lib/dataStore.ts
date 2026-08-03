@@ -70,22 +70,53 @@ export const DEFAULT_SOURCING_KEYWORDS: KeywordInput[] = [
   { keyword: "ASUS TUF", category: "laptop", min_price: 700000, max_price: 2200000, min_discount_rate: 0.15 },
   { keyword: "맥북", category: "laptop", min_price: 700000, max_price: 2600000, min_discount_rate: 0.08 },
   { keyword: "MSI 노트북", category: "laptop", min_price: 600000, max_price: 2200000, min_discount_rate: 0.15 },
+  { keyword: "갤럭시북 프로", category: "laptop", min_price: 600000, max_price: 2200000, min_discount_rate: 0.1 },
+  { keyword: "갤럭시북 울트라", category: "laptop", min_price: 600000, max_price: 2800000, min_discount_rate: 0.1 },
+  { keyword: "LG 그램 16", category: "laptop", min_price: 600000, max_price: 2200000, min_discount_rate: 0.1 },
+  { keyword: "LG 그램 프로", category: "laptop", min_price: 800000, max_price: 2500000, min_discount_rate: 0.1 },
+  { keyword: "아이디어패드 슬림", category: "laptop", min_price: 350000, max_price: 1400000, min_discount_rate: 0.12 },
+  { keyword: "리전 5", category: "laptop", min_price: 700000, max_price: 2400000, min_discount_rate: 0.15 },
+  { keyword: "맥북 에어", category: "laptop", min_price: 700000, max_price: 2600000, min_discount_rate: 0.08 },
+  { keyword: "맥북 프로", category: "laptop", min_price: 900000, max_price: 3000000, min_discount_rate: 0.08 },
   { keyword: "QHD 모니터", category: "monitor", min_price: 150000, max_price: 800000, min_discount_rate: 0.12 },
   { keyword: "4K 모니터", category: "monitor", min_price: 200000, max_price: 1100000, min_discount_rate: 0.12 },
   { keyword: "144Hz 모니터", category: "monitor", min_price: 150000, max_price: 900000, min_discount_rate: 0.12 },
   { keyword: "27인치 모니터", category: "monitor", min_price: 100000, max_price: 700000, min_discount_rate: 0.1 },
+  { keyword: "LG 울트라기어", category: "monitor", min_price: 200000, max_price: 1000000, min_discount_rate: 0.12 },
+  { keyword: "삼성 오디세이", category: "monitor", min_price: 250000, max_price: 1200000, min_discount_rate: 0.12 },
+  { keyword: "USB-C 모니터", category: "monitor", min_price: 200000, max_price: 1200000, min_discount_rate: 0.1 },
+  { keyword: "32인치 4K 모니터", category: "monitor", min_price: 250000, max_price: 1100000, min_discount_rate: 0.12 },
+  { keyword: "27인치 QHD 모니터", category: "monitor", min_price: 150000, max_price: 800000, min_discount_rate: 0.12 },
+  { keyword: "게이밍 모니터", category: "monitor", min_price: 150000, max_price: 1000000, min_discount_rate: 0.12 },
   { keyword: "로보락", category: "robot_vacuum", min_price: 300000, max_price: 1600000, min_discount_rate: 0.12 },
   { keyword: "드리미 로봇청소기", category: "robot_vacuum", min_price: 250000, max_price: 1500000, min_discount_rate: 0.12 },
   { keyword: "샤오미 로봇청소기", category: "robot_vacuum", min_price: 150000, max_price: 900000, min_discount_rate: 0.12 },
+  { keyword: "로보락 Qrevo", category: "robot_vacuum", min_price: 500000, max_price: 1600000, min_discount_rate: 0.12 },
+  { keyword: "로보락 S8", category: "robot_vacuum", min_price: 400000, max_price: 1600000, min_discount_rate: 0.12 },
+  { keyword: "드리미 X40", category: "robot_vacuum", min_price: 500000, max_price: 1800000, min_discount_rate: 0.12 },
+  { keyword: "드리미 L10s", category: "robot_vacuum", min_price: 300000, max_price: 1400000, min_discount_rate: 0.12 },
+  { keyword: "올인원 로봇청소기", category: "robot_vacuum", min_price: 300000, max_price: 1800000, min_discount_rate: 0.12 },
   { keyword: "다이슨 무선청소기", category: "cordless_vacuum", min_price: 250000, max_price: 1200000, min_discount_rate: 0.1 },
   { keyword: "삼성 제트", category: "cordless_vacuum", min_price: 200000, max_price: 1000000, min_discount_rate: 0.12 },
   { keyword: "LG 코드제로", category: "cordless_vacuum", min_price: 250000, max_price: 1200000, min_discount_rate: 0.12 },
+  { keyword: "다이슨 V12", category: "cordless_vacuum", min_price: 250000, max_price: 1200000, min_discount_rate: 0.1 },
+  { keyword: "다이슨 V15", category: "cordless_vacuum", min_price: 400000, max_price: 1400000, min_discount_rate: 0.1 },
+  { keyword: "삼성 제트 220W", category: "cordless_vacuum", min_price: 300000, max_price: 1100000, min_discount_rate: 0.12 },
+  { keyword: "LG 코드제로 A9", category: "cordless_vacuum", min_price: 250000, max_price: 1200000, min_discount_rate: 0.12 },
   { keyword: "삼성 공기청정기", category: "air_purifier", min_price: 100000, max_price: 900000, min_discount_rate: 0.1 },
   { keyword: "LG 공기청정기", category: "air_purifier", min_price: 150000, max_price: 1000000, min_discount_rate: 0.1 },
   { keyword: "위닉스 공기청정기", category: "air_purifier", min_price: 80000, max_price: 600000, min_discount_rate: 0.1 },
+  { keyword: "삼성 블루스카이", category: "air_purifier", min_price: 100000, max_price: 900000, min_discount_rate: 0.1 },
+  { keyword: "LG 퓨리케어", category: "air_purifier", min_price: 150000, max_price: 1000000, min_discount_rate: 0.1 },
+  { keyword: "위닉스 타워", category: "air_purifier", min_price: 80000, max_price: 600000, min_discount_rate: 0.1 },
+  { keyword: "20평 공기청정기", category: "air_purifier", min_price: 100000, max_price: 700000, min_discount_rate: 0.1 },
   { keyword: "위닉스 제습기", category: "dehumidifier", min_price: 100000, max_price: 700000, min_discount_rate: 0.1 },
   { keyword: "LG 제습기", category: "dehumidifier", min_price: 150000, max_price: 900000, min_discount_rate: 0.1 },
-  { keyword: "삼성 제습기", category: "dehumidifier", min_price: 150000, max_price: 900000, min_discount_rate: 0.1 }
+  { keyword: "삼성 제습기", category: "dehumidifier", min_price: 150000, max_price: 900000, min_discount_rate: 0.1 },
+  { keyword: "위닉스 뽀송", category: "dehumidifier", min_price: 100000, max_price: 700000, min_discount_rate: 0.1 },
+  { keyword: "LG 휘센 제습기", category: "dehumidifier", min_price: 150000, max_price: 900000, min_discount_rate: 0.1 },
+  { keyword: "삼성 인버터 제습기", category: "dehumidifier", min_price: 150000, max_price: 900000, min_discount_rate: 0.1 },
+  { keyword: "16L 제습기", category: "dehumidifier", min_price: 100000, max_price: 700000, min_discount_rate: 0.1 }
 ];
 
 function makeKeyword(keyword: string, category: Category, min_price: number | null, max_price: number | null, min_discount_rate: number | null): SourcingKeyword {
@@ -460,25 +491,31 @@ export async function listKeywords(options?: { activeOnly?: boolean }) {
 
 export async function ensureDefaultSourcingKeywords() {
   const existing = await listKeywords();
-  if (existing.length > 0) return { inserted_count: 0, skipped: true, keyword_count: existing.length };
+  const existingKeys = new Set(existing.map((keyword) => `${keyword.category}:${normalizeKeywordKey(keyword.keyword)}`));
+  const missingDefaults = DEFAULT_SOURCING_KEYWORDS.filter(
+    (keyword) => !existingKeys.has(`${keyword.category}:${normalizeKeywordKey(keyword.keyword)}`)
+  );
+  if (!missingDefaults.length) return { inserted_count: 0, skipped: true, keyword_count: existing.length };
 
   const client = getSupabaseServiceClient();
   if (client) {
     const { data, error } = await client
       .from("sourcing_keywords")
-      .upsert(DEFAULT_SOURCING_KEYWORDS.map((keyword) => ({ ...keyword, is_active: keyword.is_active ?? true })), {
+      .upsert(missingDefaults.map((keyword) => ({ ...keyword, is_active: keyword.is_active ?? true })), {
         onConflict: "keyword_key,category",
         ignoreDuplicates: true
       })
       .select("*");
     if (error) throw error;
-    return { inserted_count: data?.length ?? 0, skipped: false, keyword_count: data?.length ?? 0 };
+    return { inserted_count: data?.length ?? 0, skipped: false, keyword_count: existing.length + (data?.length ?? 0) };
   }
 
-  const created = createInitialKeywords();
+  const created = missingDefaults.map((input) =>
+    makeKeyword(input.keyword, input.category, input.min_price ?? null, input.max_price ?? null, input.min_discount_rate ?? null)
+  );
   memoryKeywords.unshift(...created);
   persistMemoryState();
-  return { inserted_count: created.length, skipped: false, keyword_count: created.length };
+  return { inserted_count: created.length, skipped: false, keyword_count: existing.length + created.length };
 }
 
 export async function createKeyword(input: KeywordInput) {

@@ -258,6 +258,7 @@ const requiredFiles = [
   "scripts/verify-git-deploy-readiness.mjs",
   "scripts/verify-github-hourly-scheduler.mjs",
   "scripts/verify-scheduled-affiliate-backfill.mjs",
+  "scripts/verify-sourcing-keyword-coverage.mjs",
   "scripts/verify-affiliate-identity.mjs",
   "scripts/verify-affiliate-link-intake.mjs",
   "scripts/verify-affiliate-link-intake-bulk.mjs",
@@ -1753,6 +1754,26 @@ if (fileExists("lib/sourcing.ts")) {
     "required"
   );
   check("sourcing: provider status log", sourcing.includes("provider_status"), "stores provider status for first-run diagnostics", "required");
+  if (fileExists("lib/dataStore.ts") && fileExists("sql/seed.sql") && fileExists("scripts/verify-sourcing-keyword-coverage.mjs")) {
+    const dataStore = readText("lib/dataStore.ts");
+    const seed = readText("sql/seed.sql");
+    const keywordCount = (dataStore.match(/\{ keyword: "/g) ?? []).length;
+    check(
+      "sourcing: keyword coverage",
+      keywordCount >= 55 &&
+        dataStore.includes("const existingKeys = new Set(") &&
+        dataStore.includes("const missingDefaults = DEFAULT_SOURCING_KEYWORDS.filter(") &&
+        dataStore.includes("upsert(missingDefaults.map(") &&
+        seed.includes("('갤럭시북 프로', 'laptop'") &&
+        seed.includes("('LG 울트라기어', 'monitor'") &&
+        seed.includes("('로보락 Qrevo', 'robot_vacuum'") &&
+        seed.includes("('다이슨 V15', 'cordless_vacuum'") &&
+        seed.includes("('LG 퓨리케어', 'air_purifier'") &&
+        seed.includes("('위닉스 뽀송', 'dehumidifier'") ,
+      `default sourcing coverage has ${keywordCount} keyword rows and backfills existing stores additively`,
+      "required"
+    );
+  }
   check(
     "sourcing: provider meta log",
     sourcing.includes("provider_meta: result.meta ?? null") &&
