@@ -1,17 +1,23 @@
 import { NextResponse } from "next/server";
+import { getCompareProductsErrorPayload } from "@/lib/compareApiError";
 import { listProducts } from "@/lib/dataStore";
 import { getDealFreshness } from "@/lib/dealFreshness";
-import { isDemoProduct, isPublicDealReady, toPublicDeal } from "@/lib/publicDeal";
+import { isDemoProduct, isPublicDealReady, isPublicDealVisible, toPublicDeal } from "@/lib/publicDeal";
 import type { ProductWithScore } from "@/lib/types";
 
 const maxCompareItems = 12;
 
 function isPublicCompareProduct(product: ProductWithScore) {
-  return !isDemoProduct(product) && isPublicDealReady(product) && getDealFreshness(product).status !== "stale";
+  return (
+    isPublicDealVisible(product) &&
+    !isDemoProduct(product) &&
+    isPublicDealReady(product) &&
+    getDealFreshness(product).status !== "stale"
+  );
 }
 
 function compareProductsErrorResponse(error: unknown) {
-  const message = error instanceof Error && error.message ? error.message.slice(0, 300) : "UNKNOWN_COMPARE_PRODUCTS_ERROR";
+  const { message } = getCompareProductsErrorPayload(error);
   return NextResponse.json({ ok: false, products: [], error: "COMPARE_PRODUCTS_FAILED", message });
 }
 
