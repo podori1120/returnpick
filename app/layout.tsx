@@ -89,6 +89,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/deals">
                 딜 보기
               </Link>
+              <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/recommend">
+                맞춤 추천
+              </Link>
               <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/picks">
                 검수 추천
               </Link>

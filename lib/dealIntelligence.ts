@@ -1,5 +1,6 @@
 import { categoryOptions, getCategoryLabel } from "@/lib/category";
 import { calculateDiscountRate } from "@/lib/format";
+import { matchesPriceBandValue, priceBandOptions, type PriceBandId } from "@/lib/priceBand";
 import { getPriceReferenceInfo } from "@/lib/priceReference";
 import { getDealQuality } from "@/lib/quality";
 import type { Category, ProductWithScore } from "@/lib/types";
@@ -14,7 +15,8 @@ export type UseCaseId =
   | "air_care"
   | "rainy_season";
 
-export type PriceBandId = "under_300k" | "under_700k" | "under_1200k" | "over_1200k";
+export { priceBandOptions };
+export type { PriceBandId };
 
 export const useCaseOptions: Array<{ id: UseCaseId; label: string; description: string }> = [
   { id: "office_student", label: "사무·대학생", description: "문서, 강의, 재택용으로 무난한 딜" },
@@ -25,13 +27,6 @@ export const useCaseOptions: Array<{ id: UseCaseId; label: string; description: 
   { id: "floor_care", label: "청소 자동화", description: "로봇청소기·무선청소기 중심" },
   { id: "air_care", label: "공기·필터", description: "공기청정기와 필터 확인 후보" },
   { id: "rainy_season", label: "장마·제습", description: "제습기와 습도 관리 후보" }
-];
-
-export const priceBandOptions: Array<{ id: PriceBandId; label: string; description: string; min: number; max: number | null }> = [
-  { id: "under_300k", label: "30만원 이하", description: "모니터·생활가전 입문", min: 0, max: 300000 },
-  { id: "under_700k", label: "70만원 이하", description: "가성비 노트북·청소기", min: 300000, max: 700000 },
-  { id: "under_1200k", label: "120만원 이하", description: "고급형 노트북·로봇청소기", min: 700000, max: 1200000 },
-  { id: "over_1200k", label: "120만원 이상", description: "프리미엄 후보", min: 1200000, max: null }
 ];
 
 export type UseCaseMatch = {
@@ -144,10 +139,9 @@ export function isPriceBand(value: string | undefined): value is PriceBandId {
 }
 
 export function matchesPriceBand(product: ProductWithScore, priceBandId: PriceBandId) {
-  const band = priceBandOptions.find((item) => item.id === priceBandId);
   const price = getDealPrice(product);
-  if (!band || price == null) return false;
-  return price >= band.min && (band.max == null || price <= band.max);
+  if (price == null) return false;
+  return matchesPriceBandValue(price, priceBandId);
 }
 
 export function buildDealRadar(products: ProductWithScore[]) {

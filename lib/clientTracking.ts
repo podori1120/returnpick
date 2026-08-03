@@ -1,4 +1,5 @@
 import type { AffiliateEventType } from "@/lib/types";
+export { getProductImpressionStorageKey } from "@/lib/impressionTracking";
 
 export type SavedDealItem = {
   id: string;

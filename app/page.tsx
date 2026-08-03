@@ -181,6 +181,9 @@ export default async function HomePage() {
               <Link className="focus-ring rounded-lg border border-line px-5 py-3 text-sm font-black hover:bg-mist" href="/guide/return-checklist">
                 수령 체크리스트
               </Link>
+              <Link className="focus-ring rounded-lg border border-line px-5 py-3 text-sm font-black hover:bg-mist" href="/recommend">
+                내 용도에 맞는 딜 찾기 <ArrowRight size={16} aria-hidden />
+              </Link>
             </div>
           </div>
           <div className={hasPublishedDeals ? "lg:self-start" : "hidden lg:block lg:self-start"}>

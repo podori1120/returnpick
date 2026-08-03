@@ -189,6 +189,7 @@ const requiredFiles = [
   "app/deals/category/[category]/page.tsx",
   "app/guide/search/[slug]/page.tsx",
   "app/picks/page.tsx",
+  "app/recommend/page.tsx",
   "app/picks/novatech-s1-window-cleaner/page.tsx",
   "app/picks/novatech-s1-window-cleaner/opengraph-image.tsx",
   "app/picks/novatech-s1-window-cleaner/twitter-image.tsx",
@@ -226,6 +227,9 @@ const requiredFiles = [
   "lib/categoryLanding.ts",
   "lib/searchIntentMatcher.ts",
   "lib/searchLandings.ts",
+  "lib/recommendation.ts",
+  "lib/priceBand.ts",
+  "lib/impressionTracking.ts",
   "lib/clientTracking.ts",
   "lib/launchCapabilityPolicy.ts",
   "lib/launchState.ts",
@@ -276,6 +280,7 @@ const requiredFiles = [
   "scripts/verify-search-intent-landings.mjs",
   "scripts/verify-home-purpose-selection.mjs",
   "scripts/verify-home-purpose-guides.mjs",
+  "scripts/verify-recommendation-workflow.mjs",
   "scripts/verify-keyword-coverage-api.mjs",
   "scripts/verify-public-web-config.mjs",
   "scripts/verify-web-return-info.mjs",
@@ -2687,6 +2692,74 @@ if (fileExists("app/picks/page.tsx") && fileExists("app/sitemap.ts") && fileExis
       eventRoute.includes('context: "editorial_picks_card"') &&
       eventRoute.includes('pathname: "/picks"'),
     "the public editorial hub keeps a verified fallback, adds only customer-ready products, exposes SEO metadata, and attributes its card impressions",
+    "required"
+  );
+}
+
+if (fileExists("app/recommend/page.tsx") && fileExists("lib/recommendation.ts") && fileExists("scripts/verify-recommendation-workflow.mjs") && fileExists("package.json")) {
+  const recommendationPage = readText("app/recommend/page.tsx");
+  const recommendationHelper = readText("lib/recommendation.ts");
+  const recommendationCheck = readText("scripts/verify-recommendation-workflow.mjs");
+  const priceBand = readText("lib/priceBand.ts");
+  const impressionTracking = readText("lib/impressionTracking.ts");
+  const eventTracker = readText("components/AffiliateEventTracker.tsx");
+  const packageJson = readText("package.json");
+  const homePage = readText("app/page.tsx");
+  const layout = readText("app/layout.tsx");
+  check(
+    "recommendation workflow: public route contract",
+    recommendationPage.includes('export const dynamic = "force-dynamic"') &&
+      recommendationPage.includes('searchParams: Promise<Record<string, string | string[] | undefined>>') &&
+      recommendationPage.includes('listProducts({ published: true })') &&
+      recommendationPage.includes("isPublicDealVisible(product)") &&
+      recommendationPage.includes("isPublicDealReady(product)") &&
+      recommendationPage.includes("<DealCard product={recommendation.product} />") &&
+      recommendationPage.includes("<ProductImpressionTracker") &&
+      recommendationPage.includes('channel="web_recommend"') &&
+      recommendationPage.includes('context="recommendation_results"') &&
+      recommendationPage.includes("<AffiliateNotice />") &&
+      recommendationPage.includes("<SearchIntentRail limit={4} />") &&
+      recommendationPage.includes('<ApprovalSampleCard placement="picks" />') &&
+      recommendationPage.includes('alternates: { canonical: canonicalUrl }') &&
+      recommendationPage.includes('name="useCase"') &&
+      recommendationPage.includes('name="category"') &&
+      recommendationPage.includes('name="priceBand"') &&
+      recommendationPage.includes('name="minScore"') &&
+      recommendationPage.includes('href="/deals"') &&
+      recommendationPage.includes('href="/picks"') &&
+      recommendationPage.includes("getGuideHref(filters)"),
+    "the shareable Korean recommendation route uses the published/public-ready gate, existing cards and disclosure, bounded filters, and truthful guide/editorial handoffs",
+    "required"
+  );
+  check(
+    "recommendation workflow: deterministic ranking and readiness wiring",
+    recommendationHelper.includes("parseRecommendationParams") &&
+      recommendationHelper.includes("rankRecommendationProducts") &&
+      recommendationHelper.includes("matchesUseCase") &&
+      recommendationHelper.includes("matchesPriceBand") &&
+      recommendationHelper.includes("getUseCaseMatches") &&
+      recommendationHelper.includes("getDealPrice") &&
+      recommendationHelper.includes("getDiscountRate") &&
+      recommendationHelper.includes("slice(0, MAX_RECOMMENDATIONS)") &&
+      recommendationHelper.includes("conditionMatchScore") &&
+      recommendationHelper.includes("fitScore: filters.useCase ? matchScore : null") &&
+      priceBand.includes("matchesPriceBandValue") &&
+      priceBand.includes("price < band.max") &&
+      priceBand.includes("30만~70만원 미만") &&
+      impressionTracking.includes("getProductImpressionStorageKey") &&
+      eventTracker.includes("const seenKey = getProductImpressionStorageKey(channel, context)") &&
+      recommendationCheck.includes("invalid query values should safely fall back") &&
+      recommendationCheck.includes("recommendation impressions should not share deduplication state") &&
+      recommendationCheck.includes("category-only results should show condition match") &&
+      recommendationCheck.includes("price-only results should show condition match") &&
+      recommendationCheck.includes("distinguish blocking price/stock states") &&
+      recommendationCheck.includes("fit should rank before the raw deal score") &&
+      packageJson.includes('"recommendation:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-recommendation-workflow.mjs"') &&
+      homePage.includes('href="/recommend"') &&
+      homePage.includes("내 용도에 맞는 딜 찾기") &&
+      layout.includes('href="/recommend"') &&
+      layout.includes("맞춤 추천"),
+    "the pure helper, deterministic check script, npm command, home CTA, and primary navigation are all wired",
     "required"
   );
 }
