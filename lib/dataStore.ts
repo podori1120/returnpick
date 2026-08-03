@@ -13,6 +13,7 @@ import { calculateDealScore, getLatestScore } from "@/lib/scoring";
 import { isSourcingExecutionRun } from "@/lib/sourcingRunKinds";
 import { getSupabaseServiceClient } from "@/lib/supabase";
 import { parseSpecsFromTitle } from "@/lib/specParser";
+import { normalizeKeywordKey } from "@/lib/keywordCoverage";
 import type {
   AffiliateEvent,
   AffiliateEventType,
@@ -56,10 +57,6 @@ type ProductFilters = {
 };
 
 const now = () => new Date().toISOString();
-
-function normalizeKeywordKey(keyword: string) {
-  return keyword.trim().toLowerCase();
-}
 
 export const DEFAULT_SOURCING_KEYWORDS: KeywordInput[] = [
   { keyword: "갤럭시북", category: "laptop", min_price: 400000, max_price: 1800000, min_discount_rate: 0.1 },
@@ -560,11 +557,19 @@ export async function updateKeyword(id: string, patch: Partial<KeywordInput>) {
 
   const index = memoryKeywords.findIndex((keyword) => keyword.id === id);
   if (index < 0) throw new Error("KEYWORD_NOT_FOUND");
-  memoryKeywords[index] = {
+  const nextKeyword = {
     ...memoryKeywords[index],
     ...patch,
     updated_at: now()
   };
+  const duplicateIndex = memoryKeywords.findIndex(
+    (keyword, candidateIndex) =>
+      candidateIndex !== index &&
+      keyword.category === nextKeyword.category &&
+      normalizeKeywordKey(keyword.keyword) === normalizeKeywordKey(nextKeyword.keyword)
+  );
+  if (duplicateIndex >= 0) throw new Error("DUPLICATE_KEYWORD");
+  memoryKeywords[index] = nextKeyword;
   persistMemoryState();
   return memoryKeywords[index];
 }

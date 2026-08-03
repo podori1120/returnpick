@@ -31,6 +31,13 @@ type SourcingRunResponse = {
   message?: string;
 };
 
+type KeywordCoverage = {
+  total_count: number;
+  active_count: number;
+  default_count: number;
+  missing_default_count: number;
+};
+
 function headers(password: string) {
   return { "Content-Type": "application/json", "x-admin-password": password };
 }
@@ -181,6 +188,8 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
   const [notice, setNotice] = useState<{ type: NoticeType; message: string } | null>(null);
   const [useMockFallback, setUseMockFallback] = useState(true);
   const [readiness, setReadiness] = useState<ApiReadinessSummary | null>(null);
+  const [keywordCoverage, setKeywordCoverage] = useState<KeywordCoverage | null>(null);
+  const [keywordCoverageError, setKeywordCoverageError] = useState<string | null>(null);
 
   async function loadRuns() {
     try {
@@ -212,9 +221,25 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
     }
   }
 
+  async function loadKeywordCoverage() {
+    setKeywordCoverageError(null);
+    try {
+      const response = await fetch("/api/admin/keywords", { headers: headers(password) });
+      const data = (await response.json().catch(() => ({}))) as { coverage?: KeywordCoverage; message?: string; error?: string };
+      if (!response.ok || !data.coverage) {
+        setKeywordCoverageError(data.message ?? data.error ?? "소싱 키워드 범위를 확인하지 못했습니다.");
+        return;
+      }
+      setKeywordCoverage(data.coverage);
+    } catch {
+      setKeywordCoverageError("네트워크 문제로 소싱 키워드 범위를 확인하지 못했습니다.");
+    }
+  }
+
   useEffect(() => {
     void loadRuns();
     void loadReadiness();
+    void loadKeywordCoverage();
   }, [password]);
 
   async function runSourcing() {
@@ -271,6 +296,7 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
           ? `${immediateDiagnosisMessage(run, diagnosis)}${fallbackNotice}`
           : "실행 결과를 확인하지 못했습니다."
       });
+      await loadKeywordCoverage();
       await loadRuns();
       onCompleted();
     } catch {
@@ -343,6 +369,26 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
             >
               {notice.message}
             </p>
+          ) : null}
+          {keywordCoverage || keywordCoverageError ? (
+            <div className="mt-3 rounded-lg border border-line bg-mist px-3 py-3 text-xs font-bold text-steel">
+              {keywordCoverage ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="font-black text-ink">현재 소싱 범위</span>
+                    <span>활성 {keywordCoverage.active_count}개</span>
+                    <span>전체 {keywordCoverage.total_count}개</span>
+                    <span>기본 세트 {keywordCoverage.default_count}개</span>
+                  </div>
+                  <p className="mt-1 leading-5">
+                    {keywordCoverage.missing_default_count > 0
+                      ? `기본 키워드 ${keywordCoverage.missing_default_count}개는 다음 수집 실행에서 기존 설정을 덮어쓰지 않고 추가됩니다.`
+                      : "기본 키워드가 모두 들어와 있습니다. 활성 키워드는 시간 예산에 따라 다음 실행으로 이어서 순환합니다."}
+                  </p>
+                </>
+              ) : null}
+              {keywordCoverageError ? <p className="mt-1 font-black text-coral">범위 재조회 실패: {keywordCoverageError}</p> : null}
+            </div>
           ) : null}
         </div>
         <div className="flex gap-2">

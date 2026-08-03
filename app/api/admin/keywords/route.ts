@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createKeyword, listKeywords, updateKeyword } from "@/lib/dataStore";
+import { createKeyword, DEFAULT_SOURCING_KEYWORDS, listKeywords, updateKeyword } from "@/lib/dataStore";
+import { getSourcingKeywordCoverage } from "@/lib/keywordCoverage";
 import { isCategory, requireAdmin, sanitizeText } from "@/lib/validators";
 import type { Category } from "@/lib/types";
 
@@ -87,7 +88,10 @@ export async function GET(request: Request) {
   if (unauthorized) return unauthorized;
 
   const keywords = await listKeywords();
-  return NextResponse.json({ keywords });
+  return NextResponse.json({
+    keywords,
+    coverage: getSourcingKeywordCoverage(keywords, DEFAULT_SOURCING_KEYWORDS)
+  });
 }
 
 export async function POST(request: Request) {

@@ -284,7 +284,7 @@ curl -X POST http://localhost:3000/api/admin/sourcing/run \
 
 공개 웹 참고 수집은 실행 로그의 `provider_meta.public_web_diagnostics`에 allowlist/robots/content-type/redirect/HTML 추출 결과를 최대 12건까지 남깁니다. 그래서 공개 웹을 켰는데 후보가 0개인 경우에도 `ROBOTS_DISALLOWED`, `ROBOTS_UNAVAILABLE`, `FETCHED_HTML`, `UNSUPPORTED_CONTENT_TYPE`, `CONTENT_TOO_LARGE`, `REDIRECT_BLOCKED`, `CRAWL_DELAY_TOO_HIGH` 중 어디서 막혔는지 확인하고 템플릿이나 allowlist를 조정할 수 있습니다.
 
-운영 DB의 `sourcing_keywords`가 완전히 비어 있으면 첫 소싱 실행에서 기본 키워드 24개를 자동 생성합니다. 기존 키워드가 하나라도 있으면 운영자가 의도적으로 구성한 상태로 보고 자동 주입하지 않습니다.
+운영 DB의 `sourcing_keywords`가 비어 있거나 기본 키워드가 일부 빠져 있으면 첫 소싱 실행에서 노트북·모니터·로봇청소기·무선청소기·공기청정기·제습기용 기본 키워드 55개를 부족한 만큼만 자동 보강합니다. 기존 키워드의 활성 상태·가격 조건은 덮어쓰지 않으며, 운영자가 추가한 키워드도 유지합니다. 현재 범위는 `/admin` 자동 후보 수집 카드와 `npm run sourcing:keywords:check`에서 확인할 수 있습니다.
 
 `sourcing_keywords`는 정리된 키워드값과 카테고리 조합으로 중복을 막습니다. 같은 카테고리에 같은 키워드를 다시 추가하면 새 행을 늘리지 않고 기존 키워드를 재사용합니다.
 

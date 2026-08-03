@@ -53,6 +53,7 @@
     "sourcing:diagnose": "node scripts/diagnose-sourcing-recovery.mjs",
     "sourcing:throughput:check": "node scripts/verify-sourcing-throughput.mjs",
     "sourcing:keywords:check": "node scripts/verify-sourcing-keyword-coverage.mjs",
+    "keyword-coverage:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-keyword-coverage-api.mjs",
     "doctor:production": "node scripts/run-production-doctor.mjs",
     "doctor:production:launch": "node scripts/run-production-doctor.mjs --launch",
     "doctor:production:fresh": "npm run env:pull:production && npm run env:vercel && npm run doctor:production",

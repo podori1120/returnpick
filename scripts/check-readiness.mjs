@@ -276,6 +276,7 @@ const requiredFiles = [
   "scripts/verify-search-intent-landings.mjs",
   "scripts/verify-home-purpose-selection.mjs",
   "scripts/verify-home-purpose-guides.mjs",
+  "scripts/verify-keyword-coverage-api.mjs",
   "scripts/verify-public-web-config.mjs",
   "scripts/verify-web-return-info.mjs",
   "scripts/verify-public-web-url-safety.mjs",
@@ -387,6 +388,22 @@ if (fileExists("package.json") && fileExists("scripts/verify-home-purpose-guides
       homeDiscovery.includes("guideLinks") &&
       purposeExplorer.includes("selected.guideLinks"),
     "each homepage purpose keeps multiple valid search-intent guide links for an actionable empty state",
+    "required"
+  );
+}
+
+if (fileExists("package.json") && fileExists("scripts/verify-keyword-coverage-api.mjs") && fileExists("lib/keywordCoverage.ts")) {
+  const packageJson = readText("package.json");
+  const coverageCheck = readText("scripts/verify-keyword-coverage-api.mjs");
+  const coverageHelper = readText("lib/keywordCoverage.ts");
+  check(
+    "scripts: keyword coverage API check command",
+    packageJson.includes('"keyword-coverage:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-keyword-coverage-api.mjs"') &&
+      coverageCheck.includes("getSourcingKeywordCoverage") &&
+      coverageCheck.includes("setKeywordCoverageError") &&
+      coverageHelper.includes("new Map") &&
+      coverageHelper.includes("missing_default_count"),
+    "keyword coverage check guards normalized counts, admin read-only access, and failure-safe runner refresh",
     "required"
   );
 }
@@ -3511,6 +3528,16 @@ if (fileExists("components/AdminSourcingRunner.tsx")) {
     "required"
   );
   check("admin: mock fallback follows API readiness", runner.includes("apiKeysReady") && runner.includes("setUseMockFallback(!nextReadiness.apiKeysReady)"), "admin disables mock fallback by default after API keys are detected", "required");
+  check(
+    "admin: sourcing keyword coverage",
+    runner.includes('fetch("/api/admin/keywords"') &&
+      runner.includes("loadKeywordCoverage") &&
+      runner.includes("keywordCoverage.active_count") &&
+      runner.includes("missing_default_count") &&
+      runner.includes("기본 키워드"),
+    "admin sourcing shows active keyword coverage and additive default-keyword backfill status",
+    "required"
+  );
   check("admin: mock fallback control locks after API readiness", runner.includes("mockFallbackLocked") && runner.includes("disabled={mockFallbackLocked}") && runner.includes("mockFallbackBlockedReason"), "admin cannot accidentally request mock fallback after API keys are detected", "required");
   check(
     "admin: public web only sourcing control",
