@@ -210,6 +210,7 @@ const requiredFiles = [
   "components/EditorialShareBar.tsx",
   "components/GuideEditorialLink.tsx",
   "components/SearchIntentRail.tsx",
+  "components/SearchGuideEditorialBridge.tsx",
   "components/TelegramPreview.tsx",
   "lib/affiliateLinkBackfill.ts",
   "lib/affiliateIdentity.ts",
@@ -1144,6 +1145,7 @@ if (
   fileExists("app/guide/search/[slug]/page.tsx") &&
   fileExists("lib/searchLandings.ts") &&
   fileExists("components/SearchIntentRail.tsx") &&
+  fileExists("components/SearchGuideEditorialBridge.tsx") &&
   fileExists("app/page.tsx") &&
   fileExists("app/deals/page.tsx") &&
   fileExists("app/picks/page.tsx") &&
@@ -1152,6 +1154,7 @@ if (
   const searchLandingPage = readText("app/guide/search/[slug]/page.tsx");
   const searchLandingData = readText("lib/searchLandings.ts");
   const searchRail = readText("components/SearchIntentRail.tsx");
+  const searchEditorialBridge = readText("components/SearchGuideEditorialBridge.tsx");
   const homePage = readText("app/page.tsx");
   const dealsPage = readText("app/deals/page.tsx");
   const picksPage = readText("app/picks/page.tsx");
@@ -1174,6 +1177,10 @@ if (
       !searchLandingPage.includes('"@type": "Offer"') &&
       searchRail.includes("검색 의도별 가이드") &&
       searchRail.includes("/guide/search/${item.slug}") &&
+      searchEditorialBridge.includes("approvalSampleProduct.detailPath") &&
+      searchEditorialBridge.includes("제휴 링크와 고지") &&
+      searchLandingPage.includes("SearchGuideEditorialBridge") &&
+      searchLandingPage.includes("!products.length ? <SearchGuideEditorialBridge /> : null") &&
       homePage.includes("<SearchIntentRail />") &&
       dealsPage.includes("<SearchIntentRail />") &&
       picksPage.includes("<SearchIntentRail />") &&

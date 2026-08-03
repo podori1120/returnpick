@@ -6,6 +6,7 @@ import AffiliateNotice from "@/components/AffiliateNotice";
 import { ProductImpressionTracker } from "@/components/AffiliateEventTracker";
 import DealCard from "@/components/DealCard";
 import DemoModeNotice from "@/components/DemoModeNotice";
+import SearchGuideEditorialBridge from "@/components/SearchGuideEditorialBridge";
 import { getCategoryLabel } from "@/lib/category";
 import { getCategoryLandingContent } from "@/lib/categoryLanding";
 import { listProducts } from "@/lib/dataStore";
@@ -186,6 +187,8 @@ export default async function SearchIntentPage({ params }: { params: Promise<{ s
           </div>
         </section>
       )}
+
+      {!products.length ? <SearchGuideEditorialBridge /> : null}
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]" aria-labelledby="search-checks-heading">
         <div>
