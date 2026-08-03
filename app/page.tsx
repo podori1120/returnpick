@@ -28,7 +28,7 @@ import { listProducts } from "@/lib/dataStore";
 import { getDiscoveryUpdates } from "@/lib/discoveryUpdates";
 import { getUseCaseMatches } from "@/lib/dealIntelligence";
 import { approvalSampleProduct } from "@/lib/approvalSample";
-import { homeCategoryDetails, homePurposeOptions } from "@/lib/homeDiscovery";
+import { homeCategoryDetails, homePurposeOptions, selectInitialPurposeId } from "@/lib/homeDiscovery";
 import { isDemoProduct, isPublicDealReady, isPublicDealVisible } from "@/lib/publicDeal";
 import type { Category } from "@/lib/types";
 
@@ -92,7 +92,7 @@ export default async function HomePage() {
           : null
     };
   });
-  const initialPurposeId = purposeItems.find((item) => item.count > 0)?.id ?? homePurposeOptions[0].id;
+  const initialPurposeId = selectInitialPurposeId(purposeItems);
 
   return (
     <main>

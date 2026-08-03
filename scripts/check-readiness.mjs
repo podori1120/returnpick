@@ -273,6 +273,7 @@ const requiredFiles = [
   "scripts/verify-provider-product-merge.mjs",
   "scripts/verify-scoring-rules.mjs",
   "scripts/verify-search-intent-landings.mjs",
+  "scripts/verify-home-purpose-selection.mjs",
   "scripts/verify-public-web-config.mjs",
   "scripts/verify-web-return-info.mjs",
   "scripts/verify-public-web-url-safety.mjs",
@@ -2557,10 +2558,12 @@ if (
       purposeExplorer.includes('role="tablist"') &&
       purposeExplorer.includes('role="tabpanel"') &&
       purposeExplorer.includes("aria-selected={selectedTab}") &&
-      purposeExplorer.includes('/deals?useCase=${selected.primaryUseCaseId}&sort=fit') &&
-      homePage.includes("fitScore") &&
-      purposeExplorer.includes("자동 수집 후보가 관리자 검수와 상품별 파트너스 링크 확인을 통과하면") &&
-      homePage.includes("approvalSampleProduct.detailPath"),
+       purposeExplorer.includes('/deals?useCase=${selected.primaryUseCaseId}&sort=fit') &&
+       homePage.includes("fitScore") &&
+       purposeExplorer.includes("자동 수집 후보가 관리자 검수와 상품별 파트너스 링크 확인을 통과하면") &&
+       homePage.includes("selectInitialPurposeId(purposeItems)") &&
+       homeDiscovery.includes("selectInitialPurposeId") &&
+       homePage.includes("approvalSampleProduct.detailPath"),
     "the homepage supports product search, keyboard-accessible purpose tabs, matched-deal comparison, and an honest editorial fallback before inventory exists",
     "required"
   );

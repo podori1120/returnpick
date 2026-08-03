@@ -16,6 +16,12 @@ export type HomePurposeOption = {
   guideHref: string;
 };
 
+export type HomePurposeInventoryState = {
+  id: HomePurposeId;
+  count: number;
+  editorialFallback?: unknown;
+};
+
 export const homePurposeOptions: HomePurposeOption[] = [
   {
     id: "study_work",
@@ -78,6 +84,10 @@ export const homePurposeOptions: HomePurposeOption[] = [
     guideHref: "/guide/safe-categories"
   }
 ];
+
+export function selectInitialPurposeId(items: ReadonlyArray<HomePurposeInventoryState>): HomePurposeId {
+  return items.find((item) => item.count > 0)?.id ?? items.find((item) => item.editorialFallback)?.id ?? homePurposeOptions[0].id;
+}
 
 export const homeCategoryDetails: Record<Category, { description: string }> = {
   laptop: { description: "RAM·SSD·배터리" },
