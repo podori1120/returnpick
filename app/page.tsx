@@ -80,7 +80,16 @@ export default async function HomePage() {
             verdict: topDeal.product.latest_score?.verdict ?? null,
             conditionGrade: topDeal.product.condition_grade
           }
-        : null
+        : null,
+      editorialFallback:
+        purpose.id === "cleaning"
+          ? {
+              href: approvalSampleProduct.detailPath,
+              label: "창문청소기 검수 내용 보기",
+              title: approvalSampleProduct.name,
+              description: "현재 실제 구매 경로와 상품 정보가 확인된 직접 검수 콘텐츠입니다. 가격·재고·구성품은 쿠팡 상품 페이지에서 최종 확인합니다."
+            }
+          : null
     };
   });
   const initialPurposeId = purposeItems.find((item) => item.count > 0)?.id ?? homePurposeOptions[0].id;

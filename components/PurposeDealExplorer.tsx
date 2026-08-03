@@ -26,10 +26,18 @@ export type PurposeDealSummary = {
   conditionGrade: string;
 };
 
+export type PurposeEditorialFallback = {
+  href: string;
+  label: string;
+  title: string;
+  description: string;
+};
+
 export type PurposeExplorerItem = {
   id: HomePurposeId;
   count: number;
   topDeal: PurposeDealSummary | null;
+  editorialFallback?: PurposeEditorialFallback | null;
 };
 
 const purposeIcons: Record<(typeof homePurposeOptions)[number]["icon"], LucideIcon> = {
@@ -50,7 +58,7 @@ export default function PurposeDealExplorer({
   const [selectedId, setSelectedId] = useState<HomePurposeId>(initialPurposeId);
   const selectedIndex = homePurposeOptions.findIndex((item) => item.id === selectedId);
   const selected = homePurposeOptions[selectedIndex] ?? homePurposeOptions[0];
-  const selectedMetrics = items.find((item) => item.id === selected.id) ?? { id: selected.id, count: 0, topDeal: null };
+  const selectedMetrics = items.find((item) => item.id === selected.id) ?? { id: selected.id, count: 0, topDeal: null, editorialFallback: null };
   const SelectedIcon = purposeIcons[selected.icon];
 
   function selectRelative(offset: number) {
@@ -163,6 +171,25 @@ export default function PurposeDealExplorer({
                     href={`/deals?useCase=${selected.primaryUseCaseId}&sort=fit`}
                   >
                     {selectedMetrics.count}개 비교
+                  </Link>
+                </div>
+              </>
+            ) : selectedMetrics.editorialFallback ? (
+              <>
+                <div className="flex items-center gap-2 text-lemon">
+                  <ShieldCheck size={18} aria-hidden />
+                  <p className="text-xs font-black">현재 바로 확인 가능한 직접 검수 콘텐츠</p>
+                </div>
+                <p className="mt-2 text-lg font-black leading-7">{selectedMetrics.editorialFallback.title}</p>
+                <p className="mt-2 text-sm font-semibold leading-6 text-white/70">
+                  {selectedMetrics.editorialFallback.description}
+                </p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <Link className="focus-ring inline-flex items-center gap-2 rounded-md bg-white px-4 py-3 text-sm font-black text-ink hover:bg-lemon" href={selectedMetrics.editorialFallback.href}>
+                    {selectedMetrics.editorialFallback.label} <ArrowRight size={16} aria-hidden />
+                  </Link>
+                  <Link className="focus-ring inline-flex items-center gap-2 rounded-md border border-white/25 px-4 py-3 text-sm font-black text-white hover:border-lemon hover:text-lemon" href={selected.guideHref}>
+                    구매 기준 보기 <ArrowRight size={16} aria-hidden />
                   </Link>
                 </div>
               </>
