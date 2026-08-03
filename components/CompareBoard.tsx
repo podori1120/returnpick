@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Loader2, Scale, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, Scale, Share2, Trash2 } from "lucide-react";
 import AffiliateButton from "@/components/AffiliateButton";
 import AffiliateNotice from "@/components/AffiliateNotice";
-import { getStoredJsonArray, setStoredJsonArray } from "@/lib/clientTracking";
+import { getStoredJsonArray, setStoredJsonArray, trackAffiliateEvent } from "@/lib/clientTracking";
 import { getCoupangOutboundLink } from "@/lib/coupangLink";
 import { formatPercent, formatPrice } from "@/lib/format";
 import { formatProductSpecSummary } from "@/lib/productSpecs";
@@ -17,9 +17,38 @@ type StoredCompareItem = {
 };
 
 const storageKey = "returnpick_compare_deals";
+const maxCompareItems = 12;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const sharedCompareTitle = "공유된 비교 상품";
 
 function readCompareItems(): StoredCompareItem[] {
-  return getStoredJsonArray<StoredCompareItem>(storageKey).filter((item) => item.id && item.title);
+  return getStoredJsonArray<StoredCompareItem>(storageKey).filter(
+    (item) => typeof item?.id === "string" && item.id && typeof item?.title === "string" && item.title
+  );
+}
+
+function readUrlCompareItems(url: URL): StoredCompareItem[] {
+  const ids = Array.from(
+    new Set(
+      (url.searchParams.get("ids") ?? "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter((id) => uuidPattern.test(id))
+    )
+  ).slice(0, maxCompareItems);
+
+  return ids.map((id) => ({ id, title: sharedCompareTitle }));
+}
+
+function mergeCompareItems(sharedItems: StoredCompareItem[], storedItems: StoredCompareItem[]) {
+  const seen = new Set<string>();
+  return [...sharedItems, ...storedItems]
+    .filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    })
+    .slice(0, maxCompareItems);
 }
 
 function writeCompareItems(items: StoredCompareItem[]) {
@@ -40,12 +69,18 @@ export default function CompareBoard() {
   const [products, setProducts] = useState<PublicDeal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [shareStatus, setShareStatus] = useState("");
 
   useEffect(() => {
-    setItems(readCompareItems());
+    const sharedItems = readUrlCompareItems(new URL(window.location.href));
+    const mergedItems = mergeCompareItems(sharedItems, readCompareItems());
+    if (sharedItems.length) writeCompareItems(mergedItems);
+    setItems(mergedItems);
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function load() {
       setLoading(true);
       setError("");
@@ -58,21 +93,32 @@ export default function CompareBoard() {
       try {
         const response = await fetch(`/api/products/compare?ids=${encodeURIComponent(ids.join(","))}`, { cache: "no-store" });
         const body = (await response.json().catch(() => ({}))) as { products?: PublicDeal[]; error?: string; message?: string };
+        if (cancelled) return;
         if (!response.ok || body.error) {
           setProducts([]);
           setError(body.message ?? body.error ?? "비교 상품 정보를 불러오지 못했습니다.");
           return;
         }
-        setProducts(body.products ?? []);
+        const loadedProducts = body.products ?? [];
+        const updatedItems = items.map((item) => {
+          const product = loadedProducts.find((candidate) => candidate.id === item.id);
+          return product ? { ...item, title: product.title } : item;
+        });
+        if (updatedItems.some((item, index) => item.title !== items[index]?.title)) writeCompareItems(updatedItems);
+        setProducts(loadedProducts);
       } catch {
+        if (cancelled) return;
         setProducts([]);
         setError("네트워크 문제로 비교 상품 정보를 불러오지 못했습니다.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     load();
+    return () => {
+      cancelled = true;
+    };
   }, [items]);
 
   const best = useMemo(() => {
@@ -86,6 +132,50 @@ export default function CompareBoard() {
 
   const unavailableItems = error ? [] : items.filter((item) => !products.some((product) => product.id === item.id));
   const recommendedOutboundLink = best.byScore ? getCoupangOutboundLink(best.byScore) : null;
+  const shareableProductIds = products.filter((product) => uuidPattern.test(product.id)).map((product) => product.id);
+
+  function buildShareUrl() {
+    if (!shareableProductIds.length) return null;
+    const shareUrl = new URL("/compare", window.location.origin);
+    shareUrl.searchParams.set("ids", shareableProductIds.join(","));
+    return shareUrl.toString();
+  }
+
+  async function shareCompare() {
+    const shareUrl = buildShareUrl();
+    if (!shareUrl) {
+      setShareStatus("공개된 비교 상품이 없어 공유할 수 없습니다.");
+      return;
+    }
+
+    const canUseWebShare = typeof navigator.share === "function";
+    try {
+      if (canUseWebShare) {
+        await navigator.share({
+          title: "ReturnPick 비교함",
+          text: "ReturnPick에서 비교한 공개 상품입니다.",
+          url: shareUrl
+        });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        throw new Error("COMPARE_SHARE_UNAVAILABLE");
+      }
+
+      try {
+        trackAffiliateEvent({ eventType: "share_copy", channel: "web_compare", context: "compare_share" });
+      } catch {
+        // Analytics is best-effort and must not block a completed share or copy.
+      }
+      setShareStatus(canUseWebShare ? "비교 링크를 공유했습니다." : "비교 링크를 복사했습니다.");
+    } catch (shareError) {
+      if (shareError instanceof Error && shareError.name === "AbortError") {
+        setShareStatus("공유를 취소했습니다.");
+        return;
+      }
+      setShareStatus("공유에 실패했습니다. 권한을 확인하거나 잠시 후 다시 시도해 주세요.");
+    }
+  }
 
   function removeItem(id: string) {
     const next = readCompareItems().filter((item) => item.id !== id);
@@ -115,7 +205,7 @@ export default function CompareBoard() {
           {error ? "비교 정보를 불러오지 못했습니다" : items.length ? "비교한 상품이 공개 목록에서 사라졌습니다" : "아직 비교할 상품이 없습니다"}
         </h2>
         <p className="mt-2 text-sm font-semibold leading-6 text-steel">
-          {error || (items.length ? "비공개되었거나 만료된 상품을 비교함에서 제거한 뒤 새로운 딜을 비교해 보세요." : "딜 목록이나 상세 페이지에서 비교함을 눌러 최대 6개까지 모아볼 수 있습니다.")}
+          {error || (items.length ? "비공개되었거나 만료된 상품을 비교함에서 제거한 뒤 새로운 딜을 비교해 보세요." : "딜 목록이나 상세 페이지에서 비교함을 눌러 모아보세요. 공유 링크는 공개 상품을 최대 12개까지 담을 수 있습니다.")}
         </p>
         {unavailableItems.length ? (
           <div className="mx-auto mt-5 max-w-lg rounded-lg border border-lemon bg-lemon/20 p-4 text-left">
@@ -136,12 +226,21 @@ export default function CompareBoard() {
           <Link className="focus-ring inline-flex rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink" href="/deals">
             딜 보러가기
           </Link>
+          <button
+            className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-4 py-3 text-sm font-black hover:bg-mist disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!shareableProductIds.length}
+            onClick={() => void shareCompare()}
+            type="button"
+          >
+            <Share2 size={16} aria-hidden /> 비교 링크 공유
+          </button>
           {items.length ? (
             <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-4 py-3 text-sm font-black hover:bg-mist" onClick={clearItems} type="button">
               <Trash2 size={16} aria-hidden /> 비교함 비우기
             </button>
           ) : null}
         </div>
+        {shareStatus ? <p className="mt-3 text-xs font-bold text-steel" role="status" aria-live="polite">{shareStatus}</p> : null}
       </section>
     );
   }
@@ -155,10 +254,21 @@ export default function CompareBoard() {
             <h2 className="text-xl font-black">구매 전 최종 비교</h2>
             <p className="mt-1 text-sm font-semibold text-steel">점수, 가격 차이, 반품등급, 제휴 링크 준비 상태를 한 화면에서 봅니다.</p>
           </div>
-          <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-sm font-black hover:bg-mist" onClick={clearItems} type="button">
-            <Trash2 size={16} aria-hidden /> 모두 비우기
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-sm font-black hover:bg-mist disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!shareableProductIds.length}
+              onClick={() => void shareCompare()}
+              type="button"
+            >
+              <Share2 size={16} aria-hidden /> 비교 링크 공유
+            </button>
+            <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-sm font-black hover:bg-mist" onClick={clearItems} type="button">
+              <Trash2 size={16} aria-hidden /> 모두 비우기
+            </button>
+          </div>
         </div>
+        {shareStatus ? <p className="mt-2 text-xs font-bold text-steel" role="status" aria-live="polite">{shareStatus}</p> : null}
         {unavailableItems.length ? (
           <div className="mt-4 rounded-lg border border-lemon bg-lemon/20 p-3" role="status">
             <div className="flex flex-wrap items-center justify-between gap-2">

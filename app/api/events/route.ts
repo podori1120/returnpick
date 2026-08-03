@@ -16,6 +16,15 @@ const manualTrackingSurfaces = [
     shareCopyChannels: []
   },
   {
+    context: "compare_share",
+    pathname: "/compare",
+    impressionChannels: [],
+    affiliateClickChannels: [],
+    detailViewChannels: [],
+    telegramDetailChannels: [],
+    shareCopyChannels: ["web_compare"]
+  },
+  {
     context: "editorial_pick",
     pathname: "/picks/novatech-s1-window-cleaner",
     impressionChannels: [],
@@ -107,10 +116,10 @@ function getPublicRequestOrigin(request: Request) {
 }
 
 function isManualAffiliateTrackingRequest(request: Request, body: Record<string, unknown>, channel: string | null) {
-  if (!isCoupangPartnersLink(process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL)) return false;
-
   const surface = manualTrackingSurfaces.find((item) => item.context === body.context);
   if (!surface) return false;
+  const isCompareShare = surface.context === "compare_share" && body.event_type === "share_copy";
+  if (!isCompareShare && !isCoupangPartnersLink(process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL)) return false;
 
   const allowedChannels: readonly string[] =
     body.event_type === "impression"

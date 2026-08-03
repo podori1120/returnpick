@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { listProducts } from "@/lib/dataStore";
-import { isPublicDealVisible, toPublicDeal } from "@/lib/publicDeal";
+import { getDealFreshness } from "@/lib/dealFreshness";
+import { isDemoProduct, isPublicDealReady, toPublicDeal } from "@/lib/publicDeal";
+import type { ProductWithScore } from "@/lib/types";
 
 const maxCompareItems = 12;
+
+function isPublicCompareProduct(product: ProductWithScore) {
+  return !isDemoProduct(product) && isPublicDealReady(product) && getDealFreshness(product).status !== "stale";
+}
 
 function compareProductsErrorResponse(error: unknown) {
   const message = error instanceof Error && error.message ? error.message.slice(0, 300) : "UNKNOWN_COMPARE_PRODUCTS_ERROR";
@@ -26,7 +32,7 @@ export async function GET(request: Request) {
 
     const idSet = new Set(ids);
     const products = (await listProducts({ published: true }))
-      .filter((product) => isPublicDealVisible(product) && idSet.has(product.id))
+      .filter((product) => isPublicCompareProduct(product) && idSet.has(product.id))
       .sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id))
       .map(toPublicDeal);
 
