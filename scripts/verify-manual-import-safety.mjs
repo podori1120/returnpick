@@ -45,6 +45,8 @@ assert.match(bulkRoute, /SOURCING_SCORE_SAVE_FAILED/, "bulk intake exposes a bou
 assert.match(singleUi, /operator_next_action/, "single intake renders the next operator action");
 assert.match(bulkUi, /SOURCING_SCORE_SAVE_FAILED/, "bulk intake labels score persistence warnings");
 assert.match(bulkUi, /openAdminCandidateQueue\("review", recentProductIds\)/, "bulk intake hands imported rows to the focused review queue");
+assert.match(bulkUi, /isUsableAffiliateUrl\(value\)/, "bulk intake only offers the link queue for usable Partners URLs");
+assert.match(bulkUi, /recentAffiliateLinkCount > 0/, "bulk intake link queue CTA requires a usable affiliate URL row");
 assert.match(navigation, /productIds\?: string\[\]/, "admin candidate navigation carries imported product IDs");
 assert.match(navigation, /productIds: Array\.from\(new Set\(productIds\.filter\(Boolean\)\)\)/, "admin candidate navigation de-duplicates focused IDs");
 assert.match(candidateUi, /focusProductIds/, "candidate table supports a focused imported-candidate view");

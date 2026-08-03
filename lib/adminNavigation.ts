@@ -37,6 +37,10 @@ export function openAdminCandidateQueue(queue: AdminCandidateQueue, productIds: 
   }, 80);
 }
 
+export function openAdminAffiliateLinkQueue() {
+  scrollToAdminAnchor("admin-affiliate-links");
+}
+
 function highlightAdminAnchor(target: HTMLElement) {
   const root = target.ownerDocument;
   root.querySelectorAll(`.${ADMIN_ANCHOR_HIGHLIGHT_CLASS}`).forEach((element) => {
