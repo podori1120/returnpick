@@ -2368,7 +2368,7 @@ if (fileExists("app/api/events/route.ts")) {
       eventsRoute.includes("isPublicDealVisible") &&
       eventsRoute.includes("PRODUCT_ID_REQUIRED") &&
       eventsRoute.includes("PRODUCT_NOT_PUBLIC_READY") &&
-      normalizedEventsRoute.includes("product_id: productId,\n      event_type: eventType,\n      channel,\n      context,\n      anon_session_id"),
+      normalizedEventsRoute.includes("product_id: product.id,\n      event_type: eventType,\n      channel,\n      context,\n      anon_session_id"),
     "affiliate event tracking stores events only for published affiliate-ready products and preserves content surface context",
     "required"
   );
@@ -2390,10 +2390,10 @@ if (fileExists("app/api/products/compare/route.ts")) {
   const compareRoute = readText("app/api/products/compare/route.ts");
   check(
     "compare api: safe public fallback",
-    compareRoute.includes("COMPARE_PRODUCTS_FAILED") &&
-      compareRoute.includes("compareProductsErrorResponse") &&
-      compareRoute.includes("products: []") &&
-      compareRoute.includes("isPublicDealVisible"),
+      compareRoute.includes("COMPARE_PRODUCTS_FAILED") &&
+        compareRoute.includes("compareProductsErrorResponse") &&
+        compareRoute.includes("products: []") &&
+        compareRoute.includes("isPublicCompareDeal"),
     "public compare API returns an empty safe payload on lookup failures and exposes only public affiliate-ready deals",
     "required"
   );
@@ -4701,6 +4701,8 @@ if (fileExists("lib/publicDeal.ts")) {
       publicDeal.includes('process.env.NODE_ENV === "production"') &&
       publicDeal.includes("!isDemoProduct(product)") &&
       publicDeal.includes("isPublicDealReady") &&
+      publicDeal.includes("isPublicCompareDeal") &&
+      publicDeal.includes("getDealFreshness(product).status !== \"stale\"") &&
       publicDeal.includes("getCustomerPublishReadiness(product).ready") &&
       publicDeal.includes('product.sourcing_status === "published"'),
     "production deal surfaces require published customer-ready products, while synthetic fixtures are local-only",

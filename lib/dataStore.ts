@@ -9,6 +9,7 @@ import { getCustomerPublishReadiness, getDealQuality } from "@/lib/quality";
 import { getNaverPriceTrust } from "@/lib/naverPriceTrust";
 import { isUsableProductImageUrl } from "@/lib/productImageUrl";
 import { isDemoProduct, isLocalDemoModeEnabled } from "@/lib/publicDeal";
+import { compareProductIdsEqual } from "@/lib/compareIdentity";
 import { calculateDealScore, getLatestScore } from "@/lib/scoring";
 import { isSourcingExecutionRun } from "@/lib/sourcingRunKinds";
 import { getSupabaseServiceClient } from "@/lib/supabase";
@@ -604,7 +605,7 @@ export async function getProductById(id: string) {
     return data ? normalizeProductFromDb(data as ProductWithScore) : null;
   }
 
-  const product = memoryProducts.find((item) => item.id === id);
+  const product = memoryProducts.find((item) => compareProductIdsEqual(item.id, id));
   return product ? attachMemoryScore(product) : null;
 }
 

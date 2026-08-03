@@ -1,5 +1,6 @@
 import { getCategoryLabel } from "@/lib/category";
 import { getDealPrice, getDiscountRate, getPrimaryUseCase, getReferencePrice } from "@/lib/dealIntelligence";
+import { getDealFreshness } from "@/lib/dealFreshness";
 import { getCustomerPublishReadiness, getDealQuality } from "@/lib/quality";
 import { getLatestScore } from "@/lib/scoring";
 import { getNaverPriceTrust, type NaverPriceTrustStatus } from "@/lib/naverPriceTrust";
@@ -119,6 +120,11 @@ export function isPublicDealVisible(product: ProductWithScore) {
     return isLocalDemoModeEnabled() && product.is_published && product.sourcing_status === "published";
   }
   return isPublicDealReady(product);
+}
+
+/** Compare surfaces use the same customer-ready gate as the compare API. */
+export function isPublicCompareDeal(product: ProductWithScore) {
+  return isPublicDealVisible(product) && !isDemoProduct(product) && isPublicDealReady(product) && getDealFreshness(product).status !== "stale";
 }
 
 export function toPublicDeal(product: ProductWithScore): PublicDeal {

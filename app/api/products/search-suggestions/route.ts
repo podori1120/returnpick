@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCategoryLabel } from "@/lib/category";
 import { listProducts } from "@/lib/dataStore";
 import { matchesProductSearch, normalizeProductSearchText } from "@/lib/productSearch";
-import { isPublicDealVisible } from "@/lib/publicDeal";
+import { isPublicCompareDeal, isPublicDealVisible } from "@/lib/publicDeal";
 
 export const dynamic = "force-dynamic";
 
@@ -18,10 +18,12 @@ function response(body: Record<string, unknown>) {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const query = normalizeProductSearchText(url.searchParams.get("q") ?? "").slice(0, 80);
+  const surface = url.searchParams.get("surface");
   if (query.length < 2) return response({ items: [] });
 
+  const visibilityFilter = surface === "compare" ? isPublicCompareDeal : isPublicDealVisible;
   const products = (await listProducts({ published: true }))
-    .filter(isPublicDealVisible)
+    .filter(visibilityFilter)
     .filter((product) => matchesProductSearch(product, query))
     .sort((a, b) => {
       const aTitle = normalizeProductSearchText(a.title);

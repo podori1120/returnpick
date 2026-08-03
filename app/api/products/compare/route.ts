@@ -1,20 +1,10 @@
 import { NextResponse } from "next/server";
 import { getCompareProductsErrorPayload } from "@/lib/compareApiError";
+import { MAX_COMPARE_ITEMS, normalizeCompareProductId } from "@/lib/compareIdentity";
 import { listProducts } from "@/lib/dataStore";
-import { getDealFreshness } from "@/lib/dealFreshness";
-import { isDemoProduct, isPublicDealReady, isPublicDealVisible, toPublicDeal } from "@/lib/publicDeal";
-import type { ProductWithScore } from "@/lib/types";
+import { isPublicCompareDeal, toPublicDeal } from "@/lib/publicDeal";
 
-const maxCompareItems = 12;
-
-function isPublicCompareProduct(product: ProductWithScore) {
-  return (
-    isPublicDealVisible(product) &&
-    !isDemoProduct(product) &&
-    isPublicDealReady(product) &&
-    getDealFreshness(product).status !== "stale"
-  );
-}
+const maxCompareItems = MAX_COMPARE_ITEMS;
 
 function compareProductsErrorResponse(error: unknown) {
   const { message } = getCompareProductsErrorPayload(error);
@@ -28,7 +18,7 @@ export async function GET(request: Request) {
       new Set(
         (url.searchParams.get("ids") ?? "")
           .split(",")
-          .map((id) => id.trim())
+          .map(normalizeCompareProductId)
           .filter(Boolean)
           .slice(0, maxCompareItems)
       )
@@ -38,8 +28,8 @@ export async function GET(request: Request) {
 
     const idSet = new Set(ids);
     const products = (await listProducts({ published: true }))
-      .filter((product) => isPublicCompareProduct(product) && idSet.has(product.id))
-      .sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id))
+      .filter((product) => isPublicCompareDeal(product) && idSet.has(normalizeCompareProductId(product.id)))
+      .sort((a, b) => ids.indexOf(normalizeCompareProductId(a.id)) - ids.indexOf(normalizeCompareProductId(b.id)))
       .map(toPublicDeal);
 
     return NextResponse.json({ products });

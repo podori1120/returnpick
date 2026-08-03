@@ -5,8 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Loader2, Scale, Share2, Trash2 } from "lucide-react";
 import AffiliateButton from "@/components/AffiliateButton";
 import AffiliateNotice from "@/components/AffiliateNotice";
+import CompareProductPicker, { type CompareProductSuggestion } from "@/components/CompareProductPicker";
 import { getStoredJsonArray, setStoredJsonArray, trackAffiliateEvent } from "@/lib/clientTracking";
 import { getCoupangOutboundLink } from "@/lib/coupangLink";
+import { COMPARE_UUID_PATTERN, compareProductIdsEqual, MAX_COMPARE_ITEMS, normalizeCompareProductId } from "@/lib/compareIdentity";
 import { formatPercent, formatPrice } from "@/lib/format";
 import { formatProductSpecSummary } from "@/lib/productSpecs";
 import type { PublicDeal } from "@/lib/publicDeal";
@@ -17,14 +19,14 @@ type StoredCompareItem = {
 };
 
 const storageKey = "returnpick_compare_deals";
-const maxCompareItems = 12;
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const maxCompareItems = MAX_COMPARE_ITEMS;
+const uuidPattern = COMPARE_UUID_PATTERN;
 const sharedCompareTitle = "공유된 비교 상품";
 
 function readCompareItems(): StoredCompareItem[] {
   return getStoredJsonArray<StoredCompareItem>(storageKey).filter(
     (item) => typeof item?.id === "string" && item.id && typeof item?.title === "string" && item.title
-  );
+  ).map((item) => ({ ...item, id: normalizeCompareProductId(item.id) })).filter((item) => uuidPattern.test(item.id));
 }
 
 function readUrlCompareItems(url: URL): StoredCompareItem[] {
@@ -32,7 +34,7 @@ function readUrlCompareItems(url: URL): StoredCompareItem[] {
     new Set(
       (url.searchParams.get("ids") ?? "")
         .split(",")
-        .map((id) => id.trim())
+        .map(normalizeCompareProductId)
         .filter((id) => uuidPattern.test(id))
     )
   ).slice(0, maxCompareItems);
@@ -43,6 +45,7 @@ function readUrlCompareItems(url: URL): StoredCompareItem[] {
 function mergeCompareItems(sharedItems: StoredCompareItem[], storedItems: StoredCompareItem[]) {
   const seen = new Set<string>();
   return [...sharedItems, ...storedItems]
+    .map((item) => ({ ...item, id: normalizeCompareProductId(item.id) }))
     .filter((item) => {
       if (seen.has(item.id)) return false;
       seen.add(item.id);
@@ -52,7 +55,10 @@ function mergeCompareItems(sharedItems: StoredCompareItem[], storedItems: Stored
 }
 
 function writeCompareItems(items: StoredCompareItem[]) {
-  setStoredJsonArray(storageKey, items);
+  const normalizedItems = items
+    .map((item) => ({ ...item, id: normalizeCompareProductId(item.id) }))
+    .filter((item) => uuidPattern.test(item.id));
+  setStoredJsonArray(storageKey, normalizedItems);
   try {
     window.dispatchEvent(new Event("returnpick_compare_deals_changed"));
   } catch {
@@ -70,6 +76,7 @@ export default function CompareBoard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [shareStatus, setShareStatus] = useState("");
+  const [pickerStatus, setPickerStatus] = useState("");
 
   useEffect(() => {
     const sharedItems = readUrlCompareItems(new URL(window.location.href));
@@ -101,7 +108,7 @@ export default function CompareBoard() {
         }
         const loadedProducts = body.products ?? [];
         const updatedItems = items.map((item) => {
-          const product = loadedProducts.find((candidate) => candidate.id === item.id);
+          const product = loadedProducts.find((candidate) => compareProductIdsEqual(candidate.id, item.id));
           return product ? { ...item, title: product.title } : item;
         });
         if (updatedItems.some((item, index) => item.title !== items[index]?.title)) writeCompareItems(updatedItems);
@@ -130,9 +137,11 @@ export default function CompareBoard() {
     return { byScore, byPrice, byDiscount };
   }, [products]);
 
-  const unavailableItems = error ? [] : items.filter((item) => !products.some((product) => product.id === item.id));
+  const unavailableItems = error ? [] : items.filter((item) => !products.some((product) => compareProductIdsEqual(product.id, item.id)));
   const recommendedOutboundLink = best.byScore ? getCoupangOutboundLink(best.byScore) : null;
-  const shareableProductIds = products.filter((product) => uuidPattern.test(product.id)).map((product) => product.id);
+  const shareableProductIds = products
+    .filter((product) => uuidPattern.test(product.id))
+    .map((product) => product.id);
 
   function buildShareUrl() {
     if (!shareableProductIds.length) return null;
@@ -178,7 +187,8 @@ export default function CompareBoard() {
   }
 
   function removeItem(id: string) {
-    const next = readCompareItems().filter((item) => item.id !== id);
+    const normalizedId = normalizeCompareProductId(id);
+    const next = readCompareItems().filter((item) => !compareProductIdsEqual(item.id, normalizedId));
     writeCompareItems(next);
     setItems(next);
   }
@@ -186,6 +196,29 @@ export default function CompareBoard() {
   function clearItems() {
     writeCompareItems([]);
     setItems([]);
+  }
+
+  function addCompareProduct(product: CompareProductSuggestion) {
+    const normalizedId = normalizeCompareProductId(product.id);
+    if (!uuidPattern.test(normalizedId)) {
+      setPickerStatus("공개 상품 목록에서 선택해 주세요.");
+      return;
+    }
+
+    const current = readCompareItems();
+    if (current.some((item) => compareProductIdsEqual(item.id, normalizedId))) {
+      setPickerStatus(`\"${product.title}\"은(는) 이미 비교함에 있습니다.`);
+      return;
+    }
+    if (current.length >= maxCompareItems) {
+      setPickerStatus(`비교함은 최대 ${maxCompareItems}개까지 담을 수 있습니다.`);
+      return;
+    }
+
+    const next = [...current, { id: normalizedId, title: product.title }];
+    writeCompareItems(next);
+    setItems(next);
+    setPickerStatus(`\"${product.title}\"을(를) 비교함에 추가했습니다.`);
   }
 
   if (loading) {
@@ -222,6 +255,10 @@ export default function CompareBoard() {
             </ul>
           </div>
         ) : null}
+        <div className="mx-auto mt-6 w-full max-w-2xl text-left">
+          <CompareProductPicker currentCount={items.length} maxItems={maxCompareItems} onSelect={addCompareProduct} />
+          {pickerStatus ? <p className="mt-2 text-xs font-bold text-steel" role="status" aria-live="polite">{pickerStatus}</p> : null}
+        </div>
         <div className="mt-5 flex flex-wrap justify-center gap-2">
           <Link className="focus-ring inline-flex rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink" href="/deals">
             딜 보러가기
@@ -282,6 +319,10 @@ export default function CompareBoard() {
             </div>
           </div>
         ) : null}
+        <div className="mt-5 text-left">
+          <CompareProductPicker currentCount={items.length} maxItems={maxCompareItems} onSelect={addCompareProduct} />
+          {pickerStatus ? <p className="mt-2 text-xs font-bold text-steel" role="status" aria-live="polite">{pickerStatus}</p> : null}
+        </div>
         {best.byScore ? (
           <div className="mt-4 space-y-3">
             <div className="grid gap-3 md:grid-cols-3">
@@ -360,15 +401,15 @@ export default function CompareBoard() {
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="rounded-lg bg-mist p-3">
                   <p className="text-xs font-bold text-steel">점수</p>
-                  <p className={valueClass(best.byScore?.id === product.id)}>{product.score ?? 0}점</p>
+                  <p className={valueClass(Boolean(best.byScore && compareProductIdsEqual(best.byScore.id, product.id)))}>{product.score ?? 0}점</p>
                 </div>
                 <div className="rounded-lg bg-mist p-3">
                   <p className="text-xs font-bold text-steel">할인율</p>
-                  <p className={valueClass(best.byDiscount?.id === product.id)}>{formatPercent(product.discount_rate)}</p>
+                  <p className={valueClass(Boolean(best.byDiscount && compareProductIdsEqual(best.byDiscount.id, product.id)))}>{formatPercent(product.discount_rate)}</p>
                 </div>
                 <div className="rounded-lg bg-mist p-3">
                   <p className="text-xs font-bold text-steel">구매가</p>
-                  <p className={valueClass(best.byPrice?.id === product.id)}>{formatPrice(product.deal_price)}</p>
+                  <p className={valueClass(Boolean(best.byPrice && compareProductIdsEqual(best.byPrice.id, product.id)))}>{formatPrice(product.deal_price)}</p>
                 </div>
                 <div className="rounded-lg bg-mist p-3">
                   <p className="text-xs font-bold text-steel">반품등급</p>

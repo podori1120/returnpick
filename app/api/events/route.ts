@@ -203,7 +203,7 @@ export async function POST(request: Request) {
     }
 
     const event = await createAffiliateEvent({
-      product_id: productId,
+      product_id: product.id,
       event_type: eventType,
       channel,
       context,

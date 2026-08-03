@@ -23,7 +23,10 @@ function check(name, ok, detail) {
 }
 
 const compareBoard = readText("components/CompareBoard.tsx");
+const comparePicker = readText("components/CompareProductPicker.tsx");
+const compareButton = readText("components/CompareButton.tsx");
 const compareRoute = readText("app/api/products/compare/route.ts");
+const searchSuggestionsRoute = readText("app/api/products/search-suggestions/route.ts");
 const eventRoute = readText("app/api/events/route.ts");
 const packageText = readText("package.json");
 let packageJson = {};
@@ -38,11 +41,73 @@ const shareBlockEnd = compareBoard.indexOf("if (loading)", shareBlockStart);
 const shareBlock = shareBlockStart >= 0 && shareBlockEnd > shareBlockStart ? compareBoard.slice(shareBlockStart, shareBlockEnd) : "";
 
 check(
+  "compare product picker search contract",
+  includesAll(comparePicker, [
+    "role=\"combobox\"",
+    "role=\"listbox\"",
+    "aria-activedescendant",
+    "AbortController",
+    "controller.abort()",
+    "window.setTimeout",
+    "search-suggestions?q=",
+    "surface=compare",
+    "onSelect(item)"
+  ]) && !comparePicker.includes("router.push") && !comparePicker.includes("window.location"),
+  "the picker debounces public suggestions, supports keyboard listbox selection, aborts stale requests, and does not navigate"
+);
+
+check(
+  "compare picker eligibility gate",
+  includesAll(searchSuggestionsRoute, [
+    "const surface = url.searchParams.get(\"surface\")",
+    "const visibilityFilter = surface === \"compare\" ? isPublicCompareDeal : isPublicDealVisible",
+    ".filter(visibilityFilter)"
+  ]) &&
+    includesAll(compareRoute, [
+      'import { isPublicCompareDeal, toPublicDeal } from "@/lib/publicDeal"',
+      ".filter((product) => isPublicCompareDeal(product) && idSet.has(normalizeCompareProductId(product.id)))",
+      ".sort((a, b) => ids.indexOf(normalizeCompareProductId(a.id)) - ids.indexOf(normalizeCompareProductId(b.id)))",
+      ".map(toPublicDeal)"
+    ]),
+  "compare search suggestions and compare lookup share the same fresh, non-demo, customer-ready eligibility gate"
+);
+
+check(
+  "compare picker integration",
+  (compareBoard.match(/<CompareProductPicker\b/g) ?? []).length === 2 &&
+    includesAll(compareBoard, [
+      "from \"@/components/CompareProductPicker\";",
+      "function addCompareProduct",
+      'from "@/lib/compareIdentity"',
+      "compareProductIdsEqual",
+      "onSelect={addCompareProduct}",
+      "const current = readCompareItems();",
+      "const normalizedId = normalizeCompareProductId(product.id)",
+      "current.some((item) => compareProductIdsEqual(item.id, normalizedId))",
+      "current.length >= maxCompareItems",
+      "const next = [...current, { id: normalizedId, title: product.title }]",
+      "writeCompareItems(next)",
+      "setItems(next)",
+      "setPickerStatus"
+    ]),
+  "the picker is rendered in both board states and selected public ids use existing storage with duplicate and 12-item-cap feedback"
+);
+
+check(
+  "compare cross-surface capacity",
+  includesAll(compareBoard, ["MAX_COMPARE_ITEMS", "const maxCompareItems = MAX_COMPARE_ITEMS"]) &&
+    includesAll(compareButton, ["MAX_COMPARE_ITEMS", "items.length >= MAX_COMPARE_ITEMS", "비교함은 최대"]) &&
+    !compareButton.includes("slice(0, 6)"),
+  "detail-page compare additions share the 12-item cap and refuse overflow without discarding existing selections"
+);
+
+check(
   "compare URL ids parsing",
   includesAll(compareBoard, [
     "new URL(window.location.href)",
     "searchParams.get(\"ids\")",
     ".split(\",\")",
+    ".map(normalizeCompareProductId)",
     "uuidPattern.test(id)",
     ".slice(0, maxCompareItems)",
     "mergeCompareItems(sharedItems, readCompareItems())"
@@ -94,12 +159,11 @@ check(
   "public compare API gate",
   includesAll(compareRoute, [
     "listProducts({ published: true })",
-    "function isPublicCompareProduct(product: ProductWithScore)",
-    "!isDemoProduct(product)",
-    "isPublicDealReady(product)",
-    "getDealFreshness(product).status !== \"stale\"",
-    ".filter((product) => isPublicCompareProduct(product) && idSet.has(product.id))",
-    "const maxCompareItems = 12"
+    "isPublicCompareDeal",
+    ".map(normalizeCompareProductId)",
+    ".filter((product) => isPublicCompareDeal(product) && idSet.has(normalizeCompareProductId(product.id)))",
+    "import { MAX_COMPARE_ITEMS, normalizeCompareProductId } from \"@/lib/compareIdentity\"",
+    "const maxCompareItems = MAX_COMPARE_ITEMS"
   ]),
   "published, non-demo, public-ready, and non-stale filtering remains enforced by the compare API"
 );
@@ -119,8 +183,10 @@ check(
 
 check(
   "package script",
-  packageJson?.scripts?.["compare:check"] === "node scripts/verify-compare-sharing.mjs",
-  "npm run compare:check points to this static contract check"
+  packageJson?.scripts?.["compare:check"] === "node scripts/verify-compare-sharing.mjs" &&
+    typeof packageJson?.scripts?.["compare:identity:check"] === "string" &&
+    packageJson.scripts["compare:identity:check"].includes("scripts/verify-compare-identity.mjs"),
+  "compare sharing and mixed-case identity checks are wired as npm scripts"
 );
 
 console.log("ReturnPick compare sharing contract check");
