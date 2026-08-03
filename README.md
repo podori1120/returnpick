@@ -212,7 +212,8 @@ npm run public-web-detail:check
 - `text/html` 또는 `application/xhtml+xml` 응답만 읽고, HTML 본문은 페이지당 750KB, robots.txt는 250KB까지만 읽음
 - 검색 URL이나 robots.txt가 리다이렉트하면 자동 추적하지 않고 `REDIRECT_BLOCKED`로 차단
 - HTML에서 공개 링크 텍스트의 반품/리퍼/재포장 문구를 우선 참고하고, 반품 문구가 없는 상품형 링크도 가격·스펙 후보로 제한적으로 수집
-- 반품 문구가 없는 후보는 `candidate_kind=product_without_return_evidence`로 구분하며 `condition_grade=확인필요`, `return_price=null`을 유지합니다. JSON-LD `Product`는 공개 `offers` 가격이 있을 때만 같은 방식으로 후보화합니다.
+- 반품 문구가 없는 후보는 `candidate_kind=product_without_return_evidence`로 구분하며 `condition_grade=확인필요`, `return_price=null`을 유지합니다. `판매가`·`할인가`·`정가`처럼 명시적으로 라벨된 일반 가격은 가격·스펙 검수 후보의 `source_price`로 사용할 수 있지만, 반품등급과 반품가는 명시적 근거가 있을 때까지 `확인필요` 또는 `null`로 남깁니다. JSON-LD `Product`는 공개 `offers` 가격이 있을 때만 같은 방식으로 후보화합니다.
+- 상세 페이지에 본 상품의 일반 가격처럼 서로 다른 라벨 가격이 여러 개 있으면 어느 가격이 본 상품인지 자동 판단하지 않고 상세 가격 보강을 보류합니다. 검색 결과에서 이미 확인된 `source_price`는 유지하고, 기존 가격이 없을 때만 `source_price=null`로 남겨 관리자가 본 상품 가격을 확인한 뒤 보완해야 합니다. 추천·연관상품 영역의 가격은 본 상품 가격 후보에서 제외합니다.
 - 검색 결과에서 발견한 allowlist 상품 링크 중 최대 3개의 상세 페이지를 추가로 확인해 상세에만 있는 반품등급·반품가·재고 문구를 보강
 - 상세 페이지를 읽을 때도 같은 `robots.txt`, allowlist, Crawl-delay, 수동 리다이렉트 차단, 750KB 본문 제한을 다시 적용
 - 상세 페이지에서 반품 근거를 찾지 못하면 기존 값이나 `확인필요`를 유지하고 숫자를 추정하지 않으며, 보강 근거는 `raw_json.web_return_info.detail_page`에 남김
@@ -272,7 +273,7 @@ curl -X POST http://localhost:3000/api/admin/sourcing/run \
 
 공개 웹 참고 수집을 명시적으로 켠 경우에는 쿠팡·네이버 검색이 이미 상품을 찾았더라도 robots.txt, allowlist, Crawl-delay 검사를 통과한 공개 웹 반품 후보를 보조 공급원으로 함께 수집합니다. 동일 출처 상품 ID 또는 카테고리와 정규화 상품명이 정확히 같은 후보만 중복으로 합치고, 이때 명시적인 반품가·등급 근거가 있는 레코드를 우선합니다. 일반 API 상품이 있다는 이유만으로 공개 웹 반품 후보를 건너뛰지 않으며, 반품 근거가 없는 값은 계속 `확인필요`로 남깁니다. 페이지에 일반 판매가만 있고 반품가 라벨이나 반품등급에 연결된 가격이 없으면 그 숫자를 반품가로 추정하지 않습니다.
 
-허용된 검색 페이지가 링크 카드 대신 `application/ld+json`의 `Product` 구조화 데이터를 제공하는 경우에도 상품명·설명·SKU·공개 가격과 반품 표현을 보조적으로 읽습니다. JSON-LD에 반품·리퍼·재포장 근거가 없으면 후보로 만들지 않고, 가격은 공개된 `offers` 값만 저장하며 반품가로 임의 변환하지 않습니다.
+허용된 검색 페이지가 링크 카드 대신 `application/ld+json`의 `Product` 구조화 데이터를 제공하는 경우에도 상품명·설명·SKU·공개 가격과 반품 표현을 보조적으로 읽습니다. JSON-LD에 반품·리퍼·재포장 근거가 없어도 공개된 `offers` 가격이 있으면 가격·스펙 검수 후보로 만들 수 있으며, 그 가격은 `source_price`에만 저장하고 반품가나 `new_price`로 임의 변환하지 않습니다.
 
 자동 후보 수집 패널은 실행 중, 성공, 부분 오류, API 오류, 네트워크 오류를 상태 메시지로 구분해 보여줍니다. 서버 쪽 수집 실행 API도 예외가 나면 HTML 오류 페이지 대신 `SOURCING_RUN_FAILED` JSON과 짧은 원인 메시지를 반환하므로, 승인 후 첫 실행에서 막힌 이유를 관리자 화면에서 바로 확인할 수 있습니다.
 

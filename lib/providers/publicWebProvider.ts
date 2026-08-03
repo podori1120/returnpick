@@ -1,6 +1,6 @@
 import type { Category } from "@/lib/types";
 import type { ProviderProduct, ProviderSearchResult } from "@/lib/providers/types";
-import { extractReturnInfoFromText, toReturnInfoJson } from "@/lib/webReturnInfo";
+import { cleanText, extractListedPriceCandidatesFromText, extractListedPriceFromText, extractReturnInfoFromText, toReturnInfoJson } from "@/lib/webReturnInfo";
 import { getSiteUrl } from "@/lib/siteUrl";
 import { isPublicWebHostname, safeAllowlistedPublicUrl } from "@/lib/publicWebUrlSafety";
 import { collectJsonLdProducts, readJsonLdOfferPrice, readJsonLdText } from "@/lib/publicWebJsonLd";
@@ -312,21 +312,468 @@ function isLikelyProductCard(pageUrl: URL, productUrl: URL, text: string) {
   return (pathSignal && (productTextSignal || priceSignal || specSignal)) || (productTextSignal && (priceSignal || specSignal));
 }
 
+function findHtmlTagEnd(source: string, start: number) {
+  let quote: '"' | "'" | null = null;
+  for (let index = start + 1; index < source.length; index += 1) {
+    const character = source[index];
+    if (quote) {
+      if (character === quote) quote = null;
+    } else if (character === '"' || character === "'") {
+      quote = character;
+    } else if (character === ">") {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function readOpeningAttribute(opening: string, target: string) {
+  const tagMatch = opening.match(/^<\s*[a-z][\w:-]*/i);
+  if (!tagMatch) return null;
+  const end = opening.endsWith(">") ? opening.length - 1 : opening.length;
+  let index = tagMatch[0].length;
+
+  while (index < end) {
+    while (index < end && /[\s/]/.test(opening[index])) index += 1;
+    if (index >= end) break;
+    if (!/[A-Za-z_:]/.test(opening[index])) {
+      index += 1;
+      continue;
+    }
+    const nameStart = index;
+    index += 1;
+    while (index < end && /[\w:.-]/.test(opening[index])) index += 1;
+    const name = opening.slice(nameStart, index);
+    while (index < end && /\s/.test(opening[index])) index += 1;
+
+    let value: string | null = null;
+    if (opening[index] === "=") {
+      index += 1;
+      while (index < end && /\s/.test(opening[index])) index += 1;
+      const quote = opening[index];
+      if (quote === '"' || quote === "'") {
+        index += 1;
+        const valueStart = index;
+        while (index < end && opening[index] !== quote) index += 1;
+        value = opening.slice(valueStart, index);
+        if (index < end) index += 1;
+      } else {
+        const valueStart = index;
+        while (index < end && !/[\s>]/.test(opening[index])) index += 1;
+        value = opening.slice(valueStart, index);
+      }
+    }
+    if (name.toLowerCase() === target.toLowerCase()) return value;
+  }
+  return null;
+}
+
+function isPotentialHtmlTagStart(source: string, index: number) {
+  const character = source[index + 1];
+  return character === "/" || character === "!" || character === "?" || (character != null && /[A-Za-z]/.test(character));
+}
+
+const voidHtmlTagNames = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
+const rawMarkupTagNames = new Set(["script", "style", "noscript", "template"]);
+const rawTextTagNames = new Set(["script", "style", "noscript"]);
+const jsonLdMimeType = "application/ld+json";
+const maxRawTagNesting = 256;
+
+function isHiddenOpeningTag(opening: string) {
+  const tagMatch = opening.match(/^<\s*[a-z][\w:-]*/i);
+  if (!tagMatch) return false;
+  const attributes = opening.slice(tagMatch[0].length, -1);
+  if (/(?:^|\s)hidden(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?(?=\s|\/?$)/i.test(attributes)) return true;
+  if (/(?:^|\s)aria-hidden\s*=\s*(?:"true"|'true'|true)(?=\s|\/?$)/i.test(attributes)) return true;
+  const style = readOpeningAttribute(opening, "style") ?? "";
+  return /(?:display\s*:\s*none|visibility\s*:\s*hidden)/i.test(style);
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function findRawTextClosingTag(source: string, start: number, name: string) {
+  const pattern = new RegExp(`<\\s*\\/\\s*${escapeRegExp(name)}\\b[^>]*>`, "i");
+  const match = pattern.exec(source.slice(start));
+  if (!match) return null;
+  const closingStart = start + (match.index ?? 0);
+  const closingEnd = closingStart + match[0].length - 1;
+  const nextTagStart = source.indexOf("<", closingEnd + 1);
+  if (nextTagStart >= 0) {
+    const nextClose = pattern.exec(source.slice(nextTagStart));
+    if (nextClose?.index === 0) {
+      return { start: nextTagStart, end: nextTagStart + nextClose[0].length - 1 };
+    }
+  }
+  return { start: closingStart, end: closingEnd };
+}
+
+function findClosingAnchor(source: string, start: number) {
+  let cursor = start;
+  while (cursor < source.length) {
+    const tagStart = source.indexOf("<", cursor);
+    if (tagStart < 0) return null;
+    if (!isPotentialHtmlTagStart(source, tagStart)) {
+      cursor = tagStart + 1;
+      continue;
+    }
+    if (source.startsWith("<!--", tagStart)) {
+      const commentEnd = source.indexOf("-->", tagStart + 4);
+      if (commentEnd < 0) return null;
+      cursor = commentEnd + 3;
+      continue;
+    }
+    const tagEnd = findHtmlTagEnd(source, tagStart);
+    if (tagEnd < 0) return null;
+    const token = source.slice(tagStart, tagEnd + 1);
+    const rawOpening = token.match(/^<\s*([a-z][\w:-]*)\b([\s\S]*?)>$/i);
+    if (rawOpening && rawMarkupTagNames.has(rawOpening[1].toLowerCase())) {
+      const rawClosing = findClosingNamedTag(source, tagEnd + 1, rawOpening[1].toLowerCase());
+      if (!rawClosing) return null;
+      cursor = rawClosing.end + 1;
+      continue;
+    }
+    if (/^<\s*\/\s*a\s*>$/i.test(token)) return { start: tagStart, end: tagEnd };
+    cursor = tagEnd + 1;
+  }
+  return null;
+}
+
+function findClosingNamedTag(source: string, start: number, target: string) {
+  let cursor = start;
+  const tagStack = [target];
+  while (cursor < source.length) {
+    const rawTextTag = tagStack[tagStack.length - 1];
+    if (rawTextTagNames.has(rawTextTag)) {
+      const rawClosing = findRawTextClosingTag(source, cursor, rawTextTag);
+      if (!rawClosing) return null;
+      tagStack.pop();
+      if (tagStack.length === 0) return rawClosing;
+      cursor = rawClosing.end + 1;
+      continue;
+    }
+    const tagStart = source.indexOf("<", cursor);
+    if (tagStart < 0) return null;
+    if (source.startsWith("<!--", tagStart)) {
+      const commentEnd = source.indexOf("-->", tagStart + 4);
+      if (commentEnd < 0) return null;
+      cursor = commentEnd + 3;
+      continue;
+    }
+    if (!isPotentialHtmlTagStart(source, tagStart)) {
+      cursor = tagStart + 1;
+      continue;
+    }
+    const tagEnd = findHtmlTagEnd(source, tagStart);
+    if (tagEnd < 0) return null;
+    const token = source.slice(tagStart, tagEnd + 1);
+    const closing = token.match(/^<\s*\/\s*([a-z][\w:-]*)\b[^>]*>$/i);
+    if (closing) {
+      const closingName = closing[1].toLowerCase();
+      if (tagStack[tagStack.length - 1] === closingName) {
+        tagStack.pop();
+        if (tagStack.length === 0) return { start: tagStart, end: tagEnd };
+      }
+    } else {
+      const opening = token.match(/^<\s*([a-z][\w:-]*)\b([\s\S]*?)>$/i);
+      const openingName = opening?.[1].toLowerCase();
+      if (openingName && !voidHtmlTagNames.has(openingName) && (openingName === target || rawMarkupTagNames.has(openingName))) {
+        if (tagStack.length >= maxRawTagNesting) return null;
+        tagStack.push(openingName);
+      }
+    }
+    cursor = tagEnd + 1;
+  }
+  return null;
+}
+
+const secondaryDetailMarkers = /(?:recommend|related|similar|upsell|cross[-\s]?sell|also[-\s]?bought|accessor(?:y|ies)|suggest(?:ed|ion)?|bundle|recently[-\s]?viewed|추천|연관|관련|비슷|함께\s*(?:구매|본)|액세서리|장바구니)/i;
+const secondaryDetailAttributes = ["id", "class", "aria-label", "data-testid", "data-section", "data-component", "role"];
+const secondaryHeadingContainerNames = new Set(["section", "article", "div"]);
+const MAX_SECONDARY_HEADING_SCAN_BYTES = 6000;
+const MAX_GENERIC_HEADING_CONTAINER_SCANS = 256;
+const secondaryDetailHeadingPattern = /(?:추천(?:\s*(?:상품|제품|딜|아이템))?|연관\s*(?:상품|제품)?|관련\s*(?:상품|제품)?|비슷한\s*상품|함께\s*(?:구매|본)|recommend(?:ed|ation)?|related|similar|you\s+may\s+also\s+like)/i;
+
+function isSecondaryDetailOpeningTag(opening: string) {
+  const name = opening.match(/^<\s*([a-z][\w:-]*)\b/i)?.[1]?.toLowerCase();
+  if (!name) return false;
+  if (name === "aside") return true;
+  return secondaryDetailAttributes.some((attribute) => secondaryDetailMarkers.test(readOpeningAttribute(opening, attribute) ?? ""));
+}
+
+function hasSecondaryDetailHeading(source: string) {
+  let cursor = 0;
+  while (cursor < source.length) {
+    const tagStart = source.indexOf("<", cursor);
+    if (tagStart < 0) return false;
+    if (source.startsWith("<!--", tagStart)) {
+      const commentEnd = source.indexOf("-->", tagStart + 4);
+      if (commentEnd < 0) return false;
+      cursor = commentEnd + 3;
+      continue;
+    }
+    if (!isPotentialHtmlTagStart(source, tagStart)) {
+      cursor = tagStart + 1;
+      continue;
+    }
+    const tagEnd = findHtmlTagEnd(source, tagStart);
+    if (tagEnd < 0) return false;
+    const token = source.slice(tagStart, tagEnd + 1);
+    const opening = token.match(/^<\s*([a-z][\w:-]*)\b([\s\S]*?)>$/i);
+    if (!opening) {
+      cursor = tagEnd + 1;
+      continue;
+    }
+    const name = opening[1].toLowerCase();
+    if (rawMarkupTagNames.has(name)) {
+      const closing = findClosingNamedTag(source, tagEnd + 1, name);
+      if (!closing) return false;
+      cursor = closing.end + 1;
+      continue;
+    }
+    if (secondaryHeadingContainerNames.has(name)) {
+      const nestedClosing = findClosingNamedTag(source, tagEnd + 1, name);
+      if (!nestedClosing) return false;
+      cursor = nestedClosing.end + 1;
+      continue;
+    }
+    if (/^h[1-6]$/.test(name) && !isHiddenOpeningTag(token)) {
+      const closing = findClosingNamedTag(source, tagEnd + 1, name);
+      if (!closing) return false;
+      if (secondaryDetailHeadingPattern.test(cleanText(source.slice(tagEnd + 1, closing.start)))) return true;
+      cursor = closing.end + 1;
+      continue;
+    }
+    cursor = tagEnd + 1;
+  }
+  return false;
+}
+
+function stripSecondaryDetailSections(html: string) {
+  let visible = "";
+  let copyCursor = 0;
+  let cursor = 0;
+  let genericHeadingContainerScans = 0;
+
+  while (cursor < html.length) {
+    const tagStart = html.indexOf("<", cursor);
+    if (tagStart < 0) break;
+    if (html.startsWith("<!--", tagStart)) {
+      const commentEnd = html.indexOf("-->", tagStart + 4);
+      if (commentEnd < 0) break;
+      cursor = commentEnd + 3;
+      continue;
+    }
+    if (!isPotentialHtmlTagStart(html, tagStart)) {
+      cursor = tagStart + 1;
+      continue;
+    }
+    const tagEnd = findHtmlTagEnd(html, tagStart);
+    if (tagEnd < 0) break;
+    const token = html.slice(tagStart, tagEnd + 1);
+    const opening = token.match(/^<\s*([a-z][\w:-]*)\b([\s\S]*?)>$/i);
+    if (!opening) {
+      cursor = tagEnd + 1;
+      continue;
+    }
+
+    const name = opening[1].toLowerCase();
+    if (rawMarkupTagNames.has(name)) {
+      const rawClosing = findClosingNamedTag(html, tagEnd + 1, name);
+      if (!rawClosing) break;
+      cursor = rawClosing.end + 1;
+      continue;
+    }
+
+   const selfClosing = voidHtmlTagNames.has(name);
+   let headingContainerClosing: { start: number; end: number } | null = null;
+   const headingContainer = !selfClosing && secondaryHeadingContainerNames.has(name);
+    const isRecommendationHeadingContainer = headingContainer && (() => {
+      const isGenericContainer = name === "div";
+      if (isGenericContainer) {
+        if (genericHeadingContainerScans >= MAX_GENERIC_HEADING_CONTAINER_SCANS) return false;
+        genericHeadingContainerScans += 1;
+      }
+      const headingPreview = html.slice(tagEnd + 1, Math.min(html.length, tagEnd + 1 + MAX_SECONDARY_HEADING_SCAN_BYTES));
+      if (isGenericContainer && !hasSecondaryDetailHeading(headingPreview)) return false;
+      headingContainerClosing = findClosingNamedTag(html, tagEnd + 1, name);
+      const headingSource = headingContainerClosing
+        ? html.slice(tagEnd + 1, headingContainerClosing.start)
+        : headingPreview;
+      return hasSecondaryDetailHeading(headingSource);
+    })();
+    if (isSecondaryDetailOpeningTag(token) || isRecommendationHeadingContainer) {
+      visible += html.slice(copyCursor, tagStart);
+      if (selfClosing) {
+        copyCursor = tagEnd + 1;
+        cursor = copyCursor;
+        continue;
+      }
+      const closing = headingContainerClosing ?? findClosingNamedTag(html, tagEnd + 1, name);
+      if (!closing) {
+        copyCursor = html.length;
+        cursor = html.length;
+        break;
+      }
+      copyCursor = closing.end + 1;
+      cursor = copyCursor;
+      continue;
+    }
+
+    cursor = tagEnd + 1;
+  }
+
+  visible += html.slice(copyCursor);
+  return visible;
+}
+
+function extractVisibleJsonLdBlocks(html: string) {
+  const blocks: string[] = [];
+  const suppressedTags: string[] = [];
+  let cursor = 0;
+
+  while (cursor < html.length) {
+    const tagStart = html.indexOf("<", cursor);
+    if (tagStart < 0) break;
+    if (html.startsWith("<!--", tagStart)) {
+      const commentEnd = html.indexOf("-->", tagStart + 4);
+      if (commentEnd < 0) break;
+      cursor = commentEnd + 3;
+      continue;
+    }
+    if (!isPotentialHtmlTagStart(html, tagStart)) {
+      cursor = tagStart + 1;
+      continue;
+    }
+    const tagEnd = findHtmlTagEnd(html, tagStart);
+    if (tagEnd < 0) break;
+    const token = html.slice(tagStart, tagEnd + 1);
+    const closing = token.match(/^<\s*\/\s*([a-z][\w:-]*)\b[^>]*>$/i);
+    if (closing) {
+      if (suppressedTags.length > 0) {
+        const matchingIndex = suppressedTags.lastIndexOf(closing[1].toLowerCase());
+        if (matchingIndex >= 0) suppressedTags.length = matchingIndex;
+      }
+      cursor = tagEnd + 1;
+      continue;
+    }
+    const opening = token.match(/^<\s*([a-z][\w:-]*)\b([\s\S]*?)>$/i);
+    if (!opening) {
+      cursor = tagEnd + 1;
+      continue;
+    }
+    const name = opening[1].toLowerCase();
+    const selfClosing = voidHtmlTagNames.has(name);
+
+    if (rawMarkupTagNames.has(name)) {
+      const closingTag = findClosingNamedTag(html, tagEnd + 1, name);
+      if (!closingTag) break;
+      const type = readOpeningAttribute(token, "type")?.trim().toLowerCase();
+      if (suppressedTags.length === 0 && name === "script" && !isHiddenOpeningTag(token) && type === jsonLdMimeType) {
+        blocks.push(html.slice(tagEnd + 1, closingTag.start));
+      }
+      cursor = closingTag.end + 1;
+      continue;
+    }
+
+    if (suppressedTags.length > 0) {
+      if (!selfClosing) suppressedTags.push(name);
+    } else if (isHiddenOpeningTag(token)) {
+      if (!selfClosing) suppressedTags.push(name);
+    }
+    cursor = tagEnd + 1;
+  }
+
+  return blocks;
+}
+
+function extractVisibleAnchorBlocks(html: string) {
+  const blocks: Array<{ href: string; opening: string; inner: string }> = [];
+  const suppressedTags: string[] = [];
+  let cursor = 0;
+  while (cursor < html.length) {
+    const tagStart = html.indexOf("<", cursor);
+    if (tagStart < 0) break;
+    if (html.startsWith("<!--", tagStart)) {
+      const commentEnd = html.indexOf("-->", tagStart + 4);
+      if (commentEnd < 0) break;
+      cursor = commentEnd + 3;
+      continue;
+    }
+    if (!isPotentialHtmlTagStart(html, tagStart)) {
+      cursor = tagStart + 1;
+      continue;
+    }
+    const openingEnd = findHtmlTagEnd(html, tagStart);
+    if (openingEnd < 0) break;
+    const opening = html.slice(tagStart, openingEnd + 1);
+    const closingTag = opening.match(/^<\s*\/\s*([a-z][\w:-]*)\b[^>]*>$/i);
+    if (closingTag) {
+      if (suppressedTags.length > 0) {
+        const matchingIndex = suppressedTags.lastIndexOf(closingTag[1].toLowerCase());
+        if (matchingIndex >= 0) suppressedTags.length = matchingIndex;
+      }
+      cursor = openingEnd + 1;
+      continue;
+    }
+    const openingTag = opening.match(/^<\s*([a-z][\w:-]*)\b([\s\S]*?)>$/i);
+    if (!openingTag) {
+      cursor = openingEnd + 1;
+      continue;
+    }
+    const name = openingTag[1].toLowerCase();
+    const selfClosing = voidHtmlTagNames.has(name);
+
+    if (rawMarkupTagNames.has(name)) {
+      const closingRawTag = findClosingNamedTag(html, openingEnd + 1, name);
+      if (!closingRawTag) break;
+      cursor = closingRawTag.end + 1;
+      continue;
+    }
+
+    if (/^<\s*a\b/i.test(opening)) {
+      if (suppressedTags.length === 0 && !isHiddenOpeningTag(opening)) {
+        const closing = findClosingAnchor(html, openingEnd + 1);
+        if (!closing) break;
+        cursor = closing.end + 1;
+        const href = readOpeningAttribute(opening, "href");
+        const inner = html.slice(openingEnd + 1, closing.start);
+        if (href != null) blocks.push({ href, opening, inner });
+        continue;
+      }
+      if (suppressedTags.length === 0 && isHiddenOpeningTag(opening) && !selfClosing) suppressedTags.push(name);
+      else if (suppressedTags.length > 0 && !selfClosing) suppressedTags.push(name);
+      cursor = openingEnd + 1;
+      continue;
+    }
+
+    if (suppressedTags.length > 0) {
+      if (!selfClosing) suppressedTags.push(name);
+    } else if (isHiddenOpeningTag(opening)) {
+      if (!selfClosing) suppressedTags.push(name);
+    }
+    cursor = openingEnd + 1;
+  }
+  return blocks;
+}
+
 function extractCards(html: string, category: Category, keyword: string, pageUrl: string, allowedHosts: ReadonlySet<string>): ProviderProduct[] {
-  const anchorMatches = [...html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,1500}?)<\/a>/gi)];
+  const anchorMatches = extractVisibleAnchorBlocks(html).filter((match) => match.inner.length <= 1500);
   const base = new URL(pageUrl);
   const products: ProviderProduct[] = [];
   const seenProductKeys = new Set<string>();
 
   for (const [index, match] of anchorMatches.entries()) {
-    const productUrl = safeAllowlistedPublicUrl(match[1], base, allowedHosts);
+    const productUrl = safeAllowlistedPublicUrl(match.href, base, allowedHosts);
     if (!productUrl) continue;
     const href = productUrl.toString();
     const productKey = `url:${href}`;
     if (seenProductKeys.has(productKey)) continue;
-    const block = match[2].replace(/<script[\s\S]*?<\/script>/gi, " ");
-    const text = block.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-    const returnInfo = extractReturnInfoFromText(text, href);
+    const block = `${match.opening}${match.inner}</a>`;
+    const text = cleanText(block);
+    const returnInfo = extractReturnInfoFromText(block);
+    const listedPrice = extractListedPriceFromText(block);
     if (!returnInfo.isReturnCandidate && !isLikelyProductCard(base, productUrl, text)) continue;
     seenProductKeys.add(productKey);
     products.push({
@@ -341,7 +788,7 @@ function extractCards(html: string, category: Category, keyword: string, pageUrl
       source_url: href,
       coupang_url: href.includes("coupang.com") ? href : null,
       affiliate_url: null,
-      source_price: returnInfo.return_price,
+      source_price: listedPrice,
       return_price: returnInfo.return_price,
       new_price: null,
       condition_grade: returnInfo.condition_grade ?? "확인필요",
@@ -351,6 +798,10 @@ function extractCards(html: string, category: Category, keyword: string, pageUrl
         page_url: pageUrl,
         anchor_index: index,
         candidate_kind: returnInfo.isReturnCandidate ? "return_evidence" : "product_without_return_evidence",
+        price_analysis: {
+          listed_price: listedPrice,
+          listed_price_source: listedPrice != null ? "explicit_listed_price_label" : null
+        },
         web_return_info: toReturnInfoJson(returnInfo)
       }
     });
@@ -358,10 +809,10 @@ function extractCards(html: string, category: Category, keyword: string, pageUrl
   }
 
   if (products.length < 8) {
-    for (const scriptMatch of html.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    for (const jsonLdText of extractVisibleJsonLdBlocks(html)) {
       let parsed: unknown;
       try {
-        parsed = JSON.parse(scriptMatch[1].replace(/^\s*<!--|-->\s*$/g, "").trim());
+        parsed = JSON.parse(jsonLdText.replace(/^\s*<!--|-->\s*$/g, "").trim());
       } catch {
         continue;
       }
@@ -380,7 +831,7 @@ function extractCards(html: string, category: Category, keyword: string, pageUrl
           ? record.additionalProperty.map((item) => readJsonLdText(item)).filter(Boolean).join(" ")
           : "";
         const evidenceText = [name, readJsonLdText(record.description), additionalProperties, readJsonLdText(record.itemCondition)].filter(Boolean).join(" ");
-        const returnInfo = extractReturnInfoFromText(evidenceText, href);
+        const returnInfo = extractReturnInfoFromText(evidenceText);
         const offerPrice = readJsonLdOfferPrice(record);
         if (!returnInfo.isReturnCandidate && offerPrice == null) continue;
 
@@ -399,7 +850,7 @@ function extractCards(html: string, category: Category, keyword: string, pageUrl
           affiliate_url: null,
           source_price: offerPrice,
           return_price: returnInfo.return_price,
-          new_price: offerPrice,
+          new_price: null,
           condition_grade: returnInfo.condition_grade ?? "확인필요",
           stock_count: returnInfo.stock_count,
           raw_json: {
@@ -443,8 +894,11 @@ function readHtmlTitle(html: string) {
 }
 
 function enrichProductFromDetail(product: ProviderProduct, html: string, detailUrl: URL, allowedHosts: ReadonlySet<string>) {
-  const readableHtml = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<noscript[\s\S]*?<\/noscript>/gi, " ");
-  const detailInfo = extractReturnInfoFromText(readableHtml, detailUrl.toString());
+  const detailEvidenceMarkup = stripSecondaryDetailSections(html);
+  const detailInfo = extractReturnInfoFromText(detailEvidenceMarkup);
+  const listedPriceCandidates = extractListedPriceCandidatesFromText(detailEvidenceMarkup);
+  const listedPrice = listedPriceCandidates.length === 1 ? listedPriceCandidates[0] : null;
+  const detailPriceIsAmbiguous = listedPriceCandidates.length > 1;
   const imageValue = readMetaContent(html, ["og:image", "twitter:image"]);
   const detailImage = imageValue ? safeAllowlistedPublicUrl(imageValue, detailUrl, allowedHosts)?.toString() ?? null : null;
   const existingWebInfo = product.raw_json?.web_return_info;
@@ -454,14 +908,26 @@ function enrichProductFromDetail(product: ProviderProduct, html: string, detailU
   return {
     ...product,
     image_url: product.image_url ?? detailImage,
+    source_price: product.source_price ?? (detailPriceIsAmbiguous ? null : listedPrice),
     return_price: detailInfo.return_price ?? product.return_price ?? null,
+    new_price: product.new_price ?? null,
     condition_grade: detailInfo.condition_grade ?? product.condition_grade ?? "확인필요",
     stock_count: detailInfo.stock_count ?? product.stock_count ?? null,
     raw_json: {
       ...(product.raw_json ?? {}),
       web_return_info: {
         ...(typeof existingWebInfo === "object" && existingWebInfo !== null && !Array.isArray(existingWebInfo) ? existingWebInfo : {}),
-        detail_page: detailEvidence,
+        detail_page: {
+          ...detailEvidence,
+          listed_price: listedPrice,
+          listed_price_candidates: listedPriceCandidates,
+          listed_price_source:
+            listedPrice != null
+              ? "explicit_listed_price_label"
+              : listedPriceCandidates.length > 1
+                ? "ambiguous_multiple_labeled_prices"
+                : null
+        },
         detail_page_title: detailTitle,
         detail_page_url: detailUrl.toString()
       }
