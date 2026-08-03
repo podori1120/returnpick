@@ -199,15 +199,41 @@ export default function PurposeDealExplorer({
                   <ShieldCheck size={18} aria-hidden />
                   <p className="text-xs font-black">검수 완료 딜 준비 중</p>
                 </div>
-                <p className="mt-2 text-lg font-black leading-7">상품 수를 채우기 위해 미확인 딜을 먼저 보여주지 않습니다.</p>
+                <p className="mt-2 text-lg font-black leading-7">이 용도의 상품이 들어오기 전에도 비교 기준을 바로 확인할 수 있습니다.</p>
                 <p className="mt-2 text-sm font-semibold leading-6 text-white/70">
-                  자동 수집 후보가 관리자 검수와 상품별 파트너스 링크 확인을 통과하면 이 탭에 자동으로 표시됩니다.
+                  자동 수집 후보가 관리자 검수와 상품별 파트너스 링크 확인을 통과하면 이 탭에 자동으로 표시됩니다. 지금은 아래 가이드에서 같은 기준으로 비교를 시작하세요.
                 </p>
-                <Link className="focus-ring mt-5 inline-flex items-center gap-2 rounded-md bg-white px-4 py-3 text-sm font-black text-ink hover:bg-lemon" href={selected.guideHref}>
-                  반품 구매 기준 보기 <ArrowRight size={16} aria-hidden />
+                <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                  {selected.guideLinks.slice(0, 2).map((guide) => (
+                    <Link
+                      key={guide.href}
+                      className="focus-ring inline-flex items-center justify-between gap-2 rounded-md border border-white/20 px-3 py-3 text-sm font-black text-white hover:border-lemon hover:text-lemon"
+                      href={guide.href}
+                    >
+                      {guide.label} <ArrowRight size={15} aria-hidden />
+                    </Link>
+                  ))}
+                </div>
+                <Link className="focus-ring mt-3 inline-flex items-center gap-2 text-sm font-black text-lemon hover:text-white" href={selected.guideHref}>
+                  수령 후 체크리스트 보기 <ArrowRight size={16} aria-hidden />
                 </Link>
               </>
             )}
+
+            <div className="mt-6 border-t border-white/15 pt-4">
+              <p className="text-xs font-black text-white/55">먼저 읽을 구매 가이드</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {selected.guideLinks.map((guide) => (
+                  <Link
+                    key={guide.href}
+                    className="focus-ring rounded-md border border-white/20 px-3 py-2 text-xs font-black text-white hover:border-lemon hover:text-lemon"
+                    href={guide.href}
+                  >
+                    {guide.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
 
             <div className="mt-6 border-t border-white/15 pt-4">
               <p className="text-xs font-black text-white/55">관련 카테고리</p>

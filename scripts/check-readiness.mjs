@@ -275,6 +275,7 @@ const requiredFiles = [
   "scripts/verify-scoring-rules.mjs",
   "scripts/verify-search-intent-landings.mjs",
   "scripts/verify-home-purpose-selection.mjs",
+  "scripts/verify-home-purpose-guides.mjs",
   "scripts/verify-public-web-config.mjs",
   "scripts/verify-web-return-info.mjs",
   "scripts/verify-public-web-url-safety.mjs",
@@ -369,6 +370,23 @@ if (fileExists("package.json") && fileExists("scripts/verify-search-intent-landi
       searchIntentMatcher.includes("excludeQueries") &&
       searchIntentMatcher.includes("product.category !== rule.category"),
     "search intent behavior has a runnable matcher check for positive terms, negative gaming terms, and category boundaries",
+    "required"
+  );
+}
+
+if (fileExists("package.json") && fileExists("scripts/verify-home-purpose-guides.mjs") && fileExists("lib/homeDiscovery.ts")) {
+  const packageJson = readText("package.json");
+  const purposeGuidesCheck = readText("scripts/verify-home-purpose-guides.mjs");
+  const homeDiscovery = readText("lib/homeDiscovery.ts");
+  const purposeExplorer = readText("components/PurposeDealExplorer.tsx");
+  check(
+    "scripts: home purpose guide check command",
+    packageJson.includes('"home-purpose:guides:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-home-purpose-guides.mjs"') &&
+      purposeGuidesCheck.includes("getSearchIntentLanding") &&
+      purposeGuidesCheck.includes("needs at least two buying guides") &&
+      homeDiscovery.includes("guideLinks") &&
+      purposeExplorer.includes("selected.guideLinks"),
+    "each homepage purpose keeps multiple valid search-intent guide links for an actionable empty state",
     "required"
   );
 }
@@ -2608,7 +2626,8 @@ if (
       homePage.includes("카테고리부터 골라보세요") &&
       homePage.includes("상품이 없어도 카테고리별 반품 구매 기준을 먼저 확인할 수 있습니다") &&
       homePage.includes('grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6') &&
-      purposeExplorer.includes("상품 수를 채우기 위해 미확인 딜을 먼저 보여주지 않습니다") &&
+      purposeExplorer.includes("이 용도의 상품이 들어오기 전에도 비교 기준을 바로 확인할 수 있습니다") &&
+      purposeExplorer.includes("selected.guideLinks") &&
       !purposeExplorer.includes("/redirect?") &&
       !purposeExplorer.includes("window.location"),
     "zero inventory still provides category-specific checks and purpose guidance without invented products or automatic affiliate redirects",

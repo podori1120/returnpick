@@ -14,6 +14,7 @@ export type HomePurposeOption = {
   categories: Category[];
   checks: string[];
   guideHref: string;
+  guideLinks: Array<{ label: string; href: string }>;
 };
 
 export type HomePurposeInventoryState = {
@@ -33,7 +34,12 @@ export const homePurposeOptions: HomePurposeOption[] = [
     primaryUseCaseId: "office_student",
     categories: ["laptop", "monitor"],
     checks: ["RAM 16GB와 SSD 512GB 기준", "FreeDOS 설치 비용과 난이도", "배터리·힌지·패널 상태"],
-    guideHref: "/guide/safe-categories"
+    guideHref: "/guide/safe-categories",
+    guideLinks: [
+      { label: "대학생 노트북 기준", href: "/guide/search/student-laptop" },
+      { label: "LG 그램 비교", href: "/guide/search/lg-gram" },
+      { label: "QHD 모니터 기준", href: "/guide/search/qhd-monitor" }
+    ]
   },
   {
     id: "gaming_creator",
@@ -45,7 +51,12 @@ export const homePurposeOptions: HomePurposeOption[] = [
     primaryUseCaseId: "gaming",
     categories: ["laptop", "monitor"],
     checks: ["GPU·주사율·해상도 일치", "발열·팬 소음·전원 어댑터", "100만원 이상 반품 상태 근거"],
-    guideHref: "/guide/return-checklist"
+    guideHref: "/guide/return-checklist",
+    guideLinks: [
+      { label: "게이밍 노트북 기준", href: "/guide/search/gaming-laptop" },
+      { label: "QHD 모니터 기준", href: "/guide/search/qhd-monitor" },
+      { label: "4K 모니터 기준", href: "/guide/search/4k-monitor" }
+    ]
   },
   {
     id: "cleaning",
@@ -57,7 +68,11 @@ export const homePurposeOptions: HomePurposeOption[] = [
     primaryUseCaseId: "floor_care",
     categories: ["robot_vacuum", "cordless_vacuum"],
     checks: ["도킹 스테이션·브러시 구성", "배터리 사용 흔적과 충전 상태", "맵핑 초기화·필터 교체 비용"],
-    guideHref: "/guide/return-checklist"
+    guideHref: "/guide/return-checklist",
+    guideLinks: [
+      { label: "로봇청소기 비교 기준", href: "/guide/search/robot-vacuum" },
+      { label: "무선청소기 비교 기준", href: "/guide/search/cordless-vacuum" }
+    ]
   },
   {
     id: "air_season",
@@ -69,7 +84,11 @@ export const homePurposeOptions: HomePurposeOption[] = [
     primaryUseCaseId: "air_care",
     categories: ["air_purifier", "dehumidifier"],
     checks: ["권장 평형·일일 제습량", "필터·물통·배수 호스 구성", "냄새·곰팡이·소음 흔적"],
-    guideHref: "/guide/return-checklist"
+    guideHref: "/guide/return-checklist",
+    guideLinks: [
+      { label: "공기청정기 비교 기준", href: "/guide/search/air-purifier" },
+      { label: "제습기 비교 기준", href: "/guide/search/dehumidifier" }
+    ]
   },
   {
     id: "value",
@@ -81,7 +100,12 @@ export const homePurposeOptions: HomePurposeOption[] = [
     primaryUseCaseId: "budget",
     categories: ["laptop", "monitor", "robot_vacuum"],
     checks: ["네이버 동일 모델 최저가 근거", "구성품·OS·소모품 추가 비용", "실질 할인율 15% 이상인지"],
-    guideHref: "/guide/safe-categories"
+    guideHref: "/guide/safe-categories",
+    guideLinks: [
+      { label: "반품 노트북 비교 기준", href: "/guide/search/return-laptop" },
+      { label: "QHD 모니터 비교 기준", href: "/guide/search/qhd-monitor" },
+      { label: "로봇청소기 비교 기준", href: "/guide/search/robot-vacuum" }
+    ]
   }
 ];
 
