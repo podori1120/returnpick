@@ -81,13 +81,13 @@
     "autoprefixer": "10.4.20",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.12",
-    "postcss": "8.5.18",
+    "postcss": "8.5.25",
     "tailwindcss": "3.4.17",
     "typescript": "5.7.2"
   },
   "overrides": {
     "brace-expansion": "5.0.9",
-    "postcss": "8.5.18",
+    "postcss": "8.5.25",
     "sharp": "0.35.0"
   }
 }

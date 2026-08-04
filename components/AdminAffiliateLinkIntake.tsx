@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Link2, ListPlus, LoaderCircle } from "lucide-react";
+import { CheckCircle2, Copy, Link2, ListPlus, LoaderCircle } from "lucide-react";
 import { categoryOptions } from "@/lib/category";
 import { isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
 import type { Category } from "@/lib/types";
@@ -9,6 +9,7 @@ import type { Category } from "@/lib/types";
 const emptyForm = { title: "", category: "laptop" as Category, affiliate_url: "", coupang_url: "", image_url: "", public_note: "", admin_memo: "" };
 const BULK_BATCH_SIZE = 8;
 const MAX_BULK_ROWS = 32;
+const BULK_FIELD_ORDER = "상품명\t카테고리\t상품별 파트너스 링크\t쿠팡 상품 URL\t이미지 URL\t공개 메모\t관리자 메모";
 
 function headers(password: string) {
   return { "Content-Type": "application/json", "x-admin-password": password };
@@ -175,6 +176,15 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
     }
   }
 
+  async function copyBulkFieldOrder() {
+    try {
+      await navigator.clipboard.writeText(BULK_FIELD_ORDER);
+      setNotice({ type: "success", message: "대량 입력 열 순서를 복사했습니다. 스프레드시트 첫 행에 붙여넣고 상품별 링크를 입력하세요." });
+    } catch {
+      setNotice({ type: "error", message: "브라우저에서 복사가 차단되었습니다. HTTPS 관리자 페이지에서 다시 시도하세요." });
+    }
+  }
+
   return (
     <section id="admin-affiliate-link-intake" className="scroll-mt-4 rounded-lg border border-line bg-white p-5 shadow-soft">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -199,7 +209,12 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
             <p className="inline-flex items-center gap-2 text-sm font-black text-pine"><ListPlus size={16} aria-hidden /> 여러 링크 한 번에 등록</p>
             <p className="mt-1 text-xs font-semibold leading-5 text-steel">한 줄에 상품명, 카테고리, 파트너스 링크, 쿠팡 상품 URL을 탭으로 구분하세요. 최대 32개까지 붙여넣을 수 있고, 서버에는 8개씩 순차 전송해 같은 검증을 거쳐 저장합니다.</p>
           </div>
-          <span className="text-xs font-black text-steel">{bulkRows.length}/{MAX_BULK_ROWS}개</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <button className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-line bg-white px-3 py-2 text-xs font-black text-ink hover:bg-mist" onClick={() => void copyBulkFieldOrder()} type="button">
+              <Copy size={14} aria-hidden /> 열 순서 복사
+            </button>
+            <span className="text-xs font-black text-steel">{bulkRows.length}/{MAX_BULK_ROWS}개</span>
+          </div>
         </div>
         <textarea
           aria-label="파트너스 링크 여러 개 입력"
