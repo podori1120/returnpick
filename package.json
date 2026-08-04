@@ -37,6 +37,7 @@
     "discovery-updates:check": "node scripts/verify-discovery-updates.mjs",
     "manual-import:check": "node scripts/verify-manual-import-safety.mjs",
     "affiliate-identity:check": "node scripts/verify-affiliate-identity.mjs",
+    "affiliate-backfill:safety:check": "node scripts/verify-affiliate-backfill-safety.mjs",
     "affiliate-link-intake:check": "node scripts/verify-affiliate-link-intake.mjs",
     "affiliate-link-intake-bulk:check": "node scripts/verify-affiliate-link-intake-bulk.mjs",
     "bootstrap-catalog:check": "node scripts/verify-bootstrap-catalog-runtime.mjs",

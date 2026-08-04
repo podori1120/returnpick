@@ -1,6 +1,5 @@
 import { buildCoupangSearchUrl, cleanCoupangSearchQuery, isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
 import { assessAffiliateIdentity, getAffiliateIdentityReadiness, mergeAffiliateIdentityRecord } from "@/lib/affiliateIdentity";
-import { verifyCoupangAffiliateLinkResolution } from "@/lib/coupangAffiliateLinkVerifier";
 import { listProducts, updateProduct } from "@/lib/dataStore";
 import { createCoupangDeeplink, searchCoupangProducts } from "@/lib/providers/coupangPartnersProvider";
 import type { ProductWithScore, SourcedProduct } from "@/lib/types";
@@ -66,6 +65,17 @@ function mergeBackfillRawJson(product: ProductWithScore, detail: Record<string, 
 
 function backfillErrorMessage(error: unknown) {
   return error instanceof Error && error.message ? error.message.slice(0, 300) : "UNKNOWN_AFFILIATE_BACKFILL_UPDATE_ERROR";
+}
+
+function deferAffiliateRemoteVerification() {
+  return {
+    ok: false,
+    code: "REMOTE_CHECK_DEFERRED",
+    message: "예약 보강에서는 파트너스 링크를 자동 방문하지 않습니다. 관리자 링크 큐에서 브라우저 확인을 실행하세요.",
+    product_id: null,
+    redirect_count: 0,
+    checked_at: new Date().toISOString()
+  };
 }
 
 function combineBackfillReasons(...reasons: Array<string | null | undefined>) {
@@ -395,12 +405,34 @@ export async function backfillCoupangAffiliateLinks(options?: { limit?: number; 
       continue;
     }
 
+    if (resolved.status === "provided") {
+      result.skipped_count += 1;
+      result.items.push({
+        product_id: product.id,
+        title: product.title,
+        status: "skipped",
+        reason: "AFFILIATE_IDENTITY_VERIFICATION_REQUIRED",
+        query: resolved.query,
+        source_url: resolved.sourceUrl,
+        manual_search_url: resolved.manualSearchUrl,
+        affiliate_url: affiliateUrl,
+        matched_title: resolved.matchedTitle,
+        match: resolved.match ?? null,
+        identity_status: "UNRESOLVED",
+        identity_code: "REMOTE_CHECK_DEFERRED"
+      });
+      continue;
+    }
+
     if (timeBudgetMs > 0 && Date.now() - startedAt >= timeBudgetMs) {
       result.timed_out = true;
       break;
     }
 
-    const verification = await verifyCoupangAffiliateLinkResolution(affiliateUrl);
+    // Scheduled jobs may create a product-level link through the official API,
+    // but they never visit an affiliate URL. Destination identity stays pending
+    // until an operator explicitly verifies it in the admin queue.
+    const verification = deferAffiliateRemoteVerification();
     const identity = assessAffiliateIdentity({
       product,
       affiliateUrl,

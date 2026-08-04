@@ -281,6 +281,7 @@ const requiredFiles = [
   "scripts/verify-scheduled-affiliate-backfill.mjs",
   "scripts/verify-sourcing-keyword-coverage.mjs",
   "scripts/verify-affiliate-identity.mjs",
+  "scripts/verify-affiliate-backfill-safety.mjs",
   "scripts/verify-affiliate-link-intake.mjs",
   "scripts/verify-affiliate-link-intake-bulk.mjs",
   "scripts/verify-bootstrap-catalog-runtime.mjs",
@@ -4391,6 +4392,7 @@ if (fileExists("components/AdminAffiliateLinkQueue.tsx")) {
 
 if (fileExists("lib/affiliateLinkBackfill.ts")) {
   const affiliateBackfill = readText("lib/affiliateLinkBackfill.ts");
+  const packageJson = fileExists("package.json") ? readText("package.json") : "";
   check(
     "affiliate backfill: API deeplink",
     affiliateBackfill.includes("backfillCoupangAffiliateLinks") && affiliateBackfill.includes("searchCoupangProducts") && affiliateBackfill.includes("createCoupangDeeplink"),
@@ -4400,11 +4402,19 @@ if (fileExists("lib/affiliateLinkBackfill.ts")) {
   check(
     "affiliate backfill: destination identity verification",
     affiliateBackfill.includes("getAffiliateIdentityReadiness") &&
-      affiliateBackfill.includes("verifyCoupangAffiliateLinkResolution") &&
+      !affiliateBackfill.includes("verifyCoupangAffiliateLinkResolution") &&
+      affiliateBackfill.includes("REMOTE_CHECK_DEFERRED") &&
       affiliateBackfill.includes("assessAffiliateIdentity") &&
       affiliateBackfill.includes("mergeAffiliateIdentityRecord") &&
       affiliateBackfill.includes("affiliate_verification_response"),
-    "successful product links record a verified Coupang destination before the public quality gate can expose them",
+    "scheduled backfill never visits a Partners URL and records destination identity as pending until an explicit admin verification",
+    "required"
+  );
+  check(
+    "affiliate backfill: scheduled visit safety contract",
+    packageJson.includes('"affiliate-backfill:safety:check": "node scripts/verify-affiliate-backfill-safety.mjs"') &&
+      readText("scripts/verify-affiliate-backfill-safety.mjs").includes("scheduled jobs never visit partner links"),
+    "scheduled affiliate backfill has an executable no-remote-visit contract",
     "required"
   );
   check(
