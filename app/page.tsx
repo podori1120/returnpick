@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -147,23 +146,6 @@ export default async function HomePage() {
                 </p>
               </div>
             )}
-            {!hasPublishedDeals ? (
-              <Link
-                className="focus-ring mt-4 grid max-w-2xl grid-cols-[72px_minmax(0,1fr)] items-center gap-3 rounded-lg border border-line bg-mist p-2 lg:hidden"
-                href={approvalSampleProduct.detailPath}
-              >
-                <span className="relative h-[72px] overflow-hidden rounded-md bg-white">
-                  <Image alt={approvalSampleProduct.imageAlt} className="object-cover" fill priority sizes="72px" src={approvalSampleProduct.imageSrc} />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-xs font-black text-pine">직접 검수 추천</span>
-                  <strong className="mt-1 line-clamp-1 block text-sm font-black text-ink">{approvalSampleProduct.name}</strong>
-                  <span className="mt-1 inline-flex items-center gap-1 text-xs font-black text-steel">
-                    검수 내용 보기 <ArrowRight size={13} aria-hidden />
-                  </span>
-                </span>
-              </Link>
-            ) : null}
             <div className={hasPublishedDeals ? "mt-6 flex flex-wrap gap-2" : "mt-3 flex flex-wrap gap-2 sm:mt-6"}>
               <Link
                 className={hasPublishedDeals
@@ -186,7 +168,7 @@ export default async function HomePage() {
               </Link>
             </div>
           </div>
-          <div className={hasPublishedDeals ? "lg:self-start" : "hidden lg:block lg:self-start"}>
+          <div className="lg:self-start">
             {featured[0] ? (
               <DealCard product={featured[0]} />
             ) : (

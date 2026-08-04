@@ -2652,11 +2652,13 @@ if (
       purposeExplorer.includes("aria-selected={selectedTab}") &&
        purposeExplorer.includes('/deals?useCase=${selected.primaryUseCaseId}&sort=fit') &&
        homePage.includes("fitScore") &&
-       purposeExplorer.includes("자동 수집 후보가 관리자 검수와 상품별 파트너스 링크 확인을 통과하면") &&
-       homePage.includes("selectInitialPurposeId(purposeItems)") &&
-       homeDiscovery.includes("selectInitialPurposeId") &&
-       homePage.includes("approvalSampleProduct.detailPath"),
-    "the homepage supports product search, keyboard-accessible purpose tabs, matched-deal comparison, and an honest editorial fallback before inventory exists",
+      purposeExplorer.includes("자동 수집 후보가 관리자 검수와 상품별 파트너스 링크 확인을 통과하면") &&
+      homePage.includes("selectInitialPurposeId(purposeItems)") &&
+      homeDiscovery.includes("selectInitialPurposeId") &&
+      homePage.includes("approvalSampleProduct.detailPath") &&
+      homePage.includes('<div className="lg:self-start">') &&
+      !homePage.includes('hidden lg:block lg:self-start'),
+    "the homepage supports product search, keyboard-accessible purpose tabs, matched-deal comparison, and a mobile-visible editorial fallback before inventory exists",
     "required"
   );
   check(
