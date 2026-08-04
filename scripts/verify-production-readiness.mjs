@@ -110,6 +110,8 @@ const adminUiRequiredText = [
   "/api/admin/session",
   "/api/admin/editorial-campaign",
   "/api/admin/bootstrap-catalog",
+  "/api/admin/bootstrap-catalog/manual",
+  "Supabase 전 임시 입력",
   "RETURNPICK_BOOTSTRAP_CATALOG_JSON",
   "returnpick_admin_password"
 ];
@@ -931,6 +933,26 @@ async function main() {
   } catch (error) {
     fail("affiliate link bulk API headers", error instanceof Error ? error.message : "POST failed");
     fail("affiliate link bulk route", error instanceof Error ? error.message : "POST failed");
+  }
+
+  try {
+    const manualBootstrap = await readJson("/api/admin/bootstrap-catalog/manual", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ rows: [] })
+    });
+    checkPrivateRouteHeaders("manual bootstrap API headers", manualBootstrap.response);
+    checkAdminPostProtection(
+      "manual bootstrap route",
+      "/api/admin/bootstrap-catalog/manual",
+      manualBootstrap.response,
+      manualBootstrap.json
+    );
+  } catch (error) {
+    fail("manual bootstrap API headers", error instanceof Error ? error.message : "POST failed");
+    fail("manual bootstrap route", error instanceof Error ? error.message : "POST failed");
   }
 
   let readiness = null;
