@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 const MAX_ITEMS = 8;
+const MAX_PUBLIC_WEB_ITEMS = 2;
 const MAX_BODY_BYTES = 64_000;
 const MAX_CONCURRENCY = 2;
 
@@ -17,6 +18,7 @@ type IntakeItem = {
   image_url?: unknown;
   public_note?: unknown;
   admin_memo?: unknown;
+  enrich_public_web?: unknown;
 };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -32,7 +34,8 @@ function pickItem(value: unknown): IntakeItem | null {
     coupang_url: value.coupang_url,
     image_url: value.image_url,
     public_note: value.public_note,
-    admin_memo: value.admin_memo
+    admin_memo: value.admin_memo,
+    enrich_public_web: value.enrich_public_web === true
   };
 }
 
@@ -64,6 +67,12 @@ export async function POST(request: Request) {
     }
     if (items.length > MAX_ITEMS) {
       return NextResponse.json({ error: "TOO_MANY_ITEMS", message: `한 번에 최대 ${MAX_ITEMS}개까지 등록할 수 있습니다.` }, { status: 400 });
+    }
+    if (items.some((item) => item.enrich_public_web === true) && items.length > MAX_PUBLIC_WEB_ITEMS) {
+      return NextResponse.json(
+        { error: "PUBLIC_WEB_BULK_LIMIT", message: `공개 웹 보강을 선택한 일괄 등록은 한 요청에 최대 ${MAX_PUBLIC_WEB_ITEMS}개까지 처리합니다. 관리자 화면이 자동으로 나누어 전송합니다.` },
+        { status: 400 }
+      );
     }
 
     const childHeaders = new Headers(request.headers);

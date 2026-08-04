@@ -8,5 +8,11 @@ export async function resolve(specifier, context, nextResolve) {
     const target = pathToFileURL(pathResolve(projectRoot, `${specifier.slice(2)}.ts`)).href;
     return { url: target, shortCircuit: true };
   }
+  if (specifier === "next/server") {
+    return { url: pathToFileURL(pathResolve(projectRoot, "node_modules/next/server.js")).href, shortCircuit: true };
+  }
+  if (specifier === "server-only") {
+    return { url: "data:text/javascript,export%20default%20undefined", shortCircuit: true };
+  }
   return nextResolve(specifier, context);
 }

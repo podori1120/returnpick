@@ -9,6 +9,7 @@ import type { Category } from "@/lib/types";
 
 const emptyForm = { title: "", category: "laptop" as Category, affiliate_url: "", coupang_url: "", image_url: "", public_note: "", admin_memo: "" };
 const BULK_BATCH_SIZE = 8;
+const PUBLIC_WEB_BULK_BATCH_SIZE = 2;
 const MAX_BULK_ROWS = 40;
 const BULK_FIELD_ORDER = "상품명\t카테고리\t상품별 파트너스 링크\t쿠팡 상품 URL\t이미지 URL\t공개 메모\t관리자 메모";
 
@@ -69,6 +70,7 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
   const [bulkProgress, setBulkProgress] = useState<{ completed: number; total: number } | null>(null);
   const [bulkResult, setBulkResult] = useState<BulkIntakeResult | null>(null);
   const [recentProductIds, setRecentProductIds] = useState<string[]>([]);
+  const [enrichPublicWeb, setEnrichPublicWeb] = useState(false);
   const affiliateReady = isUsableAffiliateUrl(form.affiliate_url.trim());
   const suppliedUrlReady = !form.coupang_url.trim() || isUsableCoupangProductUrl(form.coupang_url.trim());
   const bulkRows = parseBulkRows(bulkText);
@@ -84,7 +86,7 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
     setNextAction(null);
     setRecentProductIds([]);
     try {
-      const response = await fetch("/api/admin/products/link-intake", { method: "POST", headers: headers(password), body: JSON.stringify(form) });
+      const response = await fetch("/api/admin/products/link-intake", { method: "POST", headers: headers(password), body: JSON.stringify({ ...form, enrich_public_web: enrichPublicWeb }) });
       const data = (await response.json().catch(() => ({}))) as {
         error?: string;
         message?: string;
@@ -123,6 +125,7 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
     let scoreErrorCount = 0;
     let completedRows = 0;
     let interruptedMessage: string | null = null;
+    const batchSize = enrichPublicWeb ? PUBLIC_WEB_BULK_BATCH_SIZE : BULK_BATCH_SIZE;
     const finalizeBulkResult = () => {
       const result: BulkIntakeResult = {
         status: interruptedMessage
@@ -164,12 +167,12 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
     };
 
     try {
-      for (let start = 0; start < bulkRows.length; start += BULK_BATCH_SIZE) {
-        const batch = bulkRows.slice(start, start + BULK_BATCH_SIZE);
+      for (let start = 0; start < bulkRows.length; start += batchSize) {
+        const batch = bulkRows.slice(start, start + batchSize);
         const response = await fetch("/api/admin/products/link-intake/bulk", {
           method: "POST",
           headers: headers(password),
-          body: JSON.stringify({ items: batch })
+          body: JSON.stringify({ items: batch.map((item) => ({ ...item, enrich_public_web: enrichPublicWeb })) })
         });
         const data = (await response.json().catch(() => ({}))) as BulkIntakeResult & { error?: string; message?: string };
         if (!response.ok) {
@@ -239,6 +242,21 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
         <label className="text-sm font-bold text-steel">파트너스 링크<span className="text-coral">*</span><input aria-invalid={!affiliateReady && form.affiliate_url.length > 0} className="focus-ring mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink" value={form.affiliate_url} onChange={(event) => update("affiliate_url", event.target.value)} placeholder="https://link.coupang.com/a/..." type="url" /></label>
         <label className="text-sm font-bold text-steel sm:col-span-2">쿠팡 상품 URL (선택)<input aria-invalid={!suppliedUrlReady} className="focus-ring mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink" value={form.coupang_url} onChange={(event) => update("coupang_url", event.target.value)} placeholder="https://www.coupang.com/vp/products/..." type="url" /></label>
         <label className="text-sm font-bold text-steel sm:col-span-2">공개 이미지 URL (선택)<input className="focus-ring mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink" value={form.image_url} onChange={(event) => update("image_url", event.target.value)} type="url" /></label>
+        <label className="flex items-start gap-3 rounded-lg border border-line bg-mist p-3 text-sm font-bold leading-6 text-ink sm:col-span-2">
+          <input
+            aria-describedby="admin-public-web-enrichment-help"
+            checked={enrichPublicWeb}
+            className="mt-1 size-4 accent-pine"
+            onChange={(event) => setEnrichPublicWeb(event.target.checked)}
+            type="checkbox"
+          />
+          <span>
+            공개 웹 정보 보강 시도
+            <span className="mt-1 block text-xs font-semibold leading-5 text-steel" id="admin-public-web-enrichment-help">
+              체크할 때만 입력한 쿠팡 상품 URL을 1회 확인합니다. PUBLIC_WEB allowlist와 robots.txt를 통과한 공개 HTML의 제목·이미지·명시 가격·반품 근거만 후보에 채우며, 결과는 항상 검수 대기로 저장됩니다. 설정이 꺼져 있거나 접근이 제한되면 입력값만 저장합니다.
+            </span>
+          </span>
+        </label>
         <label className="text-sm font-bold text-steel">공개 메모 (선택)<textarea className="focus-ring mt-1 min-h-20 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink" value={form.public_note} onChange={(event) => update("public_note", event.target.value)} /></label>
         <label className="text-sm font-bold text-steel">관리자 메모 (선택)<textarea className="focus-ring mt-1 min-h-20 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink" value={form.admin_memo} onChange={(event) => update("admin_memo", event.target.value)} /></label>
       </div>
@@ -247,7 +265,7 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="inline-flex items-center gap-2 text-sm font-black text-pine"><ListPlus size={16} aria-hidden /> 여러 링크 한 번에 등록</p>
-            <p className="mt-1 text-xs font-semibold leading-5 text-steel">한 줄에 상품명, 카테고리, 파트너스 링크, 쿠팡 상품 URL을 탭으로 구분하세요. 최대 40개까지 붙여넣을 수 있고, 서버에는 8개씩 순차 전송해 같은 검증을 거쳐 저장합니다.</p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-steel">한 줄에 상품명, 카테고리, 파트너스 링크, 쿠팡 상품 URL을 탭으로 구분하세요. 최대 40개까지 붙여넣을 수 있고, 일반 등록은 8개씩, 공개 웹 보강을 선택하면 2개씩 순차 전송해 같은 검증을 거쳐 저장합니다.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-line bg-white px-3 py-2 text-xs font-black text-ink hover:bg-mist" onClick={() => void copyBulkFieldOrder()} type="button">
@@ -264,12 +282,12 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
           value={bulkText}
         />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs font-semibold leading-5 text-steel">이미지 URL, 공개 메모, 관리자 메모는 선택 입력입니다. 가격·반품등급·재고는 이 흐름에서 만들지 않습니다.</p>
+          <p className="text-xs font-semibold leading-5 text-steel">이미지 URL, 공개 메모, 관리자 메모는 선택 입력입니다. 가격·반품등급·재고는 임의로 만들지 않으며, 공개 웹 보강을 선택한 경우에도 페이지에서 명시적으로 확인된 값만 후보에 채웁니다.</p>
           <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-pine bg-white px-4 py-2.5 text-sm font-black text-pine hover:bg-pine hover:text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={bulkSaving || saving || bulkRows.length < 1 || bulkRows.length > MAX_BULK_ROWS} onClick={() => void submitBulk()} type="button">
             {bulkSaving ? <LoaderCircle className="animate-spin" size={16} /> : <ListPlus size={16} aria-hidden />} {bulkSaving ? "검수 중" : "여러 후보 검수 대기 저장"}
           </button>
         </div>
-        {bulkSaving && bulkProgress ? <p className="mt-3 rounded-lg border border-line bg-mist px-3 py-2 text-xs font-bold text-steel" role="status">검수 중 {bulkProgress.completed}/{bulkProgress.total}개 처리됨 · 서버 요청은 {BULK_BATCH_SIZE}개 단위로 순차 실행됩니다.</p> : null}
+        {bulkSaving && bulkProgress ? <p className="mt-3 rounded-lg border border-line bg-mist px-3 py-2 text-xs font-bold text-steel" role="status">검수 중 {bulkProgress.completed}/{bulkProgress.total}개 처리됨 · 서버 요청은 {enrichPublicWeb ? PUBLIC_WEB_BULK_BATCH_SIZE : BULK_BATCH_SIZE}개 단위로 순차 실행됩니다.</p> : null}
         {bulkResult?.items?.length ? (
           <ul className="mt-3 space-y-1 rounded-lg border border-line bg-mist p-3 text-xs font-bold text-steel">
             {bulkResult.items.map((item) => <li key={`${item.index}-${item.product_id ?? item.error ?? "result"}`}><span className={item.status === "inserted" ? "font-black text-pine" : "font-black text-coral"}>{item.status === "inserted" ? "저장" : "확인 필요"}</span> · {item.index}번 {item.product_id ?? item.error ?? item.message ?? "처리 결과 없음"}{item.operator_next_action ? <span className="text-ink"> · 다음 조치: {item.operator_next_action}</span> : null}</li>)}

@@ -16,7 +16,7 @@ assert.match(route, /verifyCoupangAffiliateLinkResolution\(affiliateUrl\)/, "aff
 assert.match(route, /extractCoupangProductId/, "provided product URLs must be parsed for product IDs");
 assert.match(route, /AFFILIATE_TARGET_MISMATCH/, "mismatched destination IDs must not save");
 assert.match(route, /source_price: null[\s\S]*return_price: null[\s\S]*new_price: null[\s\S]*naver_lowest_price: null/, "prices remain unknown");
-assert.match(route, /condition_grade: "확인필요"/, "condition remains unverified");
+assert.match(route, /condition_grade:\s+metadata\?\.condition_grade\s*\?\?\s*"확인필요"/, "condition remains unverified");
 assert.match(route, /sourcing_status: "needs_review"[\s\S]*is_published: false/, "new candidates remain unpublished review items");
 assert.match(route, /findManualImportConflict/, "duplicate conflicts are checked before insert");
 assert.match(route, /calculateDealScore[\s\S]*createDealScore/, "score is saved after insert");

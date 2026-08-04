@@ -1,16 +1,20 @@
-import type { Category } from "@/lib/types";
+import type { Category, ConditionGrade, JsonValue } from "@/lib/types";
 import type { ProviderProduct, ProviderSearchResult } from "@/lib/providers/types";
 import { cleanText, extractListedPriceCandidatesFromText, extractListedPriceFromText, extractReturnInfoFromText, toReturnInfoJson } from "@/lib/webReturnInfo";
 import { getSiteUrl } from "@/lib/siteUrl";
 import { isPublicWebHostname, safeAllowlistedPublicUrl } from "@/lib/publicWebUrlSafety";
 import { collectJsonLdProducts, readJsonLdOfferPrice, readJsonLdText } from "@/lib/publicWebJsonLd";
 
-const robotsCache = new Map<string, Promise<RobotsFetchResult>>();
+const ROBOTS_CACHE_TTL_MS = 5 * 60_000;
+type RobotsCacheEntry = { promise: Promise<RobotsFetchResult>; expiresAt: number };
+const robotsCache = new Map<string, RobotsCacheEntry>();
 const originNextFetchAt = new Map<string, number>();
 const MAX_ROBOTS_BYTES = 250_000;
 const MAX_PUBLIC_WEB_HTML_BYTES = 750_000;
 const DEFAULT_PUBLIC_WEB_REQUEST_DELAY_MS = 1200;
 const MAX_SUPPORTED_CRAWL_DELAY_SECONDS = 10;
+const DEFAULT_PUBLIC_WEB_INSPECTION_BUDGET_MS = 5_000;
+export const PUBLIC_WEB_INTAKE_ENRICHMENT_BUDGET_MS = 4_500;
 export const MAX_PUBLIC_WEB_ALLOWED_HOSTS = 5;
 export const MAX_PUBLIC_WEB_SEARCH_TEMPLATES = 5;
 export const MAX_PUBLIC_WEB_DETAIL_PAGES = 3;
@@ -21,9 +25,9 @@ type RobotsFetchResult =
 
 type LimitedTextResult =
   | { status: "ok"; text: string }
-  | { status: "CONTENT_TOO_LARGE"; text: null; error: string };
+  | { status: "CONTENT_TOO_LARGE" | "FETCH_TIMEOUT"; text: null; error: string };
 
-type PublicWebDiagnostic = {
+export type PublicWebDiagnostic = {
   status: string;
   stage?: "search" | "detail";
   url?: string;
@@ -32,6 +36,48 @@ type PublicWebDiagnostic = {
   crawl_delay_seconds?: number | null;
   content_type?: string | null;
   extracted_count?: number;
+};
+
+export type PublicWebInspectionStatus =
+  | "ok"
+  | "DISABLED"
+  | "API_NOT_CONFIGURED"
+  | "INVALID_CONFIG"
+  | "INVALID_URL"
+  | "HTTPS_REQUIRED"
+  | "HOST_NOT_ALLOWED"
+  | "PRODUCT_PATH_REQUIRED"
+  | "PRODUCT_URL_REQUIRED"
+  | "ROBOTS_UNAVAILABLE"
+  | "ROBOTS_DISALLOWED"
+  | "CRAWL_DELAY_TOO_HIGH"
+  | "REDIRECT_BLOCKED"
+  | "HTTP_ERROR"
+  | "UNSUPPORTED_CONTENT_TYPE"
+  | "CONTENT_TOO_LARGE"
+  | "FETCH_TIMEOUT"
+  | "FETCH_FAILED";
+
+export type PublicWebProductInspectionInput = {
+  url: string;
+  category: Category;
+  deadlineAt?: number;
+};
+
+export type PublicWebProductInspectionResult = {
+  status: PublicWebInspectionStatus;
+  url: string | null;
+  enriched_metadata: {
+    title: string | null;
+    image_url: string | null;
+    source_price: number | null;
+    return_price: number | null;
+    condition_grade: ConditionGrade | null;
+    stock_count: number | null;
+  };
+  fields_filled: string[];
+  diagnostics: PublicWebDiagnostic[];
+  raw_json: Record<string, JsonValue>;
 };
 
 function isEnabled() {
@@ -83,14 +129,15 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 8000
   }
 }
 
-async function readTextWithLimit(response: Response, maxBytes: number): Promise<LimitedTextResult> {
+async function readTextWithLimit(response: Response, maxBytes: number, deadlineAt?: number): Promise<LimitedTextResult> {
   const declaredLength = Number(response.headers.get("content-length") ?? 0);
   if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
     return { status: "CONTENT_TOO_LARGE", text: null, error: `CONTENT_LENGTH_${declaredLength}` };
   }
 
   if (!response.body) {
-    const text = await response.text();
+    const text = deadlineAt == null ? await response.text() : await withDeadline(response.text(), deadlineAt);
+    if (text == null) return { status: "FETCH_TIMEOUT", text: null, error: "READ_DEADLINE_EXCEEDED" };
     const byteLength = new TextEncoder().encode(text).byteLength;
     if (byteLength > maxBytes) return { status: "CONTENT_TOO_LARGE", text: null, error: `CONTENT_BYTES_${byteLength}` };
     return { status: "ok", text };
@@ -101,7 +148,12 @@ async function readTextWithLimit(response: Response, maxBytes: number): Promise<
   let received = 0;
 
   while (true) {
-    const { done, value } = await reader.read();
+    const next = await readStreamChunk(reader, deadlineAt);
+    if (next.status === "timeout") {
+      await reader.cancel().catch(() => undefined);
+      return { status: "FETCH_TIMEOUT", text: null, error: "READ_DEADLINE_EXCEEDED" };
+    }
+    const { done, value } = next;
     if (done) break;
     if (!value) continue;
 
@@ -123,32 +175,87 @@ async function readTextWithLimit(response: Response, maxBytes: number): Promise<
   return { status: "ok", text: new TextDecoder().decode(body) };
 }
 
-async function getRobots(origin: string) {
-  if (!robotsCache.has(origin)) {
-    robotsCache.set(
-      origin,
-      fetchWithTimeout(`${origin}/robots.txt`, {
-        headers: { "User-Agent": crawlUserAgent(), Accept: "text/plain,*/*;q=0.8" },
-        redirect: "manual",
-        cache: "no-store"
+async function withDeadline<T>(promise: Promise<T>, deadlineAt?: number): Promise<T | null> {
+  if (deadlineAt == null) return promise;
+  const remainingMs = deadlineAt - Date.now();
+  if (remainingMs <= 0) return null;
+
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<null>((resolve) => {
+        timeout = setTimeout(() => resolve(null), remainingMs);
       })
-        .then(async (response) => {
-          if (response.ok) {
-            const limited = await readTextWithLimit(response, MAX_ROBOTS_BYTES);
-            if (limited.status !== "ok") return { status: "error", text: null, error: "ROBOTS_CONTENT_TOO_LARGE" } as const;
-            return { status: "ok", text: limited.text } as const;
-          }
-          if (response.status === 404) return { status: "missing", text: null, error: "ROBOTS_TXT_NOT_FOUND" } as const;
-          return { status: "error", text: null, error: `ROBOTS_HTTP_${response.status}` } as const;
-        })
-        .catch((error) => ({
-          status: "error" as const,
-          text: null,
-          error: error instanceof Error ? error.message : "ROBOTS_FETCH_FAILED"
-        }))
-    );
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
   }
-  return robotsCache.get(origin)!;
+}
+
+async function readStreamChunk(reader: ReadableStreamDefaultReader<Uint8Array>, deadlineAt?: number) {
+  if (deadlineAt == null) return { status: "ok" as const, ...(await reader.read()) };
+  const remainingMs = deadlineAt - Date.now();
+  if (remainingMs <= 0) return { status: "timeout" as const };
+
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  try {
+    const result = await Promise.race([
+      reader.read(),
+      new Promise<{ status: "timeout" }>((resolve) => {
+        timeout = setTimeout(() => resolve({ status: "timeout" }), remainingMs);
+      })
+    ]);
+    if ("status" in result) return result;
+    return { status: "ok" as const, ...result };
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+function evictRobots(origin: string, promise: Promise<RobotsFetchResult>) {
+  if (robotsCache.get(origin)?.promise === promise) robotsCache.delete(origin);
+}
+
+function getRobots(origin: string, timeoutMs = 8_000, deadlineAt?: number) {
+  const cached = robotsCache.get(origin);
+  if (cached && (cached.expiresAt === 0 || cached.expiresAt > Date.now())) return cached.promise;
+  if (cached) robotsCache.delete(origin);
+
+  const promise = fetchWithTimeout(
+    `${origin}/robots.txt`,
+    {
+      headers: { "User-Agent": crawlUserAgent(), Accept: "text/plain,*/*;q=0.8" },
+      redirect: "manual",
+      cache: "no-store"
+    },
+    timeoutMs
+  )
+    .then(async (response) => {
+      if (response.ok) {
+        const limited = await readTextWithLimit(response, MAX_ROBOTS_BYTES, deadlineAt);
+        if (limited.status !== "ok") {
+          return { status: "error", text: null, error: limited.status === "FETCH_TIMEOUT" ? "ROBOTS_FETCH_TIMEOUT" : "ROBOTS_CONTENT_TOO_LARGE" } as const;
+        }
+        return { status: "ok", text: limited.text } as const;
+      }
+      if (response.status === 404) return { status: "missing", text: null, error: "ROBOTS_TXT_NOT_FOUND" } as const;
+      return { status: "error", text: null, error: `ROBOTS_HTTP_${response.status}` } as const;
+    })
+    .catch((error) => ({
+      status: "error" as const,
+      text: null,
+      error: error instanceof Error ? error.message : "ROBOTS_FETCH_FAILED"
+    }));
+
+  const entry: RobotsCacheEntry = { promise, expiresAt: 0 };
+  robotsCache.set(origin, entry);
+  void promise.then((result) => {
+    if (robotsCache.get(origin)?.promise !== promise) return;
+    if (result.status === "ok") entry.expiresAt = Date.now() + ROBOTS_CACHE_TTL_MS;
+    else robotsCache.delete(origin);
+  });
+  return promise;
 }
 
 function pathMatches(rule: string, pathname: string) {
@@ -244,13 +351,19 @@ function crawlDelaySecondsForRobots(robots: string | null, userAgent: string) {
   return group?.crawlDelaySeconds ?? null;
 }
 
-async function waitForOriginRateLimit(origin: string, delayMs: number) {
+async function waitForOriginRateLimit(origin: string, delayMs: number, deadlineAt?: number) {
+  const now = Date.now();
   const nextFetchAt = originNextFetchAt.get(origin) ?? 0;
-  const waitMs = Math.max(0, nextFetchAt - Date.now());
+  const scheduledAt = Math.max(now, nextFetchAt);
+  if (deadlineAt != null && scheduledAt > deadlineAt) return false;
+
+  // Reserve the next slot before waiting so concurrent callers cannot wake together.
+  originNextFetchAt.set(origin, scheduledAt + delayMs);
+  const waitMs = scheduledAt - now;
   if (waitMs > 0) {
     await new Promise((resolve) => setTimeout(resolve, waitMs));
   }
-  originNextFetchAt.set(origin, Date.now() + delayMs);
+  return true;
 }
 
 function safeTemplateUrl(template: string, keyword: string) {
@@ -1019,6 +1132,244 @@ async function enrichProductDetails(
   }
 
   return enriched;
+}
+
+function compactInspectionDiagnostics(diagnostics: PublicWebDiagnostic[]) {
+  return diagnostics.slice(0, 6).map((item) => ({
+    status: item.status,
+    stage: item.stage ?? null,
+    url: item.url ?? null,
+    error: item.error ?? null,
+    robots_status: item.robots_status ?? null,
+    crawl_delay_seconds: item.crawl_delay_seconds ?? null,
+    content_type: item.content_type ?? null,
+    extracted_count: item.extracted_count ?? null
+  }));
+}
+
+function emptyInspectionMetadata() {
+  return {
+    title: null,
+    image_url: null,
+    source_price: null,
+    return_price: null,
+    condition_grade: null,
+    stock_count: null
+  } as const;
+}
+
+/** Inspect one explicit allowlisted page without creating or publishing a product. */
+export async function inspectPublicWebProductUrl(input: PublicWebProductInspectionInput): Promise<PublicWebProductInspectionResult> {
+  const deadlineAt =
+    typeof input.deadlineAt === "number" && Number.isFinite(input.deadlineAt)
+      ? input.deadlineAt
+      : Date.now() + DEFAULT_PUBLIC_WEB_INSPECTION_BUDGET_MS;
+
+  if (!isEnabled()) {
+    return { status: "DISABLED", url: null, enriched_metadata: emptyInspectionMetadata(), fields_filled: [], diagnostics: [], raw_json: {} };
+  }
+
+  const rawUrl = input.url.trim();
+  if (!rawUrl) {
+    return { status: "INVALID_URL", url: null, enriched_metadata: emptyInspectionMetadata(), fields_filled: [], diagnostics: [], raw_json: {} };
+  }
+
+  const hosts = allowedHosts();
+  if (!hosts.size || hosts.size > MAX_PUBLIC_WEB_ALLOWED_HOSTS || Array.from(hosts).some((host) => !isPublicWebHostname(host))) {
+    return {
+      status: "INVALID_CONFIG",
+      url: null,
+      enriched_metadata: emptyInspectionMetadata(),
+      fields_filled: [],
+      diagnostics: [{ stage: "detail", status: "INVALID_CONFIG", error: "PUBLIC_WEB_ALLOWED_HOSTS_INVALID" }],
+      raw_json: {}
+    };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return { status: "INVALID_URL", url: null, enriched_metadata: emptyInspectionMetadata(), fields_filled: [], diagnostics: [], raw_json: {} };
+  }
+  if (parsed.protocol !== "https:") {
+    return { status: "HTTPS_REQUIRED", url: null, enriched_metadata: emptyInspectionMetadata(), fields_filled: [], diagnostics: [{ stage: "detail", status: "HTTPS_REQUIRED" }], raw_json: {} };
+  }
+
+  const detailUrl = safeAllowlistedPublicUrl(rawUrl, parsed, hosts);
+  if (!detailUrl) {
+    return {
+      status: "HOST_NOT_ALLOWED",
+      url: null,
+      enriched_metadata: emptyInspectionMetadata(),
+      fields_filled: [],
+      diagnostics: [{ stage: "detail", status: "HOST_NOT_ALLOWED", url: rawUrl.slice(0, 240) }],
+      raw_json: {}
+    };
+  }
+  if (detailUrl.pathname === "/") {
+    return {
+      status: "PRODUCT_PATH_REQUIRED",
+      url: detailUrl.toString(),
+      enriched_metadata: emptyInspectionMetadata(),
+      fields_filled: [],
+      diagnostics: [{ stage: "detail", status: "PRODUCT_PATH_REQUIRED", url: detailUrl.toString() }],
+      raw_json: {}
+    };
+  }
+
+  const normalizedUrl = detailUrl.toString();
+  if (deadlineAt <= Date.now()) {
+    return {
+      status: "FETCH_TIMEOUT",
+      url: normalizedUrl,
+      enriched_metadata: emptyInspectionMetadata(),
+      fields_filled: [],
+      diagnostics: [{ stage: "detail", status: "FETCH_TIMEOUT", url: normalizedUrl, error: "INSPECTION_DEADLINE_EXCEEDED" }],
+      raw_json: {}
+    };
+  }
+
+  const diagnostics: PublicWebDiagnostic[] = [];
+  let robots: RobotsFetchResult | null;
+  const robotsPromise = getRobots(detailUrl.origin, Math.min(8_000, deadlineAt - Date.now()), deadlineAt);
+  try {
+    robots = await withDeadline(robotsPromise, deadlineAt);
+  } catch (error) {
+    evictRobots(detailUrl.origin, robotsPromise);
+    diagnostics.push({ stage: "detail", status: "FETCH_FAILED", url: normalizedUrl, error: error instanceof Error ? error.message.slice(0, 160) : "ROBOTS_FETCH_FAILED" });
+    return { status: "FETCH_FAILED", url: normalizedUrl, enriched_metadata: emptyInspectionMetadata(), fields_filled: [], diagnostics, raw_json: {} };
+  }
+  if (!robots) {
+    evictRobots(detailUrl.origin, robotsPromise);
+    diagnostics.push({ stage: "detail", status: "FETCH_TIMEOUT", url: normalizedUrl, error: "ROBOTS_DEADLINE_EXCEEDED" });
+    return { status: "FETCH_TIMEOUT", url: normalizedUrl, enriched_metadata: emptyInspectionMetadata(), fields_filled: [], diagnostics, raw_json: {} };
+  }
+  if (robots.status !== "ok") {
+    diagnostics.push({ stage: "detail", status: "ROBOTS_UNAVAILABLE", url: normalizedUrl, robots_status: robots.status, error: robots.error });
+    return { status: "ROBOTS_UNAVAILABLE", url: normalizedUrl, enriched_metadata: emptyInspectionMetadata(), fields_filled: [], diagnostics, raw_json: {} };
+  }
+  if (!isPathAllowedByRobots(robots.text, detailUrl.pathname, crawlUserAgent())) {
+    diagnostics.push({ stage: "detail", status: "ROBOTS_DISALLOWED", url: normalizedUrl, robots_status: robots.status });
+    return { status: "ROBOTS_DISALLOWED", url: normalizedUrl, enriched_metadata: emptyInspectionMetadata(), fields_filled: [], diagnostics, raw_json: {} };
+  }
+
+  const crawlDelaySeconds = crawlDelaySecondsForRobots(robots.text, crawlUserAgent());
+  if (crawlDelaySeconds != null && crawlDelaySeconds > MAX_SUPPORTED_CRAWL_DELAY_SECONDS) {
+    diagnostics.push({ stage: "detail", status: "CRAWL_DELAY_TOO_HIGH", url: normalizedUrl, error: `CRAWL_DELAY_${crawlDelaySeconds}` });
+    return { status: "CRAWL_DELAY_TOO_HIGH", url: normalizedUrl, enriched_metadata: emptyInspectionMetadata(), fields_filled: [], diagnostics, raw_json: {} };
+  }
+
+  const waitReady = await waitForOriginRateLimit(
+    detailUrl.origin,
+    Math.max(DEFAULT_PUBLIC_WEB_REQUEST_DELAY_MS, Math.ceil((crawlDelaySeconds ?? 0) * 1000)),
+    deadlineAt
+  );
+  if (!waitReady) {
+    diagnostics.push({ stage: "detail", status: "FETCH_TIMEOUT", url: normalizedUrl, error: "RATE_LIMIT_DEADLINE_EXCEEDED" });
+    return { status: "FETCH_TIMEOUT", url: normalizedUrl, enriched_metadata: emptyInspectionMetadata(), fields_filled: [], diagnostics, raw_json: {} };
+  }
+
+  let response: Response;
+  try {
+    const remainingMs = deadlineAt - Date.now();
+    if (remainingMs <= 0) throw new Error("INSPECTION_DEADLINE_EXCEEDED");
+    response = await fetchWithTimeout(normalizedUrl, {
+      headers: { "User-Agent": crawlUserAgent(), Accept: "text/html,application/xhtml+xml" },
+      redirect: "manual",
+      cache: "no-store"
+    }, Math.min(8_000, remainingMs));
+  } catch (error) {
+    const message = error instanceof Error ? error.message.slice(0, 160) : "FETCH_FAILED";
+    const timedOut = message === "INSPECTION_DEADLINE_EXCEEDED" || message.toLowerCase().includes("abort");
+    diagnostics.push({ stage: "detail", status: timedOut ? "FETCH_TIMEOUT" : "FETCH_FAILED", url: normalizedUrl, error: message });
+    return { status: timedOut ? "FETCH_TIMEOUT" : "FETCH_FAILED", url: normalizedUrl, enriched_metadata: emptyInspectionMetadata(), fields_filled: [], diagnostics, raw_json: {} };
+  }
+  if (response.status >= 300 && response.status < 400) {
+    diagnostics.push({ stage: "detail", status: "REDIRECT_BLOCKED", url: normalizedUrl, error: safeRedirectTarget(response.headers.get("location"), detailUrl, response.status) });
+    return { status: "REDIRECT_BLOCKED", url: normalizedUrl, enriched_metadata: emptyInspectionMetadata(), fields_filled: [], diagnostics, raw_json: {} };
+  }
+  if (!response.ok) {
+    diagnostics.push({ stage: "detail", status: "HTTP_ERROR", url: normalizedUrl, error: `HTTP_${response.status}` });
+    return { status: "HTTP_ERROR", url: normalizedUrl, enriched_metadata: emptyInspectionMetadata(), fields_filled: [], diagnostics, raw_json: {} };
+  }
+
+  const contentType = response.headers.get("content-type");
+  if (!isHtmlContentType(contentType)) {
+    diagnostics.push({ stage: "detail", status: "UNSUPPORTED_CONTENT_TYPE", url: normalizedUrl, content_type: contentType, error: contentType ?? "MISSING_CONTENT_TYPE" });
+    return { status: "UNSUPPORTED_CONTENT_TYPE", url: normalizedUrl, enriched_metadata: emptyInspectionMetadata(), fields_filled: [], diagnostics, raw_json: {} };
+  }
+  let htmlResult: LimitedTextResult;
+  try {
+    htmlResult = await readTextWithLimit(response, MAX_PUBLIC_WEB_HTML_BYTES, deadlineAt);
+  } catch (error) {
+    diagnostics.push({ stage: "detail", status: "FETCH_FAILED", url: normalizedUrl, error: error instanceof Error ? error.message.slice(0, 160) : "BODY_READ_FAILED" });
+    return { status: "FETCH_FAILED", url: normalizedUrl, enriched_metadata: emptyInspectionMetadata(), fields_filled: [], diagnostics, raw_json: {} };
+  }
+  if (htmlResult.status !== "ok") {
+    diagnostics.push({ stage: "detail", status: htmlResult.status, url: normalizedUrl, error: htmlResult.error });
+    return { status: htmlResult.status, url: normalizedUrl, enriched_metadata: emptyInspectionMetadata(), fields_filled: [], diagnostics, raw_json: {} };
+  }
+
+  const pageTitle = readMetaContent(htmlResult.text, ["og:title", "twitter:title"]) ?? readHtmlTitle(htmlResult.text);
+  const baseProduct: ProviderProduct = {
+    source: "public_web_manual",
+    source_product_id: null,
+    category: input.category,
+    keyword: "",
+    title: pageTitle || "공개 웹 상품",
+    image_url: null,
+    source_url: normalizedUrl,
+    coupang_url: normalizedUrl,
+    affiliate_url: null,
+    source_price: null,
+    return_price: null,
+    new_price: null,
+    stock_count: null,
+    raw_json: { provider: "public_web_manual" }
+  };
+  const enriched = enrichProductFromDetail(baseProduct, htmlResult.text, detailUrl, hosts);
+  diagnostics.push({
+    stage: "detail",
+    status: "FETCHED_DETAIL",
+    url: normalizedUrl,
+    robots_status: robots.status,
+    crawl_delay_seconds: crawlDelaySeconds,
+    content_type: contentType
+  });
+
+  const detailPage =
+    enriched.raw_json?.web_return_info && typeof enriched.raw_json.web_return_info === "object" && !Array.isArray(enriched.raw_json.web_return_info)
+      ? (enriched.raw_json.web_return_info as Record<string, JsonValue>).detail_page
+      : null;
+  const detailPageRecord = detailPage && typeof detailPage === "object" && !Array.isArray(detailPage) ? (detailPage as Record<string, JsonValue>) : null;
+  const extractedConditionGrade = detailPageRecord?.condition_grade;
+  const conditionGrade =
+    typeof extractedConditionGrade === "string" &&
+    ["미개봉", "최상", "상", "중", "알수없음"].includes(extractedConditionGrade)
+      ? (extractedConditionGrade as ConditionGrade)
+      : null;
+  const enrichedMetadata = {
+    title: pageTitle ?? null,
+    image_url: enriched.image_url ?? null,
+    source_price: enriched.source_price ?? null,
+    return_price: enriched.return_price ?? null,
+    condition_grade: conditionGrade,
+    stock_count: enriched.stock_count ?? null
+  };
+  const fieldsFilled = Object.entries(enrichedMetadata)
+    .filter(([, value]) => value !== null && value !== "")
+    .map(([key]) => key);
+  const rawJson = {
+    ...(enriched.raw_json ?? {}),
+    public_web_inspection: {
+      url: normalizedUrl,
+      status: "ok",
+      diagnostics: compactInspectionDiagnostics(diagnostics)
+    }
+  } satisfies Record<string, JsonValue>;
+
+  return { status: "ok", url: normalizedUrl, enriched_metadata: enrichedMetadata, fields_filled: fieldsFilled, diagnostics, raw_json: rawJson };
 }
 
 export async function searchPublicWebProducts(keyword: string, category: Category): Promise<ProviderSearchResult> {
