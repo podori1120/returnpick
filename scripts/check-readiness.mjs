@@ -4834,6 +4834,15 @@ if (fileExists("components/AdminProductEditor.tsx")) {
     "product editor can atomically save and publish only when the same customer quality gate is ready",
     "required"
   );
+  check(
+    "admin: Naver price search shortcut",
+    productEditor.includes("naverShoppingSearchUrl") &&
+      productEditor.includes("search.shopping.naver.com/search/all?query=") &&
+      productEditor.includes("네이버 쇼핑에서 동일 상품 찾기") &&
+      productEditor.includes("currentNaverTrust?.label ?? \"네이버 가격 없음\""),
+    "Naver-missing candidates expose a direct same-model shopping search before manual price confirmation",
+    "required"
+  );
 }
 
 if (fileExists("lib/publicDeal.ts")) {

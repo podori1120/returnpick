@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Save, Upload } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ExternalLink, Save, Search, Upload } from "lucide-react";
 import { isApprovalSampleAffiliateUrl, isGenericCoupangLandingUrl, isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
 import { toNumberOrNull } from "@/lib/format";
 import { isUsableProductImageUrl } from "@/lib/productImageUrl";
@@ -12,6 +12,11 @@ import type { ConditionGrade, ProductWithScore } from "@/lib/types";
 
 function headers(password: string) {
   return { "Content-Type": "application/json", "x-admin-password": password };
+}
+
+function naverShoppingSearchUrl(product: ProductWithScore) {
+  const query = [product.brand, product.model_name].filter((value): value is string => Boolean(value?.trim())).join(" ").trim() || product.title;
+  return `https://search.shopping.naver.com/search/all?query=${encodeURIComponent(query)}`;
 }
 
 export default function AdminProductEditor({
@@ -207,6 +212,19 @@ export default function AdminProductEditor({
         <p className="mt-1 text-sm font-bold text-ink">
           {naverPriceNeedsConfirmation ? "입력한 가격은 동일 상품 확인 전에는 점수와 할인율에 반영되지 않습니다." : currentNaverTrust?.label ?? "네이버 가격 없음"}
         </p>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <a
+            className="focus-ring inline-flex items-center gap-1.5 text-xs font-black text-pine underline underline-offset-2 hover:text-ink"
+            href={naverShoppingSearchUrl(product)}
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            <Search size={14} aria-hidden />
+            네이버 쇼핑에서 동일 상품 찾기
+            <ExternalLink size={13} aria-hidden />
+          </a>
+          <span className="text-[11px] font-semibold text-steel">{product.brand || product.model_name ? `${product.brand ?? ""} ${product.model_name ?? ""}`.trim() : product.title}</span>
+        </div>
         {naverPriceValue != null ? (
           <label className="mt-2 flex items-start gap-2 text-sm font-bold text-ink">
             <input
