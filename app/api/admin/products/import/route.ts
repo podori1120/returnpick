@@ -6,7 +6,7 @@ import { findManualImportConflict, getManualImportTitleKey } from "@/lib/manualI
 import { getProductImageUrlIssue, isUsableProductImageUrl } from "@/lib/productImageUrl";
 import { calculateDealScore } from "@/lib/scoring";
 import { parseSpecsFromTitle } from "@/lib/specParser";
-import { isCategory, isConditionGrade, requireAdmin } from "@/lib/validators";
+import { isCategory, isConditionGrade, requireAdmin, requirePersistentStorage } from "@/lib/validators";
 
 type ImportItem = {
   product_id: string | null;
@@ -48,6 +48,8 @@ function parseIntegerField(value: string | undefined, minimum: number, invalidRe
 export async function POST(request: Request) {
   const unauthorized = requireAdmin(request);
   if (unauthorized) return unauthorized;
+  const storageUnavailable = requirePersistentStorage();
+  if (storageUnavailable) return storageUnavailable;
 
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;

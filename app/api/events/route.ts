@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAffiliateEvent, getProductById } from "@/lib/dataStore";
 import { getCoupangOutboundLink, isCoupangPartnersLink } from "@/lib/coupangLink";
 import { isPublicDealVisible } from "@/lib/publicDeal";
+import { getSupabaseServiceClient } from "@/lib/supabase";
 import type { AffiliateEventType } from "@/lib/types";
 
 const eventTypes = new Set<AffiliateEventType>(["impression", "detail_view", "affiliate_click", "telegram_detail_click", "share_copy"]);
@@ -160,6 +161,16 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   if (!isEventType(body.event_type)) {
     return NextResponse.json({ error: "INVALID_EVENT_TYPE" }, { status: 400 });
+  }
+  if (process.env.NODE_ENV === "production" && !getSupabaseServiceClient()) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "PERSISTENT_STORAGE_NOT_CONFIGURED",
+        message: "클릭 집계를 저장할 운영 DB가 아직 연결되지 않았습니다. 구매 이동은 계속되지만 이 이벤트는 기록되지 않습니다."
+      },
+      { status: 503, headers: { "Cache-Control": "no-store" } }
+    );
   }
   const eventType = body.event_type;
 

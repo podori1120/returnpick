@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createKeyword, DEFAULT_SOURCING_KEYWORDS, listKeywords, updateKeyword } from "@/lib/dataStore";
 import { getSourcingKeywordCoverage } from "@/lib/keywordCoverage";
-import { isCategory, requireAdmin, sanitizeText } from "@/lib/validators";
+import { isCategory, requireAdmin, requirePersistentStorage, sanitizeText } from "@/lib/validators";
 import type { Category } from "@/lib/types";
 
 type KeywordPayload = {
@@ -97,6 +97,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const unauthorized = requireAdmin(request);
   if (unauthorized) return unauthorized;
+  const storageUnavailable = requirePersistentStorage();
+  if (storageUnavailable) return storageUnavailable;
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const payload = buildKeywordPayload(body);
@@ -117,6 +119,8 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const unauthorized = requireAdmin(request);
   if (unauthorized) return unauthorized;
+  const storageUnavailable = requirePersistentStorage();
+  if (storageUnavailable) return storageUnavailable;
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const id = sanitizeText(body.id);

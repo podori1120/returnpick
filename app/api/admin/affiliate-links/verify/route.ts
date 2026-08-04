@@ -9,7 +9,7 @@ import {
 import { verifyCoupangAffiliateLinkResolution } from "@/lib/coupangAffiliateLinkVerifier";
 import { isApprovalSampleAffiliateUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { getProductById, updateProduct } from "@/lib/dataStore";
-import { requireAdmin } from "@/lib/validators";
+import { requireAdmin, requirePersistentStorage } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -36,6 +36,8 @@ function identityMessage(record: AffiliateIdentityRecord, fallback: string) {
 export async function POST(request: Request) {
   const unauthorized = requireAdmin(request);
   if (unauthorized) return unauthorized;
+  const storageUnavailable = requirePersistentStorage();
+  if (storageUnavailable) return storageUnavailable;
 
   const contentLengthHeader = request.headers.get("content-length");
   const declaredLength = contentLengthHeader ? Number.parseInt(contentLengthHeader, 10) : 0;

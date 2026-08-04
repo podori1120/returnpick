@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { calculateDealScore } from "@/lib/scoring";
 import { createDealScore, getProductById, updateProduct } from "@/lib/dataStore";
 import { mergeManualNaverPriceEvidence } from "@/lib/naverPriceTrust";
-import { requireAdmin } from "@/lib/validators";
+import { requireAdmin, requirePersistentStorage } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -59,6 +59,8 @@ function getEntries(value: unknown) {
 export async function POST(request: Request) {
   const unauthorized = requireAdmin(request);
   if (unauthorized) return unauthorized;
+  const storageUnavailable = requirePersistentStorage();
+  if (storageUnavailable) return storageUnavailable;
 
   const contentLength = Number(request.headers.get("content-length") ?? 0);
   if (Number.isFinite(contentLength) && contentLength > MAX_PAYLOAD_BYTES) {

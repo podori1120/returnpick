@@ -10,7 +10,7 @@ import { backfillNaverLowestPrices } from "@/lib/naverPriceBackfill";
 import { getNaverPriceTrust } from "@/lib/naverPriceTrust";
 import { isPublicDealReady } from "@/lib/publicDeal";
 import { runSourcing } from "@/lib/sourcing";
-import { requireAdmin } from "@/lib/validators";
+import { requireAdmin, requirePersistentStorage } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -233,6 +233,8 @@ function getLaunchDataSignal(
 export async function POST(request: Request) {
   const unauthorized = requireAdmin(request);
   if (unauthorized) return unauthorized;
+  const storageUnavailable = requirePersistentStorage();
+  if (storageUnavailable) return storageUnavailable;
 
   try {
   const launchStartedAt = Date.now();

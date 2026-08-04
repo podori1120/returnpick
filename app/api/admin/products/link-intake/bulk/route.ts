@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { POST as intakeOne } from "@/app/api/admin/products/link-intake/route";
-import { requireAdmin } from "@/lib/validators";
+import { requireAdmin, requirePersistentStorage } from "@/lib/validators";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -43,6 +43,8 @@ function resultStatus(status: number) {
 export async function POST(request: Request) {
   const unauthorized = requireAdmin(request);
   if (unauthorized) return unauthorized;
+  const storageUnavailable = requirePersistentStorage();
+  if (storageUnavailable) return storageUnavailable;
 
   try {
     const raw = await request.text();

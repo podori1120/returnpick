@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { runScheduledAffiliateBackfill, runScheduledSourcing, runScheduledTelegramDigest } from "@/lib/scheduler";
-import { requireAdmin } from "@/lib/validators";
+import { requireAdmin, requirePersistentStorage } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -18,6 +18,8 @@ function schedulerRunErrorResponse(error: unknown) {
 export async function POST(request: Request) {
   const unauthorized = requireAdmin(request);
   if (unauthorized) return unauthorized;
+  const storageUnavailable = requirePersistentStorage();
+  if (storageUnavailable) return storageUnavailable;
 
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;

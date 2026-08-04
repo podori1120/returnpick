@@ -7,7 +7,7 @@ import { findManualImportConflict } from "@/lib/manualImportIdentity";
 import { getProductImageUrlIssue, isUsableProductImageUrl } from "@/lib/productImageUrl";
 import { calculateDealScore } from "@/lib/scoring";
 import { parseSpecsFromTitle } from "@/lib/specParser";
-import { isCategory, requireAdmin, sanitizeText } from "@/lib/validators";
+import { isCategory, requireAdmin, requirePersistentStorage, sanitizeText } from "@/lib/validators";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -27,6 +27,8 @@ function nextAction(identityStatus: string) {
 export async function POST(request: Request) {
   const unauthorized = requireAdmin(request);
   if (unauthorized) return unauthorized;
+  const storageUnavailable = requirePersistentStorage();
+  if (storageUnavailable) return storageUnavailable;
 
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;

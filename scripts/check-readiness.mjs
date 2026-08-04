@@ -553,6 +553,70 @@ if (fileExists("package.json") && fileExists("app/api/admin/products/link-intake
   );
 }
 
+if (fileExists("lib/validators.ts") && fileExists("app/api/events/route.ts")) {
+  const validators = readText("lib/validators.ts");
+  const eventsRoute = readText("app/api/events/route.ts");
+  const persistentWriteHandlers = [
+    ["app/api/admin/keywords/route.ts", "export async function POST("],
+    ["app/api/admin/keywords/route.ts", "export async function PATCH("],
+    ["app/api/admin/products/route.ts", "export async function POST("],
+    ["app/api/admin/products/import/route.ts", "export async function POST("],
+    ["app/api/admin/products/link-intake/route.ts", "export async function POST("],
+    ["app/api/admin/products/link-intake/bulk/route.ts", "export async function POST("],
+    ["app/api/admin/products/[id]/route.ts", "export async function PATCH("],
+    ["app/api/admin/prices/manual/route.ts", "export async function POST("],
+    ["app/api/admin/prices/backfill/route.ts", "export async function POST("],
+    ["app/api/admin/affiliate-links/verify/route.ts", "export async function POST("],
+    ["app/api/admin/affiliate-links/import/route.ts", "export async function POST("],
+    ["app/api/admin/affiliate-links/backfill/route.ts", "export async function POST("],
+    ["app/api/admin/sourcing/run/route.ts", "export async function POST("],
+    ["app/api/admin/scheduler/run/route.ts", "export async function POST("],
+    ["app/api/admin/launch/route.ts", "export async function POST("],
+    ["app/api/admin/telegram/route.ts", "export async function POST("]
+  ];
+  const handlerBody = (source, marker) => {
+    const start = source.indexOf(marker);
+    if (start < 0) return null;
+    const nextHandler = source.indexOf("export async function ", start + marker.length);
+    return source.slice(start, nextHandler >= 0 ? nextHandler : source.length);
+  };
+  const storageHelperStart = validators.indexOf("export function requirePersistentStorage()");
+  const storageHelperEnd = validators.indexOf("export function sanitizeText", storageHelperStart);
+  const storageHelper = validators.slice(storageHelperStart, storageHelperEnd >= 0 ? storageHelperEnd : validators.length);
+  const hasGuardAfterAdminAuth = (source, marker) => {
+    const body = handlerBody(source, marker);
+    if (!body) return false;
+    const authIndex = body.indexOf("const unauthorized = requireAdmin(request);");
+    const authReturnIndex = body.indexOf("if (unauthorized) return unauthorized;", authIndex);
+    const guardIndex = body.indexOf("const storageUnavailable = requirePersistentStorage();", authReturnIndex);
+    const guardReturnIndex = body.indexOf("if (storageUnavailable) return storageUnavailable;", guardIndex);
+    return authIndex >= 0 && authReturnIndex > authIndex && guardIndex > authReturnIndex && guardReturnIndex > guardIndex;
+  };
+  const eventValidationIndex = eventsRoute.indexOf("if (!isEventType(body.event_type))");
+  const eventGuardIndex = eventsRoute.indexOf('if (process.env.NODE_ENV === "production" && !getSupabaseServiceClient())');
+  const eventGuardEnd = eventsRoute.indexOf("const eventType", eventGuardIndex);
+  const eventGuard = eventsRoute.slice(eventGuardIndex, eventGuardEnd >= 0 ? eventGuardEnd : eventsRoute.length);
+  const eventWriteIndex = eventsRoute.indexOf("const event = await createAffiliateEvent");
+  check(
+    "production storage: no false-success writes",
+      validators.includes("export function requirePersistentStorage()") &&
+      validators.includes('if (process.env.NODE_ENV !== "production" || getSupabaseServiceClient()) return null;') &&
+      storageHelper.includes('error: "PERSISTENT_STORAGE_NOT_CONFIGURED"') &&
+      storageHelper.includes("status: 503") &&
+      storageHelper.includes('"Cache-Control": "no-store"') &&
+      eventsRoute.includes("PERSISTENT_STORAGE_NOT_CONFIGURED") &&
+      eventValidationIndex >= 0 &&
+      eventGuardIndex > eventValidationIndex &&
+      eventWriteIndex > eventGuardIndex &&
+      eventGuard.includes("return NextResponse.json") &&
+      eventGuard.includes("status: 503") &&
+      eventGuard.includes('"Cache-Control": "no-store"') &&
+      persistentWriteHandlers.every(([file, marker]) => fileExists(file) && hasGuardAfterAdminAuth(readText(file), marker)),
+    "production admin mutations and affiliate event storage fail clearly until a durable Supabase store is connected",
+    "required"
+  );
+}
+
 if (fileExists("components/AffiliateButton.tsx") && fileExists("components/ApprovalCoupangButton.tsx")) {
   const affiliateButton = readText("components/AffiliateButton.tsx");
   const approvalButton = readText("components/ApprovalCoupangButton.tsx");

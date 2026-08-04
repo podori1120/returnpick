@@ -9,7 +9,7 @@ import { getCoupangPartnersLinkIssue, isApprovalSampleAffiliateUrl, isGenericCou
 import { getProductImageUrlIssue } from "@/lib/productImageUrl";
 import { getNaverPriceTrust, mergeManualNaverPriceEvidence } from "@/lib/naverPriceTrust";
 import { createManualCatalogReview, isManualCatalogSource } from "@/lib/manualCatalogReview";
-import { isConditionGrade, isSourcingStatus, requireAdmin, sanitizeText } from "@/lib/validators";
+import { isConditionGrade, isSourcingStatus, requireAdmin, requirePersistentStorage, sanitizeText } from "@/lib/validators";
 import type { ConditionGrade, ProductWithScore, SourcedProduct, SourcingStatus } from "@/lib/types";
 
 function productMutationErrorResponse(error: unknown) {
@@ -116,6 +116,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const unauthorized = requireAdmin(request);
   if (unauthorized) return unauthorized;
+  const storageUnavailable = requirePersistentStorage();
+  if (storageUnavailable) return storageUnavailable;
 
   try {
     const { id } = await context.params;

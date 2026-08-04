@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { listProducts } from "@/lib/dataStore";
 import { backfillNaverLowestPrices } from "@/lib/naverPriceBackfill";
 import { getNaverPriceTrust } from "@/lib/naverPriceTrust";
-import { requireAdmin } from "@/lib/validators";
+import { requireAdmin, requirePersistentStorage } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -47,6 +47,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const unauthorized = requireAdmin(request);
   if (unauthorized) return unauthorized;
+  const storageUnavailable = requirePersistentStorage();
+  if (storageUnavailable) return storageUnavailable;
 
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;

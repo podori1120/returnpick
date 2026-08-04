@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+import { getSupabaseServiceClient } from "@/lib/supabase";
 import type { Category, ConditionGrade, SourcingStatus } from "@/lib/types";
 
 export const ADMIN_SESSION_COOKIE = "returnpick_admin_session";
@@ -166,6 +167,26 @@ export function requireAdmin(request: Request) {
   }
 
   return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+}
+
+/**
+ * Production writes must land in Supabase. The in-process store is intentionally
+ * useful for local development, but it is not durable across serverless instances.
+ */
+export function requirePersistentStorage() {
+  if (process.env.NODE_ENV !== "production" || getSupabaseServiceClient()) return null;
+
+  return NextResponse.json(
+    {
+      error: "PERSISTENT_STORAGE_NOT_CONFIGURED",
+      message: "운영 DB가 연결되지 않아 변경을 저장하지 않았습니다. 현재 화면은 승인 전 확인용 모드입니다.",
+      operator_next_action: "Supabase SQL을 적용하고 NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY를 Vercel Production에 등록한 뒤 다시 시도하세요."
+    },
+    {
+      status: 503,
+      headers: { "Cache-Control": "no-store" }
+    }
+  );
 }
 
 export function sanitizeText(value: unknown, fallback = "") {

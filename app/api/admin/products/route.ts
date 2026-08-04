@@ -6,7 +6,7 @@ import { getCoupangPartnersLinkIssue, isApprovalSampleAffiliateUrl, isUsableAffi
 import { getProductImageUrlIssue, isUsableProductImageUrl } from "@/lib/productImageUrl";
 import { isPublicDealReady } from "@/lib/publicDeal";
 import { findManualImportConflict } from "@/lib/manualImportIdentity";
-import { isCategory, isSourcingStatus, requireAdmin, sanitizeText } from "@/lib/validators";
+import { isCategory, isSourcingStatus, requireAdmin, requirePersistentStorage, sanitizeText } from "@/lib/validators";
 import { parseSpecsFromTitle } from "@/lib/specParser";
 
 function adminProductsErrorResponse(error: unknown) {
@@ -45,6 +45,8 @@ function boundedText(value: unknown, maxLength: number) {
 export async function POST(request: Request) {
   const unauthorized = requireAdmin(request);
   if (unauthorized) return unauthorized;
+  const storageUnavailable = requirePersistentStorage();
+  if (storageUnavailable) return storageUnavailable;
 
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;

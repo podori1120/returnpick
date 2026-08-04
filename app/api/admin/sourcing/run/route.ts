@@ -4,7 +4,7 @@ import { getApiReadinessSummary } from "@/lib/apiReadiness";
 import { runSourcing } from "@/lib/sourcing";
 import { getNextSourcingKeywordOffset } from "@/lib/sourcingCursor";
 import { diagnoseSourcingRun } from "@/lib/sourcingDiagnostics";
-import { requireAdmin } from "@/lib/validators";
+import { requireAdmin, requirePersistentStorage } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -66,6 +66,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const unauthorized = requireAdmin(request);
   if (unauthorized) return unauthorized;
+  const storageUnavailable = requirePersistentStorage();
+  if (storageUnavailable) return storageUnavailable;
 
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { backfillCoupangAffiliateLinks } from "@/lib/affiliateLinkBackfill";
-import { requireAdmin } from "@/lib/validators";
+import { requireAdmin, requirePersistentStorage } from "@/lib/validators";
 
 function positiveInteger(value: unknown, fallback: number) {
   const parsed = Math.floor(Number(value));
@@ -15,6 +15,8 @@ function affiliateBackfillErrorResponse(error: unknown) {
 export async function POST(request: Request) {
   const unauthorized = requireAdmin(request);
   if (unauthorized) return unauthorized;
+  const storageUnavailable = requirePersistentStorage();
+  if (storageUnavailable) return storageUnavailable;
 
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;

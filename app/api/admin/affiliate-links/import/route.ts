@@ -5,7 +5,7 @@ import { getCustomerPublishReadiness } from "@/lib/quality";
 import { getAffiliateIdentityReadiness } from "@/lib/affiliateIdentity";
 import { findAffiliateImportProduct, parseAffiliateImportLine } from "@/lib/affiliateImport";
 import { createManualCatalogReview, isManualCatalogSource } from "@/lib/manualCatalogReview";
-import { requireAdmin } from "@/lib/validators";
+import { requireAdmin, requirePersistentStorage } from "@/lib/validators";
 
 type ImportItem = {
   product_id: string;
@@ -31,6 +31,8 @@ function getRawEntries(body: Record<string, unknown>) {
 export async function POST(request: Request) {
   const unauthorized = requireAdmin(request);
   if (unauthorized) return unauthorized;
+  const storageUnavailable = requirePersistentStorage();
+  if (storageUnavailable) return storageUnavailable;
 
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;

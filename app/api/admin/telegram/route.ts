@@ -7,7 +7,7 @@ import {
   sendTelegramEditorialPick,
   sendTelegramForProduct
 } from "@/lib/telegram";
-import { requireAdmin } from "@/lib/validators";
+import { requireAdmin, requirePersistentStorage } from "@/lib/validators";
 
 function telegramAdminErrorResponse(error: unknown) {
   const message = error instanceof Error && error.message ? error.message.slice(0, 300) : "UNKNOWN_TELEGRAM_ADMIN_ERROR";
@@ -31,6 +31,8 @@ function telegramAdminErrorResponse(error: unknown) {
 export async function POST(request: Request) {
   const unauthorized = requireAdmin(request);
   if (unauthorized) return unauthorized;
+  const storageUnavailable = requirePersistentStorage();
+  if (storageUnavailable) return storageUnavailable;
 
   try {
     const body = (await request.json().catch(() => ({}))) as { productId?: string; mode?: string; campaign?: string };
