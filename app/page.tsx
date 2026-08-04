@@ -99,7 +99,7 @@ function HomeHeroCopy({ hasPublishedDeals, className = "" }: { hasPublishedDeals
         <Link
           className={hasPublishedDeals
             ? "focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink"
-            : "focus-ring hidden items-center gap-2 rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink sm:inline-flex"}
+            : "focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink"}
           href={hasPublishedDeals ? "/deals" : approvalSampleProduct.detailPath}
         >
           {hasPublishedDeals ? "검수 완료 딜" : "첫 추천 구매 전 체크"} <ArrowRight size={16} aria-hidden />
