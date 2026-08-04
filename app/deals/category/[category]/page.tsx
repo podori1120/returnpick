@@ -165,12 +165,17 @@ export default async function CategoryDealPage({ params }: { params: Promise<{ c
               <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-pine/10 text-pine"><ClipboardCheck size={21} aria-hidden /></span>
               <div>
                 <h3 className="font-black">공개 검수를 통과한 {label} 딜을 준비 중입니다</h3>
-                <p className="mt-1 text-sm font-semibold leading-6 text-steel">가격과 반품 근거가 확인되기 전에는 상품 수를 채우기 위해 임의 게시하지 않습니다.</p>
+                <p className="mt-1 text-sm font-semibold leading-6 text-steel">가격과 반품 근거가 확인되기 전에는 상품 수를 채우기 위해 임의 게시하지 않습니다. 현재 공개된 검수 추천에서 리턴픽의 구매 전 확인 순서를 먼저 살펴보세요.</p>
               </div>
             </div>
-            <Link className="focus-ring inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-pine px-4 py-3 text-sm font-black text-pine hover:bg-pine hover:text-white" href="/guide/safe-categories">
-              반품 안전 기준 보기 <ArrowRight size={16} aria-hidden />
-            </Link>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Link className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink" href="/picks">
+                검수 추천 모음 보기 <ArrowRight size={16} aria-hidden />
+              </Link>
+              <Link className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-pine px-4 py-3 text-sm font-black text-pine hover:bg-pine hover:text-white" href="/guide/safe-categories">
+                반품 안전 기준 보기 <ArrowRight size={16} aria-hidden />
+              </Link>
+            </div>
           </div>
         )}
       </section>

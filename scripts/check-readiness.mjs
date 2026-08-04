@@ -1201,6 +1201,8 @@ if (
       categoryLandingPage.includes('"@type": "FAQPage"') &&
       categoryLandingPage.includes("AffiliateNotice") &&
       categoryLandingPage.includes("가격과 반품 근거가 확인되기 전에는 상품 수를 채우기 위해 임의 게시하지 않습니다") &&
+      categoryLandingPage.includes('href="/picks"') &&
+      categoryLandingPage.includes("검수 추천 모음 보기") &&
       !categoryLandingPage.includes('"@type": "Offer"') &&
       homePage.includes('/deals/category/${category.value}') &&
       sitemap.includes('/deals/category/${category.value}') &&
