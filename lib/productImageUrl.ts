@@ -3,7 +3,24 @@ export type ProductImageUrlIssue =
   | "IMAGE_URL_TOO_LONG"
   | "IMAGE_URL_HTTPS_REQUIRED"
   | "IMAGE_URL_PUBLIC_HOST_REQUIRED"
-  | "IMAGE_URL_CREDENTIALS_OR_PORT_NOT_ALLOWED";
+  | "IMAGE_URL_CREDENTIALS_OR_PORT_NOT_ALLOWED"
+  | "IMAGE_HOST_NOT_ALLOWED";
+
+const navigationHosts = new Set(["coupang.com", "www.coupang.com", "link.coupang.com", "partners.coupang.com"]);
+
+function isHostOrSubdomain(hostname: string, baseHost: string) {
+  return hostname === baseHost || hostname.endsWith(`.${baseHost}`);
+}
+
+function isAllowlistedManualImageHost(hostname: string) {
+  return (
+    isHostOrSubdomain(hostname, "coupangcdn.com") ||
+    hostname === "image.coupang.com" ||
+    hostname === "img.coupang.com" ||
+    hostname === "thumbnail.coupang.com" ||
+    isHostOrSubdomain(hostname, "pstatic.net")
+  );
+}
 
 function isPrivateIpv4(hostname: string) {
   const parts = hostname.split(".").map(Number);
@@ -41,6 +58,7 @@ export function getProductImageUrlIssue(value: string | null | undefined): Produ
     if (url.protocol !== "https:") return "IMAGE_URL_HTTPS_REQUIRED";
     if (url.username || url.password || url.port) return "IMAGE_URL_CREDENTIALS_OR_PORT_NOT_ALLOWED";
     if (!isPublicHostname(url.hostname)) return "IMAGE_URL_PUBLIC_HOST_REQUIRED";
+    if (navigationHosts.has(url.hostname.toLowerCase())) return "IMAGE_HOST_NOT_ALLOWED";
     return null;
   } catch {
     return "IMAGE_URL_HTTPS_REQUIRED";
@@ -49,4 +67,14 @@ export function getProductImageUrlIssue(value: string | null | undefined): Produ
 
 export function isUsableProductImageUrl(value: string | null | undefined) {
   return getProductImageUrlIssue(value) === null;
+}
+
+/** Manual catalog input only accepts product image CDNs, never arbitrary navigation or affiliate destinations. */
+export function isUsableManualProductImageUrl(value: string | null | undefined) {
+  if (!isUsableProductImageUrl(value)) return false;
+  try {
+    return isAllowlistedManualImageHost(new URL(value!.trim()).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
 }

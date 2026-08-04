@@ -5,6 +5,7 @@ import { getCustomerPublishReadiness, getDealQuality } from "@/lib/quality";
 import { getLatestScore } from "@/lib/scoring";
 import { getNaverPriceTrust, type NaverPriceTrustStatus } from "@/lib/naverPriceTrust";
 import { getProductDiscoveryObservation } from "@/lib/discoveryUpdates";
+import { isFreshManualCatalogReview, isManualCatalogSource } from "@/lib/manualCatalogReview";
 import type { Category, ConditionGrade, RiskFlag, Verdict, ProductWithScore, JsonValue, SnapshotChangeFlag } from "@/lib/types";
 
 export type PublicDealChangeSummary = {
@@ -111,7 +112,8 @@ export function isLocalDemoModeEnabled() {
 }
 
 export function isPublicDealReady(product: ProductWithScore) {
-  return !isDemoProduct(product) && product.is_published && product.sourcing_status === "published" && getCustomerPublishReadiness(product).ready;
+  const manualReviewFresh = !isManualCatalogSource(product.source) || isFreshManualCatalogReview(product.raw_json);
+  return !isDemoProduct(product) && manualReviewFresh && product.is_published && product.sourcing_status === "published" && getCustomerPublishReadiness(product).ready;
 }
 
 /** Public pages may show clearly labelled fixtures only in a local development session. */

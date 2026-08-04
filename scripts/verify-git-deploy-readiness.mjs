@@ -9,8 +9,11 @@ const requiredTrackedFiles = [
   "README.md",
   "app/api/admin/api-readiness/route.ts",
   "app/api/admin/launch/route.ts",
+  "app/api/admin/bootstrap-catalog/manual/route.ts",
   "app/products/approval-sample/page.tsx",
   "components/AdminApiReadinessPanel.tsx",
+  "components/AdminBootstrapCatalogPanel.tsx",
+  "lib/manualBootstrapCatalog.ts",
   "lib/launchCapabilityPolicy.ts",
   "lib/scheduler.ts",
   "next.config.mjs",
@@ -21,6 +24,8 @@ const requiredTrackedFiles = [
   "scripts/run-production-doctor.mjs",
   "scripts/run-production-launch.mjs",
   "scripts/verify-launch-capability-policy.mjs",
+  "scripts/verify-manual-bootstrap-catalog.mjs",
+  "scripts/verify-manual-bootstrap-runtime.mjs",
   "sql/schema.sql",
   "vercel.json"
 ];

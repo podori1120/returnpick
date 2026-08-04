@@ -241,6 +241,25 @@ npm run affiliate-link-intake:check
 npm run affiliate-link-intake-bulk:check
 ```
 
+## 7-3. Supabase 전 수동 임시 카탈로그
+
+쿠팡 파트너스 승인 직후 실제 상품별 링크를 확보했지만 Supabase를 아직 연결하지 못한 경우, `/admin`의 `승인 전 출시 카탈로그`에서 `Supabase 전 임시 입력`을 사용할 수 있습니다. `열 순서 복사`로 아래 TSV 열을 복사한 뒤, 관리자가 직접 확인한 상품만 한 줄씩 붙여넣습니다.
+
+```text
+상품명	카테고리	쿠팡 상품 URL	상품별 파트너스 링크	브랜드	모델명	이미지 URL	수집 당시 가격	반품가	새상품가	네이버 최저가	반품등급	재고 수량	공개 메모
+```
+
+각 행에는 정확한 `https://www.coupang.com/vp/products/{상품번호}` URL, 해당 상품으로 연결되는 `https://link.coupang.com/a/{상품별코드}` 링크, 쿠팡·네이버 상품 이미지 CDN의 공개 HTTPS 이미지 URL, 직접 확인한 가격 중 하나 이상이 필요합니다. 파트너스 링크를 브라우저에서 열어 상품 URL과 같은 상품인지 확인한 뒤 확인 체크박스를 선택하세요. 승인용 샘플 링크, 가짜 링크, 임의로 추정한 반품가·재고는 입력하지 않습니다. 한 번에 최대 20개까지 입력할 수 있지만, 환경변수 용량 때문에 일부만 들어가는 경우에는 부분 카탈로그를 만들지 않고 전체를 거부합니다.
+
+`수동 공개 스냅샷 만들기`가 반환한 `RETURNPICK_BOOTSTRAP_CATALOG_JSON` Key와 Value를 Vercel **Production** 환경변수에 넣고 새 배포를 만들어야 공개 페이지에 반영됩니다. 이 값은 임시 공개 상품 보존용이라 관리자 수정, 클릭 집계, 자동 소싱, 텔레그램 발송 기록을 대체하지 않으며, 지속 운영 전에는 `sql/schema.sql`을 적용한 Supabase 연결이 필요합니다. 수동 공개 검토 시각은 7일 후 만료되므로 가격·재고·파트너스 목적지를 다시 확인하고 카탈로그를 재생성하세요.
+
+수동 임시 카탈로그 입력 검증은 다음 명령으로 확인할 수 있습니다.
+
+```bash
+npm run manual-bootstrap:check
+npm run manual-bootstrap:runtime:check
+```
+
 ## 8. 로컬 실행
 
 ```bash

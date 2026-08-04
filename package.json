@@ -39,6 +39,8 @@
     "affiliate-link-intake:check": "node scripts/verify-affiliate-link-intake.mjs",
     "affiliate-link-intake-bulk:check": "node scripts/verify-affiliate-link-intake-bulk.mjs",
     "bootstrap-catalog:check": "node scripts/verify-bootstrap-catalog-runtime.mjs",
+    "manual-bootstrap:check": "node scripts/verify-manual-bootstrap-catalog.mjs",
+    "manual-bootstrap:runtime:check": "node scripts/verify-manual-bootstrap-runtime.mjs",
     "demo-catalog:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-demo-catalog-stability.mjs",
     "supabase-config:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-supabase-config-guard.mjs",
     "content-kit:check": "node scripts/verify-product-distribution-kit.mjs",
