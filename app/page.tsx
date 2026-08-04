@@ -46,7 +46,7 @@ const categoryIcons: Record<Category, LucideIcon> = {
 
 function HomeHeroCopy({ hasPublishedDeals, className = "" }: { hasPublishedDeals: boolean; className?: string }) {
   return (
-    <div className={`flex flex-col justify-center ${className}`}>
+    <div className={`flex flex-col justify-center lg:justify-start lg:pt-10 ${className}`}>
       <p className="text-sm font-black text-pine">
         {hasPublishedDeals ? "반품 노트북·디지털·소형가전 비교" : "오늘의 직접 검수 추천"}
       </p>
