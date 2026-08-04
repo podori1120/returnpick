@@ -29,7 +29,7 @@ import { getUseCaseMatches } from "@/lib/dealIntelligence";
 import { approvalSampleProduct } from "@/lib/approvalSample";
 import { homeCategoryDetails, homePurposeOptions, selectInitialPurposeId } from "@/lib/homeDiscovery";
 import { isDemoProduct, isPublicDealReady, isPublicDealVisible } from "@/lib/publicDeal";
-import type { Category } from "@/lib/types";
+import type { Category, ProductWithScore } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +43,90 @@ const categoryIcons: Record<Category, LucideIcon> = {
   air_purifier: Wind,
   dehumidifier: CloudRain
 };
+
+function HomeHeroCopy({ hasPublishedDeals, className = "" }: { hasPublishedDeals: boolean; className?: string }) {
+  return (
+    <div className={`flex flex-col justify-center ${className}`}>
+      <p className="text-sm font-black text-pine">
+        {hasPublishedDeals ? "반품 노트북·디지털·소형가전 비교" : "오늘의 직접 검수 추천"}
+      </p>
+      <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
+        {hasPublishedDeals ? "가격보다 먼저, 살 만한 근거를 확인합니다" : "사기 전에, 확인할 것부터 정리했습니다"}
+      </h1>
+      <p className="mt-4 max-w-2xl text-base font-semibold leading-7 text-steel">
+        {hasPublishedDeals
+          ? "상품명과 모델을 검색하면 가격 차이, 반품등급, 핵심 스펙과 주의점을 한 번에 비교합니다. 확인되지 않은 반품 정보는 추측하지 않고 확인필요로 표시합니다."
+          : `${approvalSampleProduct.name}의 핵심 사양과 구매 전 확인사항을 직접 정리했습니다. 가격·재고·배송 조건은 쿠팡에서 최종 확인하며, 확인되지 않은 반품 정보는 추측하지 않습니다.`}
+      </p>
+      {hasPublishedDeals ? (
+        <>
+          <form action="/deals" className="mt-6 flex max-w-2xl gap-2" role="search">
+            <label className="relative min-w-0 flex-1">
+              <span className="sr-only">상품 검색</span>
+              <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-steel" size={20} aria-hidden />
+              <input
+                className="focus-ring h-12 w-full rounded-lg border border-line bg-white pl-12 pr-4 text-sm font-bold text-ink placeholder:text-steel"
+                name="search"
+                placeholder="상품명·브랜드·모델명 검색"
+              />
+            </label>
+            <button className="focus-ring inline-flex h-12 shrink-0 items-center gap-2 rounded-lg bg-ink px-5 text-sm font-black text-white hover:bg-pine" type="submit">
+              딜 찾기 <ArrowRight size={17} aria-hidden />
+            </button>
+          </form>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-steel">
+            <span>많이 찾는 검색</span>
+            {popularSearches.map((keyword) => (
+              <Link
+                key={keyword}
+                className="focus-ring rounded-md border border-line bg-white px-2.5 py-1.5 text-ink hover:border-pine hover:text-pine"
+                href={`/deals?search=${encodeURIComponent(keyword)}`}
+              >
+                {keyword}
+              </Link>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="mt-4 max-w-2xl border-y border-line py-3 sm:mt-6 sm:py-4">
+          <p className="text-xs font-black text-pine">현재 공개된 직접 검수 콘텐츠 1건</p>
+          <p className="mt-1 text-sm font-semibold leading-6 text-steel">
+            실제 구매 경로와 검수 근거가 확인된 콘텐츠만 먼저 보여드립니다. 자동 수집 딜은 상품별 파트너스 링크와 검수를 마친 뒤 추가됩니다.
+          </p>
+        </div>
+      )}
+      <div className={hasPublishedDeals ? "mt-6 flex flex-wrap gap-2" : "mt-3 flex flex-wrap gap-2 sm:mt-6"}>
+        <Link
+          className={hasPublishedDeals
+            ? "focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink"
+            : "focus-ring hidden items-center gap-2 rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink sm:inline-flex"}
+          href={hasPublishedDeals ? "/deals" : approvalSampleProduct.detailPath}
+        >
+          {hasPublishedDeals ? "검수 완료 딜" : "첫 추천 구매 전 체크"} <ArrowRight size={16} aria-hidden />
+        </Link>
+        {hasPublishedDeals ? (
+          <Link className="focus-ring rounded-lg border border-pine bg-white px-5 py-3 text-sm font-black text-pine hover:bg-pine hover:text-white" href={approvalSampleProduct.detailPath}>
+            직접 검수 추천 상품
+          </Link>
+        ) : null}
+        <Link className="focus-ring rounded-lg border border-line px-5 py-3 text-sm font-black hover:bg-mist" href="/guide/return-checklist">
+          수령 체크리스트
+        </Link>
+        <Link className="focus-ring rounded-lg border border-line px-5 py-3 text-sm font-black hover:bg-mist" href="/recommend">
+          내 용도에 맞는 딜 찾기 <ArrowRight size={16} aria-hidden />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function HomeHeroCard({ featured, className = "" }: { featured: ProductWithScore[]; className?: string }) {
+  return (
+    <div className={`lg:self-start ${className}`}>
+      {featured[0] ? <DealCard product={featured[0]} /> : <ApprovalSampleCard placement="home" />}
+    </div>
+  );
+}
 
 export default async function HomePage() {
   const products = (await listProducts({ published: true }))
@@ -97,84 +181,17 @@ export default async function HomePage() {
     <main>
       <section className="border-b border-line bg-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-4 sm:px-6 sm:py-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:py-4">
-          <div className="flex flex-col justify-center">
-            <p className="text-sm font-black text-pine">
-              {hasPublishedDeals ? "반품 노트북·디지털·소형가전 비교" : "오늘의 직접 검수 추천"}
-            </p>
-            <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
-              {hasPublishedDeals ? "가격보다 먼저, 살 만한 근거를 확인합니다" : "사기 전에, 확인할 것부터 정리했습니다"}
-            </h1>
-            <p className="mt-4 max-w-2xl text-base font-semibold leading-7 text-steel">
-              {hasPublishedDeals
-                ? "상품명과 모델을 검색하면 가격 차이, 반품등급, 핵심 스펙과 주의점을 한 번에 비교합니다. 확인되지 않은 반품 정보는 추측하지 않고 확인필요로 표시합니다."
-                : `${approvalSampleProduct.name}의 핵심 사양과 구매 전 확인사항을 직접 정리했습니다. 가격·재고·배송 조건은 쿠팡에서 최종 확인하며, 확인되지 않은 반품 정보는 추측하지 않습니다.`}
-            </p>
-            {hasPublishedDeals ? (
-              <>
-                <form action="/deals" className="mt-6 flex max-w-2xl gap-2" role="search">
-                  <label className="relative min-w-0 flex-1">
-                    <span className="sr-only">상품 검색</span>
-                    <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-steel" size={20} aria-hidden />
-                    <input
-                      className="focus-ring h-12 w-full rounded-lg border border-line bg-white pl-12 pr-4 text-sm font-bold text-ink placeholder:text-steel"
-                      name="search"
-                      placeholder="상품명·브랜드·모델명 검색"
-                    />
-                  </label>
-                  <button className="focus-ring inline-flex h-12 shrink-0 items-center gap-2 rounded-lg bg-ink px-5 text-sm font-black text-white hover:bg-pine" type="submit">
-                    딜 찾기 <ArrowRight size={17} aria-hidden />
-                  </button>
-                </form>
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-steel">
-                  <span>많이 찾는 검색</span>
-                  {popularSearches.map((keyword) => (
-                    <Link
-                      key={keyword}
-                      className="focus-ring rounded-md border border-line bg-white px-2.5 py-1.5 text-ink hover:border-pine hover:text-pine"
-                      href={`/deals?search=${encodeURIComponent(keyword)}`}
-                    >
-                      {keyword}
-                    </Link>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="mt-4 max-w-2xl border-y border-line py-3 sm:mt-6 sm:py-4">
-                <p className="text-xs font-black text-pine">현재 공개된 직접 검수 콘텐츠 1건</p>
-                <p className="mt-1 text-sm font-semibold leading-6 text-steel">
-                  실제 구매 경로와 검수 근거가 확인된 콘텐츠만 먼저 보여드립니다. 자동 수집 딜은 상품별 파트너스 링크와 검수를 마친 뒤 추가됩니다.
-                </p>
-              </div>
-            )}
-            <div className={hasPublishedDeals ? "mt-6 flex flex-wrap gap-2" : "mt-3 flex flex-wrap gap-2 sm:mt-6"}>
-              <Link
-                className={hasPublishedDeals
-                  ? "focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink"
-                  : "focus-ring hidden items-center gap-2 rounded-lg bg-pine px-5 py-3 text-sm font-black text-white hover:bg-ink sm:inline-flex"}
-                href={hasPublishedDeals ? "/deals" : approvalSampleProduct.detailPath}
-              >
-                {hasPublishedDeals ? "검수 완료 딜" : "첫 추천 구매 전 체크"} <ArrowRight size={16} aria-hidden />
-              </Link>
-              {hasPublishedDeals ? (
-                <Link className="focus-ring rounded-lg border border-pine bg-white px-5 py-3 text-sm font-black text-pine hover:bg-pine hover:text-white" href={approvalSampleProduct.detailPath}>
-                  직접 검수 추천 상품
-                </Link>
-              ) : null}
-              <Link className="focus-ring rounded-lg border border-line px-5 py-3 text-sm font-black hover:bg-mist" href="/guide/return-checklist">
-                수령 체크리스트
-              </Link>
-              <Link className="focus-ring rounded-lg border border-line px-5 py-3 text-sm font-black hover:bg-mist" href="/recommend">
-                내 용도에 맞는 딜 찾기 <ArrowRight size={16} aria-hidden />
-              </Link>
-            </div>
-          </div>
-          <div className="lg:self-start">
-            {featured[0] ? (
-              <DealCard product={featured[0]} />
-            ) : (
-              <ApprovalSampleCard placement="home" />
-            )}
-          </div>
+          {hasPublishedDeals ? (
+            <>
+              <HomeHeroCopy hasPublishedDeals />
+              <HomeHeroCard featured={featured} />
+            </>
+          ) : (
+            <>
+              <HomeHeroCard featured={featured} className="lg:col-start-2 lg:row-start-1" />
+              <HomeHeroCopy hasPublishedDeals={false} className="lg:col-start-1 lg:row-start-1" />
+            </>
+          )}
         </div>
       </section>
 
