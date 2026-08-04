@@ -3545,6 +3545,9 @@ if (fileExists("app/api/admin/session/route.ts") && fileExists("components/Admin
 
 if (fileExists("components/AdminLaunchStatusBar.tsx")) {
   const launchStatusBar = readText("components/AdminLaunchStatusBar.tsx");
+  const recoveryBranchStart = launchStatusBar.indexOf(') : launchPath.mode === "recovery" ? (');
+  const recoveryBranchEnd = recoveryBranchStart >= 0 ? launchStatusBar.indexOf(") : (", recoveryBranchStart + 1) : -1;
+  const recoveryBranch = recoveryBranchStart >= 0 && recoveryBranchEnd > recoveryBranchStart ? launchStatusBar.slice(recoveryBranchStart, recoveryBranchEnd) : "";
   check(
     "admin: launch status command center",
     launchStatusBar.includes("운영 전환 센터") &&
@@ -3570,14 +3573,66 @@ if (fileExists("components/AdminLaunchStatusBar.tsx")) {
     "required"
   );
   check(
+    "admin: storage-aware pre-approval path",
+    launchStatusBar.includes("getAdminLaunchPath") &&
+      launchStatusBar.includes("Supabase 연결 전 임시 출시 동선") &&
+      launchStatusBar.includes("실제 상품 TSV 입력") &&
+      launchStatusBar.includes("카탈로그 값 복사") &&
+      launchStatusBar.includes('href="/deals"') &&
+      launchStatusBar.includes("상품별 후보 저장·클릭 집계가 가능한 정식 운영 DB가 없습니다"),
+    "admin shows a usable manual catalog path when Supabase-backed intake is unavailable",
+    "required"
+  );
+  check(
+    "admin: live storage verification branch",
+    launchStatusBar.includes("storageStatus") &&
+      launchStatusBar.includes("isReadinessResponse") &&
+      launchStatusBar.includes("isStoragePayload") &&
+      launchStatusBar.includes("isAdminStorageStatus") &&
+      launchStatusBar.includes("isReadinessResponse(data)") &&
+      launchStatusBar.includes("저장소 확인 필요") &&
+      launchStatusBar.includes("라이브 저장소 상태 확인 중") &&
+      launchStatusBar.includes('readiness.catalogLaunchReady && !readiness.launchReady && storageStatus === "unconfigured"') &&
+      launchStatusBar.includes("launchPath.mode === \"recovery\"") &&
+      recoveryBranch.length > 0 &&
+      !recoveryBranch.includes('href="/deals"') &&
+      !recoveryBranch.includes("admin-bootstrap-catalog") &&
+      !recoveryBranch.includes("임시 카탈로그 입력") &&
+      !recoveryBranch.includes("admin-first-launch") &&
+      !recoveryBranch.includes("admin-candidate-review") &&
+      !recoveryBranch.includes("admin-affiliate-link-intake") &&
+      !recoveryBranch.includes("admin-affiliate-links") &&
+      !recoveryBranch.includes("admin-telegram-distribution"),
+    "admin does not treat unknown or unverified Supabase state as durable storage",
+    "required"
+  );
+  check(
     "admin: launch status safe readiness fetch",
     launchStatusBar.includes('fetch("/api/admin/api-readiness"') &&
       launchStatusBar.includes("x-admin-password") &&
-      launchStatusBar.includes("data.message ?? data.error") &&
+      launchStatusBar.includes("responseMessage(data") &&
+      launchStatusBar.includes("isReadinessResponse(data)") &&
       launchStatusBar.includes("네트워크 문제로 운영 전환 상태를 불러오지 못했습니다") &&
       launchStatusBar.includes("scrollToAdminAnchor(\"admin-api-readiness\")") &&
       launchStatusBar.includes("scrollToAdminAnchor(\"admin-ops-dashboard\")"),
     "admin top bar fetches readiness with the admin password and handles API/network errors inline",
+    "required"
+  );
+}
+
+if (fileExists("lib/adminLaunchPath.ts") && fileExists("scripts/verify-admin-launch-path.mjs")) {
+  const launchPath = readText("lib/adminLaunchPath.ts");
+  const launchPathCheck = readText("scripts/verify-admin-launch-path.mjs");
+  check(
+    "scripts: admin launch path behavior check",
+    launchPath.includes("export function getAdminLaunchPath") &&
+      launchPathCheck.includes("storageStatus: \"unconfigured\"") &&
+      launchPathCheck.includes("storageStatus: \"unverified\"") &&
+      launchPathCheck.includes("storageStatus: \"verified\"") &&
+      launchPathCheck.includes("readinessKnown: false") &&
+      launchPathCheck.includes("future_status") &&
+      launchPathCheck.includes("verified storage must keep the persistent workflow"),
+    "admin launch anchors and labels are covered for unknown, unconfigured, unverified, and verified storage states",
     "required"
   );
 }

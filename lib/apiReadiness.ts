@@ -68,6 +68,12 @@ export type ApiConnectionCheck = {
   detail?: Record<string, JsonValue>;
 };
 
+export type SupabaseStorageReadiness = {
+  status: "verified" | "unconfigured" | "unverified";
+  message: string;
+  checkedAt: string;
+};
+
 function normalizeUrl(value: string | undefined) {
   const raw = value?.trim();
   if (!raw) return null;
@@ -1687,6 +1693,68 @@ export function getApiReadinessSummary(): ApiReadinessSummary {
     requiredConnectionCheckIds: getRequiredConnectionCheckIds(publicWebEnabled, apiKeysReady),
     optionalConnectionCheckIds: getOptionalConnectionCheckIds(apiKeysReady)
   };
+}
+
+export async function getSupabaseStorageReadiness(): Promise<SupabaseStorageReadiness> {
+  const checkedAt = new Date().toISOString();
+  const summary = getApiReadinessSummary();
+  const supabaseItem = summary.items.find((item) => item.id === "supabase");
+
+  if (!supabaseItem || supabaseItem.state === "missing") {
+    return {
+      status: "unconfigured",
+      message: "Supabase 운영 DB 환경변수가 아직 연결되지 않았습니다.",
+      checkedAt
+    };
+  }
+
+  if (supabaseItem.state !== "ready") {
+    return {
+      status: "unverified",
+      message: "Supabase 환경변수 형식 또는 필수 값이 완전하지 않습니다.",
+      checkedAt
+    };
+  }
+
+  const client = getSupabaseServiceClient();
+  if (!client) {
+    return {
+      status: "unverified",
+      message: "Supabase 서버 클라이언트를 만들지 못했습니다. 운영 키를 확인하세요.",
+      checkedAt
+    };
+  }
+
+  try {
+    const [schemaVersion, products] = await Promise.all([
+      client.from("returnpick_schema_meta").select("value").eq("key", "schema_version").maybeSingle(),
+      client.from("sourced_products").select("id", { count: "exact", head: true }).limit(1)
+    ]);
+    const schemaVersionValue =
+      schemaVersion.data && typeof schemaVersion.data === "object" && "value" in schemaVersion.data
+        ? String(schemaVersion.data.value ?? "")
+        : "";
+
+    if (schemaVersion.error || products.error || schemaVersionValue !== EXPECTED_SCHEMA_VERSION) {
+      return {
+        status: "unverified",
+        message: "Supabase에 연결됐지만 최신 schema.sql 또는 핵심 테이블 확인이 필요합니다.",
+        checkedAt
+      };
+    }
+
+    return {
+      status: "verified",
+      message: "Supabase 핵심 테이블과 최신 스키마 버전이 확인되었습니다.",
+      checkedAt
+    };
+  } catch {
+    return {
+      status: "unverified",
+      message: "Supabase 라이브 연결 확인에 실패했습니다. URL, 키와 schema.sql을 확인하세요.",
+      checkedAt
+    };
+  }
 }
 
 export async function runApiConnectionChecks(): Promise<ApiConnectionCheck[]> {

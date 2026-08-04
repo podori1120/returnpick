@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getApiReadinessSummary, runApiConnectionChecks } from "@/lib/apiReadiness";
+import { getApiReadinessSummary, getSupabaseStorageReadiness, runApiConnectionChecks } from "@/lib/apiReadiness";
 import { requireAdmin } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,9 @@ export async function GET(request: Request) {
   if (unauthorized) return unauthorized;
 
   try {
-    return NextResponse.json({ readiness: getApiReadinessSummary() });
+    const readiness = getApiReadinessSummary();
+    const storage = await getSupabaseStorageReadiness();
+    return NextResponse.json({ readiness, storage });
   } catch (error) {
     return apiReadinessErrorResponse(error);
   }
@@ -27,7 +29,9 @@ export async function POST(request: Request) {
 
   try {
     const checks = await runApiConnectionChecks();
-    return NextResponse.json({ readiness: getApiReadinessSummary(), checks });
+    const readiness = getApiReadinessSummary();
+    const storage = await getSupabaseStorageReadiness();
+    return NextResponse.json({ readiness, storage, checks });
   } catch (error) {
     return apiReadinessErrorResponse(error);
   }
