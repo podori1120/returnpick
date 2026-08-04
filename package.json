@@ -13,6 +13,7 @@
     "check:launch": "node scripts/check-readiness.mjs --launch",
     "check:production": "node scripts/verify-production-readiness.mjs",
     "check:production:launch": "node scripts/verify-production-readiness.mjs --launch",
+    "production-readiness:check": "node scripts/verify-production-readiness.mjs --self-test",
     "env:production": "node scripts/print-production-env-template.mjs",
     "env:pull:production": "npx vercel env pull .env.production --environment=production --yes",
     "env:check": "node scripts/verify-production-env.mjs",

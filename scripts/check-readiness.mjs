@@ -835,7 +835,8 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-readines
   check(
     "scripts: production readiness commands",
     packageJson.includes('"check:production": "node scripts/verify-production-readiness.mjs"') &&
-      packageJson.includes('"check:production:launch": "node scripts/verify-production-readiness.mjs --launch"'),
+      packageJson.includes('"check:production:launch": "node scripts/verify-production-readiness.mjs --launch"') &&
+      packageJson.includes('"production-readiness:check": "node scripts/verify-production-readiness.mjs --self-test"'),
     "package.json exposes report and launch-mode production readiness checks",
     "required"
   );
@@ -883,6 +884,10 @@ if (fileExists("package.json") && fileExists("scripts/verify-production-readines
       productionVerifier.includes("cache-control") &&
       productionVerifier.includes("/guide/safe-categories") &&
       productionVerifier.includes("requiredConnectionCheckIds") &&
+      productionVerifier.includes("catalogLaunchReady") &&
+      productionVerifier.includes("limited catalog is publishable") &&
+      productionVerifier.includes("readinessReportStatus") &&
+      productionVerifier.includes("runReadinessPolicySelfTest") &&
       productionVerifier.includes("nofollow sponsored noopener noreferrer") &&
       productionVerifier.includes("extractApprovalPartnersUrl") &&
       productionVerifier.includes("checkApprovalRedirect") &&

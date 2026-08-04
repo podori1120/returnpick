@@ -648,7 +648,14 @@ function summarizeReadiness(readiness) {
   if (!readiness || typeof readiness !== "object") return "readiness payload missing";
   const blocking = Array.isArray(readiness.blockingItemIds) ? readiness.blockingItemIds.join(", ") : "";
   const optional = Array.isArray(readiness.optionalMissingItemIds) ? readiness.optionalMissingItemIds.join(", ") : "";
-  return `mode=${readiness.mode ?? "unknown"}, launchReady=${Boolean(readiness.launchReady)}, blocking=${blocking || "none"}, optional=${optional || "none"}`;
+  return `mode=${readiness.mode ?? "unknown"}, launchReady=${Boolean(readiness.launchReady)}, catalogLaunchReady=${Boolean(readiness.catalogLaunchReady)}, blocking=${blocking || "none"}, optional=${optional || "none"}`;
+}
+
+function readinessReportStatus(readiness, launchMode) {
+  if (launchMode) return readiness?.launchReady ? "pass" : "fail";
+  if (readiness?.launchReady) return "pass";
+  if (readiness?.catalogLaunchReady) return "pass";
+  return "warn";
 }
 
 function checkReadiness(readiness) {
@@ -657,20 +664,28 @@ function checkReadiness(readiness) {
     return;
   }
 
-  if (requireLaunchReady) {
-    if (readiness.launchReady) {
-      pass("admin readiness", summarizeReadiness(readiness));
-    } else {
-      fail("admin readiness", summarizeReadiness(readiness));
-    }
-    return;
-  }
-
-  if (readiness.mode === "launch_ready") {
+  const status = readinessReportStatus(readiness, requireLaunchReady);
+  if (status === "fail") {
+    fail("admin readiness", summarizeReadiness(readiness));
+  } else if (status === "pass" && readiness.catalogLaunchReady && !readiness.launchReady) {
+    pass("admin readiness", `limited catalog is publishable; full automation remains gated: ${summarizeReadiness(readiness)}`);
+  } else if (status === "pass" && readiness.mode === "manual_launch_ready") {
+    pass("admin readiness", `manual-link core launch is ready; optional API automation remains gated: ${summarizeReadiness(readiness)}`);
+  } else if (status === "pass") {
     pass("admin readiness", summarizeReadiness(readiness));
   } else {
     warn("admin readiness", summarizeReadiness(readiness));
   }
+}
+
+function runReadinessPolicySelfTest() {
+  const catalogOnly = { mode: "pre_approval", launchReady: false, catalogLaunchReady: true };
+  if (readinessReportStatus(catalogOnly, false) !== "pass") throw new Error("catalog-only report mode must pass");
+  if (readinessReportStatus(catalogOnly, true) !== "fail") throw new Error("catalog-only launch mode must fail");
+
+  const manualLaunch = { mode: "manual_launch_ready", launchReady: true, catalogLaunchReady: true };
+  if (readinessReportStatus(manualLaunch, false) !== "pass") throw new Error("manual-link core launch must pass report mode");
+  if (readinessReportStatus(manualLaunch, true) !== "pass") throw new Error("manual-link core launch must pass launch mode");
 }
 
 function checkConnectionCards(readiness, checks) {
@@ -1018,7 +1033,17 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
+if (args.includes("--self-test")) {
+  try {
+    runReadinessPolicySelfTest();
+    console.log("Production readiness policy checks passed.");
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  }
+} else {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}
