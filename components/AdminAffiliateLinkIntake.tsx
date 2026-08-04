@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Copy, Link2, ListPlus, LoaderCircle } from "lucide-react";
+import { ArrowRight, CheckCircle2, Copy, Link2, ListPlus, LoaderCircle, ShieldCheck } from "lucide-react";
+import { openAdminAffiliateLinkQueue, openAdminCandidateQueue } from "@/lib/adminNavigation";
 import { categoryOptions } from "@/lib/category";
 import { isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
 import type { Category } from "@/lib/types";
@@ -67,6 +68,7 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ completed: number; total: number } | null>(null);
   const [bulkResult, setBulkResult] = useState<BulkIntakeResult | null>(null);
+  const [recentProductIds, setRecentProductIds] = useState<string[]>([]);
   const affiliateReady = isUsableAffiliateUrl(form.affiliate_url.trim());
   const suppliedUrlReady = !form.coupang_url.trim() || isUsableCoupangProductUrl(form.coupang_url.trim());
   const bulkRows = parseBulkRows(bulkText);
@@ -76,9 +78,11 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
   }
 
   async function submit() {
+    if (bulkSaving) return;
     setSaving(true);
     setNotice(null);
     setNextAction(null);
+    setRecentProductIds([]);
     try {
       const response = await fetch("/api/admin/products/link-intake", { method: "POST", headers: headers(password), body: JSON.stringify(form) });
       const data = (await response.json().catch(() => ({}))) as {
@@ -94,6 +98,7 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
         return;
       }
       setNotice({ type: data.score_error ? "info" : "success", message: data.message ?? `검수 대기 후보를 저장했습니다${data.product?.id ? `: ${data.product.id}` : ""}.` });
+      setRecentProductIds(data.product?.id ? [data.product.id] : []);
       setForm(emptyForm);
       onCreated();
     } catch {
@@ -110,6 +115,7 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
     setBulkResult(null);
     setNotice(null);
     setNextAction(null);
+    setRecentProductIds([]);
     const aggregatedItems: NonNullable<BulkIntakeResult["items"]> = [];
     let scannedCount = 0;
     let insertedCount = 0;
@@ -117,6 +123,46 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
     let scoreErrorCount = 0;
     let completedRows = 0;
     let interruptedMessage: string | null = null;
+    const finalizeBulkResult = () => {
+      const result: BulkIntakeResult = {
+        status: interruptedMessage
+          ? insertedCount > 0
+            ? "partial"
+            : "error"
+          : errorCount > 0
+            ? insertedCount > 0
+              ? "partial"
+              : "error"
+            : scoreErrorCount > 0
+              ? "partial"
+              : "ok",
+        scanned_count: scannedCount,
+        inserted_count: insertedCount,
+        error_count: errorCount,
+        score_error_count: scoreErrorCount,
+        items: aggregatedItems
+      };
+      setBulkResult(result);
+      setRecentProductIds(
+        Array.from(
+          new Set(
+            aggregatedItems
+              .filter((item) => item.status === "inserted" && item.product_id)
+              .map((item) => item.product_id as string)
+          )
+        )
+      );
+      const scoreWarning = scoreErrorCount ? ` 점수 재계산 필요 ${scoreErrorCount}개.` : "";
+      const interruptedNotice = interruptedMessage
+        ? ` ${completedRows}개 처리 후 중단되었습니다: ${interruptedMessage}`
+        : "";
+      setNotice({
+        type: result.status === "ok" ? "success" : result.status === "partial" ? "info" : "error",
+        message: `총 ${result.scanned_count}개 중 ${result.inserted_count}개를 검수 대기 후보로 저장했습니다. 오류 ${result.error_count}개.${scoreWarning}${interruptedNotice}`
+      });
+      if (result.inserted_count) onCreated();
+    };
+
     try {
       for (let start = 0; start < bulkRows.length; start += BULK_BATCH_SIZE) {
         const batch = bulkRows.slice(start, start + BULK_BATCH_SIZE);
@@ -139,37 +185,10 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
         aggregatedItems.push(...(data.items ?? []).map((item) => ({ ...item, index: item.index + start })));
         setBulkProgress({ completed: completedRows, total: bulkRows.length });
       }
-
-      const result: BulkIntakeResult = {
-        status: interruptedMessage
-          ? insertedCount > 0
-            ? "partial"
-            : "error"
-          : errorCount > 0
-            ? insertedCount > 0
-              ? "partial"
-              : "error"
-            : scoreErrorCount > 0
-              ? "partial"
-              : "ok",
-        scanned_count: scannedCount,
-        inserted_count: insertedCount,
-        error_count: errorCount,
-        score_error_count: scoreErrorCount,
-        items: aggregatedItems
-      };
-      setBulkResult(result);
-      const scoreWarning = scoreErrorCount ? ` 점수 재계산 필요 ${scoreErrorCount}개.` : "";
-      const interruptedNotice = interruptedMessage
-        ? ` ${completedRows}개 처리 후 중단되었습니다: ${interruptedMessage}`
-        : "";
-      setNotice({
-        type: result.status === "ok" ? "success" : result.status === "partial" ? "info" : "error",
-        message: `총 ${result.scanned_count}개 중 ${result.inserted_count}개를 검수 대기 후보로 저장했습니다. 오류 ${result.error_count}개.${scoreWarning}${interruptedNotice}`
-      });
-      if (result.inserted_count) onCreated();
+      finalizeBulkResult();
     } catch {
-      setNotice({ type: "error", message: `네트워크 문제로 일괄 후보 등록을 완료하지 못했습니다. ${completedRows}개 처리 후 멈췄습니다.` });
+      interruptedMessage = "네트워크 문제로 다음 묶음 처리를 완료하지 못했습니다.";
+      finalizeBulkResult();
     } finally {
       setBulkSaving(false);
       setBulkProgress(null);
@@ -193,6 +212,27 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
       </div>
       {notice ? <p className={`mt-4 rounded-lg border px-3 py-2 text-sm font-bold ${notice.type === "success" ? "border-pine/30 bg-pine/10 text-pine" : notice.type === "info" ? "border-lemon/50 bg-lemon/15 text-ink" : "border-coral/30 bg-coral/10 text-coral"}`} role="status">{notice.message}</p> : null}
       {nextAction ? <p className="mt-3 rounded-lg border border-lemon/40 bg-lemon/15 px-3 py-2 text-sm font-bold text-ink">다음 행동: {nextAction}</p> : null}
+      {recentProductIds.length ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-pine/30 bg-pine/5 px-3 py-3">
+          <p className="text-xs font-black leading-5 text-pine">방금 등록한 {recentProductIds.length.toLocaleString("ko-KR")}개 후보를 바로 검토하세요. 게시 전 가격·등급·재고와 상품별 링크를 다시 확인합니다.</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="focus-ring inline-flex items-center gap-1.5 rounded-lg bg-pine px-3 py-2 text-xs font-black text-white hover:bg-ink"
+              onClick={() => openAdminCandidateQueue("review", recentProductIds)}
+              type="button"
+            >
+              <ArrowRight size={14} aria-hidden /> 등록 후보 검토
+            </button>
+            <button
+              className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-pine/30 bg-white px-3 py-2 text-xs font-black text-pine hover:bg-pine/10"
+              onClick={openAdminAffiliateLinkQueue}
+              type="button"
+            >
+              <ShieldCheck size={14} aria-hidden /> 링크 목적지 큐
+            </button>
+          </div>
+        </div>
+      ) : null}
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <label className="text-sm font-bold text-steel sm:col-span-2">상품명<span className="text-coral">*</span><input className="focus-ring mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink" value={form.title} onChange={(event) => update("title", event.target.value)} /></label>
         <label className="text-sm font-bold text-steel">카테고리<span className="text-coral">*</span><select className="focus-ring mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink" value={form.category} onChange={(event) => update("category", event.target.value)}>{categoryOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
@@ -202,7 +242,7 @@ export default function AdminAffiliateLinkIntake({ password, onCreated }: { pass
         <label className="text-sm font-bold text-steel">공개 메모 (선택)<textarea className="focus-ring mt-1 min-h-20 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink" value={form.public_note} onChange={(event) => update("public_note", event.target.value)} /></label>
         <label className="text-sm font-bold text-steel">관리자 메모 (선택)<textarea className="focus-ring mt-1 min-h-20 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink" value={form.admin_memo} onChange={(event) => update("admin_memo", event.target.value)} /></label>
       </div>
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4"><p className="text-xs font-semibold text-steel">목적지 상품번호가 확인되지 않으면 저장하지 않습니다. 제한 응답에서 관리자가 상품 URL을 입력한 경우에도 게시 불가 검수 후보로만 저장됩니다.</p><button className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-4 py-2.5 text-sm font-black text-white hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60" disabled={saving || form.title.trim().length < 5 || !affiliateReady || !suppliedUrlReady} onClick={() => void submit()} type="button">{saving ? <LoaderCircle className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}링크로 상품번호 확인 → 검수 대기 후보 저장</button></div>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4"><p className="text-xs font-semibold text-steel">목적지 상품번호가 확인되지 않으면 저장하지 않습니다. 제한 응답에서 관리자가 상품 URL을 입력한 경우에도 게시 불가 검수 후보로만 저장됩니다.</p><button className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-4 py-2.5 text-sm font-black text-white hover:bg-ink disabled:cursor-not-allowed disabled:opacity-60" disabled={saving || bulkSaving || form.title.trim().length < 5 || !affiliateReady || !suppliedUrlReady} onClick={() => void submit()} type="button">{saving ? <LoaderCircle className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}링크로 상품번호 확인 → 검수 대기 후보 저장</button></div>
       <div className="mt-6 border-t border-line pt-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

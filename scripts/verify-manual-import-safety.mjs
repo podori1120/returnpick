@@ -8,6 +8,7 @@ const singleRoute = fs.readFileSync(path.join(process.cwd(), "app", "api", "admi
 const bulkRoute = fs.readFileSync(path.join(process.cwd(), "app", "api", "admin", "products", "import", "route.ts"), "utf8");
 const singleUi = fs.readFileSync(path.join(process.cwd(), "components", "AdminManualProductForm.tsx"), "utf8");
 const bulkUi = fs.readFileSync(path.join(process.cwd(), "components", "AdminManualProductBulkForm.tsx"), "utf8");
+const affiliateIntakeUi = fs.readFileSync(path.join(process.cwd(), "components", "AdminAffiliateLinkIntake.tsx"), "utf8");
 const candidateUi = fs.readFileSync(path.join(process.cwd(), "components", "AdminCandidateTable.tsx"), "utf8");
 const navigation = fs.readFileSync(path.join(process.cwd(), "lib", "adminNavigation.ts"), "utf8");
 const ts = require("typescript");
@@ -47,6 +48,13 @@ assert.match(bulkUi, /SOURCING_SCORE_SAVE_FAILED/, "bulk intake labels score per
 assert.match(bulkUi, /openAdminCandidateQueue\("review", recentProductIds\)/, "bulk intake hands imported rows to the focused review queue");
 assert.match(bulkUi, /isUsableAffiliateUrl\(value\)/, "bulk intake only offers the link queue for usable Partners URLs");
 assert.match(bulkUi, /recentAffiliateLinkCount > 0/, "bulk intake link queue CTA requires a usable affiliate URL row");
+assert.match(affiliateIntakeUi, /setRecentProductIds\(data\.product\?\.id \? \[data\.product\.id\] : \[\]\)/, "single affiliate intake keeps the newly inserted product focused");
+assert.match(affiliateIntakeUi, /openAdminCandidateQueue\("review", recentProductIds\)/, "affiliate intake hands the new product directly to review");
+assert.match(affiliateIntakeUi, /onClick=\{openAdminAffiliateLinkQueue\}/, "affiliate intake provides a destination-verification handoff");
+assert.match(affiliateIntakeUi, /new Set\([\s\S]*aggregatedItems[\s\S]*filter\(\(item\) => item\.status === "inserted" && item\.product_id\)/, "affiliate intake deduplicates inserted bulk product IDs for the review handoff");
+assert.ok((affiliateIntakeUi.match(/setRecentProductIds\(\[\]\)/g) ?? []).length >= 2, "affiliate intake clears stale handoff IDs before single and bulk submissions");
+assert.match(affiliateIntakeUi, /disabled=\{saving \|\| bulkSaving \|\|/, "single affiliate intake is locked while bulk intake is running");
+assert.match(affiliateIntakeUi, /interruptedMessage = "네트워크 문제로 다음 묶음 처리를 완료하지 못했습니다\."[\s\S]*finalizeBulkResult\(\)/, "bulk network interruptions preserve partial results and handoff IDs");
 assert.match(navigation, /productIds\?: string\[\]/, "admin candidate navigation carries imported product IDs");
 assert.match(navigation, /productIds: Array\.from\(new Set\(productIds\.filter\(Boolean\)\)\)/, "admin candidate navigation de-duplicates focused IDs");
 assert.match(candidateUi, /focusProductIds/, "candidate table supports a focused imported-candidate view");
