@@ -239,6 +239,7 @@ const requiredFiles = [
   "lib/productDistributionKit.ts",
   "lib/approvalSample.ts",
   "lib/adminNavigation.ts",
+  "lib/adminSourcingGate.ts",
   "lib/apiReadiness.ts",
   "lib/categoryLanding.ts",
   "lib/searchIntentMatcher.ts",
@@ -300,6 +301,7 @@ const requiredFiles = [
   "scripts/sitemapContract.mjs",
   "scripts/verify-keyword-coverage-api.mjs",
   "scripts/verify-public-web-config.mjs",
+  "scripts/verify-admin-sourcing-gate.mjs",
   "scripts/verify-web-return-info.mjs",
   "scripts/verify-public-web-url-safety.mjs",
   "scripts/verify-public-web-detail-enrichment.mjs",
@@ -527,6 +529,7 @@ if (fileExists("package.json") && fileExists("app/api/admin/products/link-intake
   const bulkRoute = readText("app/api/admin/products/link-intake/bulk/route.ts");
   const bulkCheck = readText("scripts/verify-affiliate-link-intake-bulk.mjs");
   const intakeUi = readText("components/AdminAffiliateLinkIntake.tsx");
+  const adminNavigation = readText("lib/adminNavigation.ts");
   check(
     "scripts: affiliate link bulk intake contract check",
     packageJson.includes('"affiliate-link-intake-bulk:check": "node scripts/verify-affiliate-link-intake-bulk.mjs"') &&
@@ -540,7 +543,10 @@ if (fileExists("package.json") && fileExists("app/api/admin/products/link-intake
       bulkCheck.includes("review-only persistence") &&
       intakeUi.includes("/api/admin/products/link-intake/bulk") &&
       intakeUi.includes("점수 재계산 필요") &&
-      intakeUi.includes("operator_next_action"),
+      intakeUi.includes("operator_next_action") &&
+      intakeUi.includes('tabIndex={-1}') &&
+      intakeUi.includes('aria-labelledby="admin-affiliate-link-intake-title"') &&
+      adminNavigation.includes("target.focus({ preventScroll: true })"),
     "bulk Partners-link intake is authenticated, bounded, and delegates every row to the strict single-item review gate",
     "required"
   );
@@ -3686,6 +3692,21 @@ if (fileExists("components/AdminKeywordManager.tsx")) {
 
 if (fileExists("components/AdminSourcingRunner.tsx")) {
   const runner = readText("components/AdminSourcingRunner.tsx");
+  const sourcingGate = readText("lib/adminSourcingGate.ts");
+  const sourcingGateCheck = readText("scripts/verify-admin-sourcing-gate.mjs");
+  const packageJson = readText("package.json");
+  check(
+    "scripts: admin sourcing gate check command",
+    packageJson.includes('"admin-sourcing-gate:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-admin-sourcing-gate.mjs"') &&
+      sourcingGate.includes("blockedInProduction") &&
+      sourcingGateCheck.includes('phase, "ready"') &&
+      sourcingGateCheck.includes('phase, "public_web"') &&
+      sourcingGateCheck.includes('phase, "blocked"') &&
+      sourcingGateCheck.includes('phase, "loading"') &&
+      sourcingGateCheck.includes('phase, "error"'),
+    "admin sourcing gate has executable coverage for API-ready, public-web-only, blocked, loading, and failed-readiness states",
+    "required"
+  );
   check("admin: sourcing run diagnosis", runner.includes("diagnoseSourcingRun") && runner.includes("providerStats"), "admin shows first-run sourcing diagnostics", "required");
   check(
     "admin: sourcing immediate diagnosis feedback",
@@ -3732,6 +3753,16 @@ if (fileExists("components/AdminSourcingRunner.tsx")) {
       runner.includes("공개 웹 후보 수집") &&
       runner.includes("반품 근거와 링크는 관리자 검수 후에만 공개됩니다"),
     "admin exposes an explicit public-web-only candidate run before Coupang API approval while keeping candidates behind review",
+    "required"
+  );
+  check(
+    "admin: production sourcing gate is explicit",
+      runner.includes("sourcingBlockedInProduction") &&
+      runner.includes('process.env.NODE_ENV === "production"') &&
+      runner.includes("상품별 링크 등록으로 이동") &&
+      runner.includes("sourcingGate.disabled") &&
+      runner.includes("준비도 다시 확인"),
+    "production does not offer a dead-end sourcing button when API/public-web collection is unavailable and points to manual link intake",
     "required"
   );
   check(

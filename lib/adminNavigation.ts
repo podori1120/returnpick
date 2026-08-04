@@ -16,6 +16,7 @@ export function scrollToAdminAnchor(anchor: string) {
   if (!target) return;
 
   target.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (target.tabIndex === -1) target.focus({ preventScroll: true });
 
   if (typeof window !== "undefined") {
     window.history.replaceState(null, "", `#${anchor}`);

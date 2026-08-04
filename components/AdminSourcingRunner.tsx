@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Play, RefreshCw, ToggleLeft } from "lucide-react";
 import { scrollToAdminAnchor } from "@/lib/adminNavigation";
+import { getSourcingGateState } from "@/lib/adminSourcingGate";
 import { formatDate } from "@/lib/format";
 import { diagnoseSourcingRun, type SourcingDiagnosis } from "@/lib/sourcingDiagnostics";
 import type { SourcingRun } from "@/lib/types";
@@ -188,6 +189,8 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
   const [notice, setNotice] = useState<{ type: NoticeType; message: string } | null>(null);
   const [useMockFallback, setUseMockFallback] = useState(true);
   const [readiness, setReadiness] = useState<ApiReadinessSummary | null>(null);
+  const [readinessLoading, setReadinessLoading] = useState(true);
+  const [readinessError, setReadinessError] = useState<string | null>(null);
   const [keywordCoverage, setKeywordCoverage] = useState<KeywordCoverage | null>(null);
   const [keywordCoverageError, setKeywordCoverageError] = useState<string | null>(null);
 
@@ -206,18 +209,26 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
   }
 
   async function loadReadiness() {
+    setReadinessLoading(true);
+    setReadinessError(null);
     try {
       const response = await fetch("/api/admin/api-readiness", { headers: headers(password) });
       const data = await response.json().catch(() => ({}));
       const nextReadiness = data.readiness as ApiReadinessSummary | undefined;
       if (!response.ok || !nextReadiness) {
-        setNotice({ type: "error", message: data.message ?? data.error ?? "API 준비도 상태를 확인하지 못했습니다." });
+        const message = data.message ?? data.error ?? "API 준비도 상태를 확인하지 못했습니다.";
+        setReadinessError(message);
+        setNotice({ type: "error", message });
         return;
       }
       setReadiness(nextReadiness);
       setUseMockFallback(!nextReadiness.apiKeysReady);
     } catch {
-      setNotice({ type: "error", message: "네트워크 문제로 API 준비도 상태를 확인하지 못했습니다." });
+      const message = "네트워크 문제로 API 준비도 상태를 확인하지 못했습니다.";
+      setReadinessError(message);
+      setNotice({ type: "error", message });
+    } finally {
+      setReadinessLoading(false);
     }
   }
 
@@ -309,13 +320,13 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
   const latestDiagnosis = diagnoseSourcingRun(runs[0]);
   const mockFallbackLocked = Boolean(readiness?.apiKeysReady);
   const manualLaunchMode = readiness?.mode === "manual_launch_ready";
-  const publicWebOnly = Boolean(
-    readiness &&
-      !readiness.apiKeysReady &&
-      readiness.runtimeReady &&
-      readiness.items.some((item) => item.id === "public_web" && item.state === "ready")
-  );
-  const automatedSourcingUnavailable = manualLaunchMode && process.env.NODE_ENV === "production" && !publicWebOnly;
+  const sourcingGate = getSourcingGateState(readiness, {
+    isProduction: process.env.NODE_ENV === "production",
+    loading: readinessLoading,
+    hasError: Boolean(readinessError)
+  });
+  const publicWebOnly = sourcingGate.publicWebOnly;
+  const sourcingBlockedInProduction = sourcingGate.blockedInProduction;
   const latestDiagnosisQuickActions = latestDiagnosis ? diagnosisQuickActions(latestDiagnosis) : [];
 
   return (
@@ -329,16 +340,38 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
           <p className="mt-1 text-xs font-bold text-steel">
             운영 함수 시간 제한을 피하기 위해 52초 안에 가능한 만큼 처리하고, 필요하면 다음 실행에서 이어갑니다.
           </p>
-          <p className={`mt-1 text-xs font-black ${readiness?.apiKeysReady || manualLaunchMode ? "text-pine" : "text-steel"}`}>
-            {readiness?.apiKeysReady
-              ? "API 키 감지됨 · 목업 대체 기본 꺼짐"
-              : publicWebOnly
-                ? "공개 웹 후보 수집 가능 · 링크는 관리자 검수 후 보강"
-              : manualLaunchMode
-                ? "수동 링크 운영 가능 · API 자동 수집 대기"
-                : "승인 대기 · 목업 대체 기본 켜짐"}
+          <p className={`mt-1 text-xs font-black ${sourcingGate.phase === "error" || sourcingGate.phase === "blocked" ? "text-coral" : readiness?.apiKeysReady || publicWebOnly ? "text-pine" : manualLaunchMode ? "text-pine" : "text-steel"}`}>
+            {readinessLoading
+              ? "준비도 확인 중"
+              : readinessError
+                ? "준비도 확인 실패"
+                : readiness?.apiKeysReady
+                  ? "API 키 감지됨 · 목업 대체 기본 꺼짐"
+                  : publicWebOnly
+                    ? "공개 웹 후보 수집 가능 · 링크는 관리자 검수 후 보강"
+                    : sourcingBlockedInProduction
+                      ? "Production 수집 설정 대기 · 수동 링크 등록 가능"
+                      : manualLaunchMode
+                        ? "수동 링크 운영 가능 · API 자동 수집 대기"
+                        : "승인 대기 · 목업 대체 기본 켜짐"}
           </p>
-          {manualLaunchMode && !publicWebOnly ? (
+          {readinessError ? (
+            <div className="mt-2 rounded-lg border border-coral/30 bg-coral/10 px-3 py-2 text-xs font-black text-coral" role="alert">
+              <p>{readinessError}</p>
+              <button className="focus-ring mt-2 rounded-md border border-coral/40 bg-white px-2.5 py-1.5 text-xs font-black text-ink hover:bg-mist disabled:opacity-60" disabled={readinessLoading} onClick={() => void loadReadiness()} type="button">
+                준비도 다시 확인
+              </button>
+            </div>
+          ) : null}
+          {sourcingBlockedInProduction && !readinessError ? (
+            <div className="mt-2 rounded-lg border border-coral/30 bg-coral/10 px-3 py-2 text-xs font-black text-coral">
+              <p>Production에서는 쿠팡 API 또는 검증된 공개 웹 수집 설정이 없으면 후보 수집을 실행하지 않습니다. 실제 상품별 파트너스 링크는 수동 등록 후 검수·게시하세요.</p>
+              <button className="focus-ring mt-2 rounded-md border border-coral/40 bg-white px-2.5 py-1.5 text-xs font-black text-ink hover:bg-mist" onClick={() => scrollToAdminAnchor("admin-affiliate-link-intake")} type="button">
+                상품별 링크 등록으로 이동
+              </button>
+            </div>
+          ) : null}
+          {manualLaunchMode && !publicWebOnly && !sourcingBlockedInProduction ? (
             <p className="mt-2 rounded-lg border border-lemon/70 bg-lemon/20 px-3 py-2 text-xs font-black text-ink">
               쿠팡 API 권한 전에는 이 버튼으로 자동 수집하지 않습니다. 관리자 수동 후보 등록에서 실제 상품별 링크를 넣어 검수·게시하세요.
             </p>
@@ -413,10 +446,10 @@ export default function AdminSourcingRunner({ password, onCompleted }: { passwor
           <button
             className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-4 py-2 text-sm font-black text-white hover:bg-ink disabled:opacity-60"
             onClick={runSourcing}
-            disabled={running || automatedSourcingUnavailable}
+            disabled={running || sourcingGate.disabled}
             type="button"
           >
-            <Play size={16} aria-hidden /> {automatedSourcingUnavailable ? "API 권한 대기" : publicWebOnly ? "공개 웹 후보 수집" : "후보 수집 실행"}
+            <Play size={16} aria-hidden /> {sourcingGate.phase === "loading" ? "준비도 확인 중" : sourcingGate.phase === "error" ? "준비도 확인 실패" : sourcingGate.phase === "blocked" ? "수집 설정 대기" : sourcingGate.phase === "public_web" ? "공개 웹 후보 수집" : "후보 수집 실행"}
           </button>
         </div>
       </div>
