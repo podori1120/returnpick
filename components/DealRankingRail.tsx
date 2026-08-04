@@ -3,6 +3,7 @@ import { ArrowRight, CheckCircle2, Medal, ShieldCheck } from "lucide-react";
 import AffiliateButton from "@/components/AffiliateButton";
 import CompareButton from "@/components/CompareButton";
 import SavedDealButton from "@/components/SavedDealButton";
+import WebEvidenceBadge from "@/components/WebEvidenceBadge";
 import { getCategoryLabel } from "@/lib/category";
 import { getCoupangOutboundLink } from "@/lib/coupangLink";
 import { getDealPrice, getDiscountRate, getReferencePrice } from "@/lib/dealIntelligence";
@@ -58,6 +59,7 @@ export default function DealRankingRail({ products }: { products: ProductWithSco
                       <span className={product.return_price && !["확인필요", "알수없음"].includes(product.condition_grade) ? "rounded bg-white px-2 py-1 text-pine" : "rounded bg-coral/10 px-2 py-1 text-coral"}>
                         {getReturnEvidenceLabel(product)}
                       </span>
+                      <WebEvidenceBadge product={product} />
                     </div>
                   </div>
                 </div>

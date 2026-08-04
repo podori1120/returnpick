@@ -15,6 +15,7 @@ import CompareButton from "@/components/CompareButton";
 import SavedDealButton from "@/components/SavedDealButton";
 import ScoreBadge from "@/components/ScoreBadge";
 import VerdictBadge from "@/components/VerdictBadge";
+import WebEvidenceBadge from "@/components/WebEvidenceBadge";
 
 export default function DealCard({ product }: { product: ProductWithScore }) {
   const score = getLatestScore(product);
@@ -58,6 +59,7 @@ export default function DealCard({ product }: { product: ProductWithScore }) {
           <span className={product.return_price && !["확인필요", "알수없음"].includes(product.condition_grade) ? "rounded-md bg-pine/10 px-2.5 py-1 text-xs font-bold text-pine" : "rounded-md bg-coral/10 px-2.5 py-1 text-xs font-bold text-coral"}>
             {getReturnEvidenceLabel(product)}
           </span>
+          <WebEvidenceBadge product={product} />
           <span className="rounded-md bg-mist px-2.5 py-1 text-xs font-bold text-steel">
             {quality.label} {quality.confidence}
           </span>
