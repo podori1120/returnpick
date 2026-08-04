@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Loader2, Scale, Share2, Trash2 } from "lucide-react";
 import AffiliateButton from "@/components/AffiliateButton";
+import AffiliateInlineDisclosure from "@/components/AffiliateInlineDisclosure";
 import AffiliateNotice from "@/components/AffiliateNotice";
 import CompareProductPicker, { type CompareProductSuggestion } from "@/components/CompareProductPicker";
 import { getStoredJsonArray, setStoredJsonArray, trackAffiliateEvent } from "@/lib/clientTracking";
@@ -359,6 +360,7 @@ export default function CompareBoard() {
                   sponsored={recommendedOutboundLink?.isAffiliate}
                   channel="compare"
                   context="compare"
+                  placement="compare_recommended"
                   className="focus-ring inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink sm:w-auto"
                 />
               </div>
@@ -440,7 +442,9 @@ export default function CompareBoard() {
                 sponsored={outboundLink.isAffiliate}
                 channel="compare"
                 context="compare"
+                placement="compare_card"
               />
+              {outboundLink.isAffiliate ? <AffiliateInlineDisclosure className="mt-2" /> : null}
             </div>
           </article>
           );

@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, Clock3, ShieldCheck } from "lucide-react";
 import AffiliateButton from "@/components/AffiliateButton";
+import AffiliateInlineDisclosure from "@/components/AffiliateInlineDisclosure";
 import PurchaseVerificationStrip from "@/components/PurchaseVerificationStrip";
 import { getCoupangOutboundLink } from "@/lib/coupangLink";
 import { getPurchaseDecision } from "@/lib/purchaseDecision";
@@ -17,6 +18,7 @@ export default function PurchaseDecisionPanel({ product }: { product: ProductWit
   const decision = getPurchaseDecision(product);
   const demoProduct = isDemoProduct(product);
   const outboundLink = getCoupangOutboundLink(product);
+  const affiliateReady = !demoProduct && outboundLink.isAffiliate;
 
   return (
     <section className="rounded-lg border border-line bg-white p-5 shadow-soft">
@@ -59,14 +61,15 @@ export default function PurchaseDecisionPanel({ product }: { product: ProductWit
             </p>
             <AffiliateButton
               productId={product.id}
-              href={demoProduct || !outboundLink.isAffiliate ? null : outboundLink.href}
-              label={demoProduct ? "데모 상품 · 구매 링크 없음" : outboundLink.isAffiliate ? "쿠팡에서 실시간 가격 확인" : "링크 확인필요"}
+              href={affiliateReady ? outboundLink.href : null}
+              label={demoProduct ? "데모 상품 · 구매 링크 없음" : affiliateReady ? "쿠팡에서 실시간 가격 확인" : "링크 확인필요"}
               disabledLabel={demoProduct ? "데모 상품 · 구매 링크 없음" : "링크 확인필요"}
               placement="detail_decision"
               context="deal_detail"
-              sponsored={outboundLink.isAffiliate}
+              sponsored={affiliateReady}
               className="focus-ring inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-pine px-4 py-3 text-sm font-black text-white hover:bg-ink sm:w-auto sm:min-w-[220px]"
             />
+            {affiliateReady ? <AffiliateInlineDisclosure className="mt-2 sm:mt-0 sm:max-w-sm" /> : null}
           </div>
 
           <div className="grid gap-3 md:grid-cols-3">
@@ -109,7 +112,7 @@ export default function PurchaseDecisionPanel({ product }: { product: ProductWit
             <span>
               {demoProduct
                 ? "로컬 데모 상품은 구매 링크와 수익 이벤트를 연결하지 않습니다."
-                : outboundLink.isAffiliate
+                : affiliateReady
                 ? "구매 버튼은 사용자가 직접 누를 때만 새 탭으로 열리며, 링크 근처에 제휴 안내를 표시합니다."
                 : "상품별 파트너스 링크가 확인되기 전에는 구매 버튼을 비활성화합니다."}
             </span>

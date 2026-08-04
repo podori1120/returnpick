@@ -164,6 +164,15 @@ function check(name, ok, detail, severity = "required") {
   results.push({ name, ok: Boolean(ok), detail, severity });
 }
 
+function hasAdjacentInlineDisclosure(text, placement, condition) {
+  const placementIndex = text.indexOf(`placement="${placement}"`);
+  if (placementIndex < 0) return false;
+  const ctaEnd = text.indexOf("/>", placementIndex);
+  if (ctaEnd < 0) return false;
+  const afterCta = text.slice(ctaEnd + 2, ctaEnd + 700);
+  return afterCta.includes(condition) && afterCta.includes("AffiliateInlineDisclosure");
+}
+
 function checkEnvGroup(name, keys, severity = "required") {
   const missing = keys.filter((key) => !hasEnv(key));
   check(name, missing.length === 0, missing.length ? `missing: ${missing.join(", ")}` : `set: ${keys.join(", ")}`, severity);
@@ -214,6 +223,7 @@ const requiredFiles = [
   "components/AdminPriceBackfillPanel.tsx",
   "components/AdminProductEditor.tsx",
   "components/AffiliateEventTracker.tsx",
+  "components/AffiliateInlineDisclosure.tsx",
   "components/EditorialShareBar.tsx",
   "components/GuideEditorialLink.tsx",
   "components/SearchIntentRail.tsx",
@@ -2875,13 +2885,94 @@ if (
       dealDetail.includes("const affiliateReady") &&
       dealDetail.includes('disabledLabel={demoProduct ? "데모 상품 · 구매 링크 없음" : "링크 확인필요"}') &&
       dealDetail.includes("구매 버튼이 비활성화되어 있습니다") &&
-      purchaseDecisionPanel.includes("!outboundLink.isAffiliate ? null : outboundLink.href") &&
+      purchaseDecisionPanel.includes("href={affiliateReady ? outboundLink.href : null}") &&
       purchaseDecisionPanel.includes('"링크 확인필요"') &&
       purchaseDecisionPanel.includes("구매 버튼을 비활성화합니다") &&
       compareBoard.includes("링크 확인필요") &&
       !dealDetail.includes("쿠팡 검색 결과로 이동") &&
       !purchaseDecisionPanel.includes("일반 쿠팡 검색으로 이동"),
     "missing or non-affiliate product URLs are shown as 확인필요 and never presented as a regular Coupang search CTA",
+    "required"
+  );
+}
+
+const inlineDisclosureFiles = [
+  "components/AffiliateInlineDisclosure.tsx",
+  "components/DealDetail.tsx",
+  "components/PurchaseDecisionPanel.tsx",
+  "components/CompareBoard.tsx",
+  "components/SavedDealsBoard.tsx"
+];
+const inlineDisclosureFilesPresent = inlineDisclosureFiles.every(fileExists);
+check(
+  "public CTA: inline affiliate disclosure files",
+  inlineDisclosureFilesPresent,
+  inlineDisclosureFilesPresent ? inlineDisclosureFiles.join(", ") : `missing: ${inlineDisclosureFiles.filter((file) => !fileExists(file)).join(", ")}`,
+  "required"
+);
+
+if (inlineDisclosureFilesPresent) {
+  const inlineDisclosure = readText("components/AffiliateInlineDisclosure.tsx");
+  const dealDetail = readText("components/DealDetail.tsx");
+  const purchaseDecision = readText("components/PurchaseDecisionPanel.tsx");
+  const compareBoard = readText("components/CompareBoard.tsx");
+  const savedBoard = readText("components/SavedDealsBoard.tsx");
+  check(
+    "public CTA: shared inline disclosure copy",
+    inlineDisclosure.includes('data-affiliate-disclosure="inline"') &&
+      inlineDisclosure.includes("쿠팡 파트너스 활동의 일환") &&
+      inlineDisclosure.includes("가격과 재고, 반품등급은 수시로 변동될 수 있습니다") &&
+      inlineDisclosure.includes('href="/disclosure"') &&
+      inlineDisclosure.includes("제휴 안내"),
+    "shared inline copy keeps the required affiliate notice, volatility warning, and disclosure-page link",
+    "required"
+  );
+  check(
+    "public CTA: detail hero disclosure placement",
+    dealDetail.includes("const affiliateReady = !demoProduct && outboundLink.isAffiliate") &&
+      hasAdjacentInlineDisclosure(dealDetail, "detail_hero", "affiliateReady"),
+    "the hero CTA has an adjacent disclosure under the enabled affiliate-link condition",
+    "required"
+  );
+  check(
+    "public CTA: detail price disclosure placement",
+    hasAdjacentInlineDisclosure(dealDetail, "detail_price", "affiliateReady"),
+    "the price comparison CTA has an adjacent disclosure under the enabled affiliate-link condition",
+    "required"
+  );
+  check(
+    "public CTA: detail sidebar disclosure placement",
+    hasAdjacentInlineDisclosure(dealDetail, "detail_sidebar", "affiliateReady"),
+    "the sidebar CTA has an adjacent disclosure under the enabled affiliate-link condition",
+    "required"
+  );
+  check(
+    "public CTA: detail mobile disclosure placement",
+    hasAdjacentInlineDisclosure(dealDetail, "detail_mobile_sticky", "affiliateReady"),
+    "the mobile sticky CTA has an adjacent disclosure under the enabled affiliate-link condition",
+    "required"
+  );
+  check(
+    "public CTA: purchase decision disclosure placement",
+    purchaseDecision.includes("const affiliateReady = !demoProduct && outboundLink.isAffiliate") &&
+      purchaseDecision.includes("href={affiliateReady ? outboundLink.href : null}") &&
+      purchaseDecision.includes("sponsored={affiliateReady}") &&
+      hasAdjacentInlineDisclosure(purchaseDecision, "detail_decision", "affiliateReady"),
+    "the purchase decision CTA only shows the inline disclosure when its explicit link is enabled",
+    "required"
+  );
+  check(
+    "public CTA: compare card disclosure placement",
+    compareBoard.includes('import AffiliateInlineDisclosure from "@/components/AffiliateInlineDisclosure"') &&
+      hasAdjacentInlineDisclosure(compareBoard, "compare_card", "outboundLink.isAffiliate"),
+    "each comparison card keeps the affiliate disclosure beside its outbound CTA",
+    "required"
+  );
+  check(
+    "public CTA: saved deal disclosure placement",
+    savedBoard.includes('import AffiliateInlineDisclosure from "@/components/AffiliateInlineDisclosure"') &&
+      hasAdjacentInlineDisclosure(savedBoard, "saved_card", "outboundLink.isAffiliate"),
+    "each saved-deal card keeps the affiliate disclosure beside its outbound CTA",
     "required"
   );
 }

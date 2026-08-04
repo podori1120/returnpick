@@ -1,5 +1,6 @@
 import AffiliateNotice from "@/components/AffiliateNotice";
 import AffiliateButton from "@/components/AffiliateButton";
+import AffiliateInlineDisclosure from "@/components/AffiliateInlineDisclosure";
 import DemoModeNotice from "@/components/DemoModeNotice";
 import { DealViewTracker } from "@/components/AffiliateEventTracker";
 import Checklist from "@/components/Checklist";
@@ -42,7 +43,7 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
   const canonicalUrl = `${getSiteUrl()}/deals/${product.id}`;
 
   return (
-    <main className="mx-auto max-w-7xl px-4 pb-28 pt-8 sm:px-6 lg:pb-8">
+    <main className="mx-auto max-w-7xl px-4 pb-40 pt-8 sm:px-6 sm:pb-32 lg:pb-8">
       <DealViewTracker productId={product.id} title={product.title} context="deal_detail" />
       {demoProduct ? <DemoModeNotice count={1} /> : null}
       <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
@@ -99,9 +100,10 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
                   disabledLabel={demoProduct ? "데모 상품 · 구매 링크 없음" : "링크 확인필요"}
                   placement="detail_hero"
                   context="deal_detail"
-                  sponsored={outboundLink.isAffiliate}
+                  sponsored={affiliateReady}
                   className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-pine px-4 py-2 text-sm font-black text-white hover:bg-ink"
                 />
+                {affiliateReady ? <AffiliateInlineDisclosure className="basis-full mt-1" /> : null}
               </div>
               <DealShareBar productId={product.id} canonicalUrl={canonicalUrl} />
             </div>
@@ -119,13 +121,13 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
                 <div>
                   <p className="text-sm font-black text-pine">쿠팡 파트너스</p>
                   <p className="mt-1 text-sm font-semibold text-steel">
-                    {outboundLink.isAffiliate
+                    {affiliateReady
                       ? "가격과 재고는 쿠팡에서 다시 확인하세요. 버튼을 누르면 쿠팡 파트너스 링크가 새 탭으로 열립니다."
                       : demoProduct
                         ? "이 상품은 로컬 화면 확인용 샘플입니다. 실제 구매를 진행하려면 운영 데이터에 상품별 파트너스 링크를 연결해야 합니다."
                         : "가격과 재고는 쿠팡에서 다시 확인하세요. 상품별 파트너스 링크가 확인되면 구매 버튼이 활성화됩니다."}
                   </p>
-                  {!outboundLink.isAffiliate && !demoProduct ? (
+                  {!affiliateReady && !demoProduct ? (
                     <p className="mt-1 text-xs font-bold text-coral">상품별 쿠팡 파트너스 링크가 확인되면 구매 버튼이 활성화됩니다.</p>
                   ) : null}
                 </div>
@@ -136,9 +138,10 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
                   disabledLabel={demoProduct ? "데모 상품 · 구매 링크 없음" : "링크 확인필요"}
                   placement="detail_price"
                   context="deal_detail"
-                  sponsored={outboundLink.isAffiliate}
+                  sponsored={affiliateReady}
                   className="focus-ring inline-flex min-w-[180px] items-center justify-center gap-2 rounded-lg bg-ink px-4 py-3 text-sm font-black text-white hover:bg-pine"
                 />
+                {affiliateReady ? <AffiliateInlineDisclosure className="basis-full mt-1" /> : null}
               </div>
             </div>
           </section>
@@ -218,15 +221,15 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
               disabledLabel={demoProduct ? "데모 상품 · 구매 링크 없음" : "링크 확인필요"}
               placement="detail_sidebar"
               context="deal_detail"
-              sponsored={outboundLink.isAffiliate}
+              sponsored={affiliateReady}
             />
-            <p className="mt-3 text-xs font-semibold leading-5 text-steel">
-              {demoProduct
-                ? "로컬 데모 상품이라 실제 쿠팡 구매 링크가 연결되지 않았습니다."
-                : outboundLink.isAffiliate
-                ? "이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."
-                : "상품별 쿠팡 파트너스 링크가 아직 연결되지 않아 구매 버튼이 비활성화되어 있습니다."}
-            </p>
+            {affiliateReady ? (
+              <AffiliateInlineDisclosure className="mt-3" />
+            ) : (
+              <p className="mt-3 text-xs font-semibold leading-5 text-steel">
+                {demoProduct ? "로컬 데모 상품이라 실제 쿠팡 구매 링크가 연결되지 않았습니다." : "상품별 쿠팡 파트너스 링크가 아직 연결되지 않아 구매 버튼이 비활성화되어 있습니다."}
+              </p>
+            )}
           </div>
           <AffiliateNotice />
         </aside>
@@ -240,11 +243,15 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
             disabledLabel={demoProduct ? "데모 상품 · 구매 링크 없음" : "링크 확인필요"}
             placement="detail_mobile_sticky"
             context="deal_detail"
-            sponsored={outboundLink.isAffiliate}
+            sponsored={affiliateReady}
           />
-          <p className="mt-1 text-center text-[11px] font-semibold text-steel">
-            {demoProduct ? "로컬 데모 상품 · 실제 구매 링크 없음" : outboundLink.isAffiliate ? "쿠팡 파트너스 활동의 일환으로 일정액의 수수료를 제공받습니다." : "상품별 파트너스 링크 확인 전이라 구매 버튼이 비활성화되어 있습니다."}
-          </p>
+          {affiliateReady ? (
+            <AffiliateInlineDisclosure className="mt-1 text-center text-[11px]" />
+          ) : (
+            <p className="mt-1 text-center text-[11px] font-semibold text-steel">
+              {demoProduct ? "로컬 데모 상품 · 실제 구매 링크 없음" : "상품별 파트너스 링크 확인 전이라 구매 버튼이 비활성화되어 있습니다."}
+            </p>
+          )}
         </div>
       </div>
     </main>
