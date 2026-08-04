@@ -16,6 +16,7 @@ import {
 import AffiliateNotice from "@/components/AffiliateNotice";
 import ApprovalSampleCard from "@/components/ApprovalSampleCard";
 import DealCard from "@/components/DealCard";
+import DealRankingRail from "@/components/DealRankingRail";
 import DemoModeNotice from "@/components/DemoModeNotice";
 import DiscoveryWorkbench from "@/components/DiscoveryWorkbench";
 import PurposeDealExplorer, { type PurposeExplorerItem } from "@/components/PurposeDealExplorer";
@@ -248,25 +249,13 @@ export default async function HomePage() {
       <PurposeDealExplorer items={purposeItems} initialPurposeId={initialPurposeId} />
 
       {hasPublishedDeals ? (
-        <section className="mx-auto max-w-7xl space-y-5 px-4 py-8 sm:px-6">
-          <VerifiedUpdatesRail updates={verifiedUpdates} title="최근 확인된 변동" description="가격·재고·반품 조건을 실제로 다시 관찰한 공개 상품을 먼저 확인하세요." />
-          <RecentDealsRail />
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-sm font-black text-pine">오늘의 딜</p>
-              <h2 className="text-2xl font-black">오늘 볼 만한 딜</h2>
-              <p className="mt-1 text-sm font-semibold text-steel">현재 공개 상품 {products.length.toLocaleString("ko-KR")}개</p>
-            </div>
-            <Link className="text-sm font-black text-pine hover:text-ink" href="/deals">
-              더 보기
-            </Link>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {featured.map((product) => (
-              <DealCard key={product.id} product={product} />
-            ))}
-          </div>
-        </section>
+        <>
+          <section className="mx-auto max-w-7xl space-y-5 px-4 py-8 sm:px-6">
+            <VerifiedUpdatesRail updates={verifiedUpdates} title="최근 확인된 변동" description="가격·재고·반품 조건을 실제로 다시 관찰한 공개 상품을 먼저 확인하세요." />
+            <RecentDealsRail />
+          </section>
+          <DealRankingRail products={featured} />
+        </>
       ) : null}
 
       <section className="mx-auto grid max-w-7xl gap-4 px-4 py-8 sm:px-6 lg:grid-cols-3">

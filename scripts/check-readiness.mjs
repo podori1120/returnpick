@@ -210,6 +210,7 @@ const requiredFiles = [
   "app/picks/novatech-s1-window-cleaner/twitter-image.tsx",
   "components/AdminLaunchStatusBar.tsx",
   "components/ApprovalSampleCard.tsx",
+  "components/DealRankingRail.tsx",
   "components/AdminApiReadinessPanel.tsx",
   "components/AdminAffiliateLinkQueue.tsx",
   "components/AdminAffiliateLinkIntake.tsx",
@@ -2640,6 +2641,7 @@ if (
   fileExists("app/products/approval-sample/page.tsx") &&
   fileExists("app/api/events/route.ts") &&
   fileExists("components/PurposeDealExplorer.tsx") &&
+  fileExists("components/DealRankingRail.tsx") &&
   fileExists("lib/homeDiscovery.ts") &&
   fileExists("app/page.tsx") &&
   fileExists("app/deals/page.tsx")
@@ -2650,6 +2652,7 @@ if (
   const approvalPage = readText("app/products/approval-sample/page.tsx");
   const eventRoute = readText("app/api/events/route.ts");
   const purposeExplorer = readText("components/PurposeDealExplorer.tsx");
+  const dealRankingRail = readText("components/DealRankingRail.tsx");
   const homeDiscovery = readText("lib/homeDiscovery.ts");
   const homePage = readText("app/page.tsx");
   const dealsPage = readText("app/deals/page.tsx");
@@ -2761,6 +2764,35 @@ if (
       !purposeExplorer.includes("/redirect?") &&
       !purposeExplorer.includes("window.location"),
     "zero inventory still provides category-specific checks and purpose guidance without invented products or automatic affiliate redirects",
+    "required"
+  );
+  check(
+    "home discovery: ranked conversion rail for public deals",
+      homePage.includes('import DealRankingRail from "@/components/DealRankingRail"') &&
+      homePage.includes("<DealRankingRail products={featured} />") &&
+      homePage.includes("const featured = products.slice(0, 6);") &&
+      homePage.includes("filter(isPublicDealVisible)") &&
+      dealRankingRail.includes('id="deal-ranking-heading"') &&
+      dealRankingRail.includes("const rankedProducts = [...products]") &&
+      dealRankingRail.includes("getLatestScore(b)?.total_score ?? 0") &&
+      dealRankingRail.includes("getLatestScore(a)?.total_score ?? 0") &&
+      dealRankingRail.includes(".slice(0, 6);") &&
+      dealRankingRail.includes("if (!rankedProducts.length) return null;") &&
+      dealRankingRail.includes("getLatestScore(product)") &&
+      dealRankingRail.includes("getDiscountRate(product)") &&
+      dealRankingRail.includes("formatPrice(dealPrice)") &&
+      dealRankingRail.includes("formatPrice(referencePrice)") &&
+      dealRankingRail.includes("getCoupangOutboundLink(product)") &&
+      dealRankingRail.includes("outboundLink.isAffiliate") &&
+      dealRankingRail.includes("href={outboundLink.href}") &&
+      dealRankingRail.includes('placement="home_ranking"') &&
+      dealRankingRail.includes('context="home_ranking"') &&
+      dealRankingRail.includes('label="쿠팡에서 가격 확인"') &&
+      dealRankingRail.includes("제휴 링크이며 구매가 발생하면 운영자가 수수료") &&
+      dealRankingRail.includes('href="/disclosure"') &&
+      dealRankingRail.includes("CompareButton") &&
+      dealRankingRail.includes("SavedDealButton"),
+    "public deals expose a score-ranked scan path with comparison, save, detail, tracked affiliate CTA, and nearby disclosure without rendering when inventory is empty",
     "required"
   );
   check(
