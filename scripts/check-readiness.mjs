@@ -2626,8 +2626,9 @@ if (
   );
   check(
     "editorial pick: card purchase CTA is disclosed and tracked",
-    approvalCard.includes("ApprovalCoupangButton") &&
+      approvalCard.includes("ApprovalCoupangButton") &&
       approvalCard.includes('label="쿠팡에서 가격 확인"') &&
+      approvalCard.includes('placement === "home" ? "aspect-video" : "aspect-[3/2]"') &&
       approvalCard.includes("쿠팡 파트너스 활동의 일환으로") &&
       approvalCard.includes('href=\"/disclosure\"') &&
       approvalCard.includes("web_editorial_card_home") &&

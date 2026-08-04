@@ -21,7 +21,7 @@ export default function ApprovalSampleCard({ placement }: { placement: "home" | 
     <article className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">
       <EditorialPickImpressionTracker placement={placement} />
       <Link className="focus-ring group block" href={approvalSampleProduct.detailPath} aria-label={`${approvalSampleProduct.name} 상세 보기`}>
-        <div className="relative aspect-[3/2] overflow-hidden bg-mist">
+        <div className={`relative overflow-hidden bg-mist ${placement === "home" ? "aspect-video" : "aspect-[3/2]"}`}>
           <Image
             alt={approvalSampleProduct.imageAlt}
             className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
@@ -32,7 +32,7 @@ export default function ApprovalSampleCard({ placement }: { placement: "home" | 
           />
           <span className="absolute left-3 top-3 rounded-md bg-white/95 px-2.5 py-1 text-xs font-black text-ink shadow-soft">연출 이미지</span>
         </div>
-        <div className="p-5">
+        <div className={placement === "home" ? "p-4 sm:p-5" : "p-5"}>
           <div className="flex flex-wrap items-center gap-2 text-xs font-black">
             <span className="rounded-md bg-pine/10 px-2.5 py-1 text-pine">직접 검수 추천</span>
             <span className="rounded-md bg-mist px-2.5 py-1 text-steel">{approvalSampleProduct.categoryLabel}</span>
@@ -56,7 +56,7 @@ export default function ApprovalSampleCard({ placement }: { placement: "home" | 
           </span>
         </div>
       </Link>
-      <div className="border-t border-line p-5">
+      <div className={placement === "home" ? "border-t border-line p-4 sm:p-5" : "border-t border-line p-5"}>
         <ApprovalCoupangButton
           href={process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL?.trim() ?? ""}
           label="쿠팡에서 가격 확인"
