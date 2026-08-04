@@ -17,6 +17,7 @@ type ApiReadinessSummary = {
   apiKeysReady: boolean;
   runtimeReady: boolean;
   launchReady: boolean;
+  catalogLaunchReady: boolean;
   blockingEnv: string[];
   optionalMissingItemIds: string[];
 };
@@ -48,6 +49,16 @@ function statusCopy(readiness: ApiReadinessSummary | null) {
       title: "상품별 파트너스 링크를 검수해 바로 운영할 수 있습니다.",
       body: "쿠팡 API 권한은 자동 후보 수집 기능에만 필요합니다. 관리자에서 실제 상품별 링크를 확인한 후보를 승인·게시하고, API 권한이 열리면 자동 소싱을 추가하세요.",
       tone: "border-pine/30 bg-pine/5 text-pine",
+      icon: CheckCircle2
+    };
+  }
+
+  if (readiness.catalogLaunchReady && !readiness.launchReady) {
+    return {
+      label: "제한 공개 가능",
+      title: "검수된 임시 카탈로그를 제한적으로 공개할 수 있습니다.",
+      body: "상품별 파트너스 링크와 공개 검수가 끝난 카탈로그만 공개합니다. 자동 수집·영구 클릭 집계·스케줄러는 Supabase 연결만으로 켜지지 않으며, Cron 보호값·핵심 연결 테스트·Production 첫 가동 확인까지 통과한 뒤 정식 운영으로 전환됩니다.",
+      tone: "border-lemon/50 bg-lemon/15 text-ink",
       icon: CheckCircle2
     };
   }
@@ -153,10 +164,10 @@ export default function AdminLaunchStatusBar({ password }: { password: string })
           </button>
           <button
             className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-3 py-2 text-xs font-black text-white hover:bg-ink"
-            onClick={() => scrollToAdminAnchor(readiness?.launchReady ? "admin-first-launch" : "admin-api-readiness")}
+            onClick={() => scrollToAdminAnchor(readiness?.launchReady ? "admin-first-launch" : readiness?.catalogLaunchReady ? "admin-bootstrap-catalog" : "admin-api-readiness")}
             type="button"
           >
-            <Rocket size={14} aria-hidden /> {readiness?.launchReady ? "첫 가동" : "설정 보강"}
+            <Rocket size={14} aria-hidden /> {readiness?.launchReady ? "첫 가동" : readiness?.catalogLaunchReady ? "카탈로그 공개" : "설정 보강"}
           </button>
           <button
             className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-xs font-black text-ink hover:bg-mist"

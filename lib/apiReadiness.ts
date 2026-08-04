@@ -17,6 +17,7 @@ import {
 import { getCustomerPublishReadiness } from "@/lib/quality";
 import {
   OPTIONAL_CAPABILITY_ITEM_IDS,
+  evaluateCatalogLaunchReadiness,
   evaluateLaunchReadiness,
   getOptionalConnectionCheckIds,
   getRequiredConnectionCheckIds
@@ -49,6 +50,7 @@ export type ApiReadinessSummary = {
   apiKeysReady: boolean;
   runtimeReady: boolean;
   launchReady: boolean;
+  catalogLaunchReady: boolean;
   blockingItemIds: string[];
   blockingEnv: string[];
   optionalItemIds: string[];
@@ -1656,6 +1658,7 @@ export function getApiReadinessSummary(): ApiReadinessSummary {
   const itemById = new Map(items.map((item) => [item.id, item]));
   const optionalItemIds = [...OPTIONAL_CAPABILITY_ITEM_IDS];
   const { apiKeysReady, runtimeReady, launchReady, blockingItemIds, optionalMissingItemIds } = evaluateLaunchReadiness(items, publicWebEnabled);
+  const catalogLaunchReady = evaluateCatalogLaunchReadiness(items);
   const blockingEnv = blockingItemIds.flatMap((id) => itemById.get(id)?.missingEnv ?? []);
   const optionalMissingEnv = optionalMissingItemIds.flatMap((id) => itemById.get(id)?.missingEnv ?? []);
   const mode: ReadinessMode = launchReady ? (apiKeysReady ? "launch_ready" : "manual_launch_ready") : apiKeysReady ? "api_ready" : "pre_approval";
@@ -1675,6 +1678,7 @@ export function getApiReadinessSummary(): ApiReadinessSummary {
     apiKeysReady,
     runtimeReady,
     launchReady,
+    catalogLaunchReady,
     blockingItemIds,
     blockingEnv,
     optionalItemIds,

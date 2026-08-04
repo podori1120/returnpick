@@ -24,6 +24,7 @@ const readyCoreItems = [
 ].map((id) => ({ id, state: "ready" }));
 const optionalMissingItems = [
   ...readyCoreItems,
+  { id: "bootstrap_catalog", state: "ready" },
   { id: "coupang", state: "missing" },
   { id: "naver", state: "missing" },
   { id: "telegram", state: "missing" },
@@ -51,10 +52,44 @@ assert.deepEqual(
   ["coupang", "naver", "telegram"],
   "missing optional capabilities must remain visible"
 );
+assert.equal(
+  policy.evaluateCatalogLaunchReadiness(optionalMissingItems),
+  true,
+  "a validated bootstrap catalog must permit limited public launch"
+);
+assert.equal(
+  policy.evaluateLaunchReadiness(optionalMissingItems, false).launchReady,
+  true,
+  "a complete core runtime must remain fully launch-ready when a bootstrap catalog is also present"
+);
 assert.equal(policy.isCapabilityReady(optionalMissingItems, "telegram"), false, "Telegram delivery must stay gated without its credentials");
 
 const withoutSupabase = optionalMissingItems.map((item) => (item.id === "supabase" ? { ...item, state: "missing" } : item));
 assert.deepEqual(policy.getLaunchBlockingItemIds(withoutSupabase, false), ["supabase"], "durable storage remains a core launch requirement");
+assert.equal(
+  policy.evaluateLaunchReadiness(withoutSupabase, false).launchReady,
+  false,
+  "full launch must remain blocked without Supabase even when a limited catalog is ready"
+);
+assert.equal(
+  policy.evaluateCatalogLaunchReadiness(withoutSupabase),
+  true,
+  "limited catalog launch must remain available without Supabase"
+);
+const withoutCatalog = optionalMissingItems.map((item) => (item.id === "bootstrap_catalog" ? { ...item, state: "missing" } : item));
+assert.equal(
+  policy.evaluateCatalogLaunchReadiness(withoutCatalog),
+  false,
+  "limited catalog launch must remain blocked without a validated catalog"
+);
+for (const requiredCatalogId of ["site", "approval_link", "admin_password", "bootstrap_catalog"]) {
+  const withoutRequiredCatalogItem = optionalMissingItems.map((item) => (item.id === requiredCatalogId ? { ...item, state: "missing" } : item));
+  assert.equal(
+    policy.evaluateCatalogLaunchReadiness(withoutRequiredCatalogItem),
+    false,
+    `limited catalog launch must remain blocked without ${requiredCatalogId}`
+  );
+}
 assert.deepEqual(
   policy.getLaunchBlockingItemIds(optionalMissingItems, true),
   ["public_web"],

@@ -24,6 +24,7 @@ type ApiReadinessSummary = {
   apiKeysReady: boolean;
   runtimeReady: boolean;
   launchReady: boolean;
+  catalogLaunchReady: boolean;
   blockingItemIds: string[];
   blockingEnv: string[];
   optionalItemIds: string[];
@@ -309,6 +310,7 @@ function stepMeta(done: boolean) {
 function modeLabel(readiness: ApiReadinessSummary) {
   if (readiness.mode === "manual_launch_ready") return "수동 출시 가능";
   if (readiness.launchReady) return "운영 준비 완료";
+  if (readiness.catalogLaunchReady) return "제한 공개 가능";
   if (readiness.apiKeysReady) return "API 키 입력됨";
   return "승인 대기";
 }
@@ -324,6 +326,15 @@ function nextLaunchAction(readiness: ApiReadinessSummary, checks: ApiConnectionC
       title: "상품별 쿠팡 파트너스 링크를 검수해 바로 게시하세요.",
       body: "쿠팡 API 권한은 자동 후보 수집 기능에만 필요합니다. 실제 상품 URL과 상품별 파트너스 링크를 관리자에서 확인한 뒤 승인·게시하고, API 권한이 열리면 자동 수집을 추가합니다.",
       bullets: ["상품별 파트너스 링크 수동 등록", "반품가·등급·재고 검수", "API 권한 발급 후 자동화 전환"]
+    };
+  }
+
+  if (readiness.catalogLaunchReady && !readiness.launchReady) {
+    return {
+      stage: "제한 공개",
+      title: "검수된 임시 카탈로그를 공개하고 Supabase 연결을 이어가세요.",
+      body: "실제 상품별 파트너스 링크와 공개 검수를 통과한 카탈로그가 준비됐습니다. 이 경로는 구매 전환용 공개만 지원합니다. Supabase 연결만으로 자동 운영이 열리지 않으며, Cron 보호값·핵심 연결 테스트·Production 첫 가동 확인까지 통과해야 자동 수집·영구 이벤트 저장·시간별 작업을 시작할 수 있습니다.",
+      bullets: ["RETURNPICK_BOOTSTRAP_CATALOG_JSON을 Vercel Production에 반영", "공개 상품 페이지와 제휴 고지 확인", "Supabase SQL·환경변수 준비 후 정식 전환"]
     };
   }
 
@@ -647,6 +658,11 @@ export default function AdminApiReadinessPanel({ password }: { password: string 
           {readiness.apiKeysReady && !readiness.launchReady ? (
             <p className="mt-2 rounded-lg border border-coral/30 bg-coral/10 px-3 py-2 text-xs font-black text-coral">
               API 키는 들어갔지만 운영 필수 설정이 남아 있습니다. 누락 환경변수: {readiness.blockingEnv.length ? readiness.blockingEnv.join(", ") : "연결 테스트 필요"}
+            </p>
+          ) : null}
+          {readiness.catalogLaunchReady && !readiness.launchReady ? (
+            <p className="mt-2 rounded-lg border border-lemon/50 bg-lemon/15 px-3 py-2 text-xs font-black text-ink">
+              제한 공개 가능: <a className="underline" href="#admin-bootstrap-catalog">검수된 임시 카탈로그</a>만 공개할 수 있습니다. Supabase 연결만으로 자동 운영이 열리지 않으며, Cron 보호값·핵심 연결 테스트·Production 첫 가동 확인까지 통과해야 자동 수집·영구 클릭 집계·스케줄러를 시작할 수 있습니다.
             </p>
           ) : null}
           {readiness.optionalMissingItemIds.length ? (
