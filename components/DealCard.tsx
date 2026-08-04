@@ -9,6 +9,7 @@ import { getDealQuality, getReturnEvidenceLabel } from "@/lib/quality";
 import { getPurchaseDecision } from "@/lib/purchaseDecision";
 import { getDealFreshness } from "@/lib/dealFreshness";
 import { getLatestScore } from "@/lib/scoring";
+import { getPriceReferenceInfo } from "@/lib/priceReference";
 import type { ProductWithScore } from "@/lib/types";
 import CompareButton from "@/components/CompareButton";
 import SavedDealButton from "@/components/SavedDealButton";
@@ -18,6 +19,7 @@ import VerdictBadge from "@/components/VerdictBadge";
 export default function DealCard({ product }: { product: ProductWithScore }) {
   const score = getLatestScore(product);
   const reference = getReferencePrice(product);
+  const referenceInfo = getPriceReferenceInfo(product);
   const deal = getDealPrice(product);
   const discount = getDiscountRate(product);
   const quality = getDealQuality(product);
@@ -98,6 +100,7 @@ export default function DealCard({ product }: { product: ProductWithScore }) {
           <div>
             <p className="text-xs font-bold text-steel">기준가</p>
             <p className="font-black">{formatPrice(reference)}</p>
+            <p className="mt-0.5 text-[10px] font-bold leading-4 text-steel">{referenceInfo.label}</p>
           </div>
         </div>
         <div className="rounded-lg border border-line bg-mist p-3">

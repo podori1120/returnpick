@@ -1172,6 +1172,14 @@ if (
     "customer-ready deal cards expose a tracked Coupang price CTA with nearby affiliate disclosure, surface context, and a disclosure-page link",
     "required"
   );
+  check(
+    "public UX: card reference source",
+    dealCard.includes('import { getPriceReferenceInfo } from "@/lib/priceReference"') &&
+      dealCard.includes("const referenceInfo = getPriceReferenceInfo(product)") &&
+      dealCard.includes("referenceInfo.label"),
+    "deal cards identify whether the reference price is Naver, new-product, or collected price",
+    "required"
+  );
 }
 
 if (
