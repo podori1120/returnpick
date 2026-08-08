@@ -9,6 +9,7 @@ import SavedDealButton from "@/components/SavedDealButton";
 import DealQualityCard from "@/components/DealQualityCard";
 import PriceComparison from "@/components/PriceComparison";
 import PriceHistory from "@/components/PriceHistory";
+import PriceWatchButton from "@/components/PriceWatchButton";
 import ProductSpecSummary from "@/components/ProductSpecSummary";
 import PurchaseDecisionPanel from "@/components/PurchaseDecisionPanel";
 import RelatedDeals from "@/components/RelatedDeals";
@@ -145,6 +146,8 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
               </div>
             </div>
           </section>
+
+          <PriceWatchButton productId={product.id} title={product.title} currentPrice={dealPrice} />
 
           <DealQualityCard product={product} />
           <ReturnEvidence product={product} />

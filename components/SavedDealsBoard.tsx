@@ -10,12 +10,14 @@ import SavedDealButton from "@/components/SavedDealButton";
 import { getCoupangOutboundLink } from "@/lib/coupangLink";
 import { getSavedDealItems, savedDealsChangeEvent, setSavedDealItems, type SavedDealItem } from "@/lib/clientTracking";
 import { formatDate, formatPercent, formatPrice } from "@/lib/format";
+import { evaluatePriceWatch, getPriceWatchItems, priceWatchChangeEvent, type PriceWatchItem } from "@/lib/priceWatch";
 import type { PublicDeal } from "@/lib/publicDeal";
 
 export default function SavedDealsBoard() {
   const [items, setItems] = useState<SavedDealItem[]>([]);
   const [products, setProducts] = useState<PublicDeal[]>([]);
   const [removedCount, setRemovedCount] = useState(0);
+  const [priceWatches, setPriceWatches] = useState<PriceWatchItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -30,6 +32,20 @@ export default function SavedDealsBoard() {
     return () => {
       window.removeEventListener("storage", sync);
       window.removeEventListener(savedDealsChangeEvent, sync);
+    };
+  }, []);
+
+  useEffect(() => {
+    function sync() {
+      setPriceWatches(getPriceWatchItems());
+    }
+
+    sync();
+    window.addEventListener("storage", sync);
+    window.addEventListener(priceWatchChangeEvent, sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener(priceWatchChangeEvent, sync);
     };
   }, []);
 
@@ -227,6 +243,20 @@ export default function SavedDealsBoard() {
                       <div className={`rounded-md border px-3 py-2 text-xs font-bold leading-5 ${notice.className}`} role="status">
                         <p className="font-black">{notice.label}</p>
                         <p className="mt-0.5">{notice.detail}</p>
+                      </div>
+                    );
+                  })()}
+                  {(() => {
+                    const watch = priceWatches.find((item) => item.productId === product.id);
+                    if (!watch) return null;
+                    const watchStatus = evaluatePriceWatch(product.deal_price, watch.targetPrice);
+                    const hit = watchStatus === "hit";
+                    return (
+                      <div className={`rounded-md border px-3 py-2 text-xs font-bold leading-5 ${hit ? "border-pine bg-pine/10 text-pine" : "border-line bg-mist text-steel"}`} role="status">
+                        <p className="font-black">내 목표가 {formatPrice(watch.targetPrice)}</p>
+                        <p className="mt-0.5">
+                          {hit ? "현재가가 목표가 이하입니다." : watchStatus === "above" ? `현재가 ${formatPrice(product.deal_price)} · 목표가까지 ${formatPrice((product.deal_price ?? 0) - watch.targetPrice)} 차이` : "현재가 확인필요 · 상세에서 다시 확인하세요."}
+                        </p>
                       </div>
                     );
                   })()}
