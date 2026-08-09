@@ -197,9 +197,11 @@ const requiredFiles = [
   "app/api/admin/products/link-intake/bulk/route.ts",
   "app/api/admin/session/route.ts",
   "app/api/admin/telegram/route.ts",
+  "app/api/admin/blogger/route.ts",
   "app/api/cron/sourcing/route.ts",
   "app/api/cron/affiliate-backfill/route.ts",
   "app/api/cron/telegram-digest/route.ts",
+  "app/api/cron/blogger-digest/route.ts",
   "app/api/events/route.ts",
   "app/deals/category/[category]/page.tsx",
   "app/guide/search/[slug]/page.tsx",
@@ -232,6 +234,7 @@ const requiredFiles = [
   "components/MobileNav.tsx",
   "components/TelegramPreview.tsx",
   "lib/affiliateLinkBackfill.ts",
+  "lib/blogger.ts",
   "lib/affiliateIdentity.ts",
   "lib/affiliateImport.ts",
   "lib/bootstrapCatalog.ts",
@@ -293,6 +296,7 @@ const requiredFiles = [
   "scripts/verify-demo-catalog-stability.mjs",
   "scripts/verify-supabase-config-guard.mjs",
   "scripts/verify-product-distribution-kit.mjs",
+  "scripts/verify-blogger-distribution.mjs",
   "scripts/verify-launch-capability-policy.mjs",
   "scripts/verify-manual-import-safety.mjs",
   "scripts/verify-naver-product-match.mjs",
@@ -1786,7 +1790,10 @@ if (fileExists("package.json") && fileExists("scripts/verify-supabase-schema.mjs
       supabaseSchemaVerifier.includes("context") &&
       supabaseSchemaVerifier.includes("writeSmokeCheck") &&
       supabaseSchemaVerifier.includes("publicColumnBoundaryCheck") &&
+      supabaseSchemaVerifier.includes("authenticatedCandidateRpcBoundaryCheck") &&
       supabaseSchemaVerifier.includes("NEXT_PUBLIC_SUPABASE_ANON_KEY") &&
+      supabaseSchemaVerifier.includes("anon candidate RPC denied") &&
+      supabaseSchemaVerifier.includes("authenticated candidate RPC denied") &&
       supabaseSchemaVerifier.includes("internal product columns denied") &&
       supabaseSchemaVerifier.includes("internal snapshot columns denied") &&
       supabaseSchemaVerifier.includes("NEXT_PUBLIC_SUPABASE_URL") &&
@@ -1898,12 +1905,51 @@ if (fileExists("scripts/verify-scheduled-affiliate-backfill.mjs")) {
 
 if (fileExists("sql/schema.sql")) {
   const schema = readText("sql/schema.sql");
-  const schemaVersion = "2026-08-01-public-column-boundary";
+  const schemaVersion = "2026-08-09-blogger-keyset-queue";
   const apiReadinessSource = fileExists("lib/apiReadiness.ts") ? readText("lib/apiReadiness.ts") : "";
+  const distributionQueueSource = fileExists("lib/distributionQueue.ts") ? readText("lib/distributionQueue.ts") : "";
   check(
     "schema version marker",
     schema.includes("returnpick_schema_meta") && schema.includes(schemaVersion) && schema.includes("schema_version"),
     "schema.sql writes a launch-ready schema version marker for admin readiness",
+    "required"
+  );
+  const schemaVersionWriteIndex = schema.indexOf("insert into returnpick_schema_meta");
+  const schemaGrantIndex = schema.lastIndexOf("grant select (");
+  check(
+    "schema version is recorded after DDL",
+    schemaVersionWriteIndex > schema.indexOf("create table if not exists distribution_deliveries") &&
+      schemaVersionWriteIndex > schemaGrantIndex,
+    "schema.sql updates the readiness version only after tables, migrations, policies, grants, and backfills complete",
+    "required"
+  );
+  check(
+    "schema distribution delivery ledger guard",
+    schema.includes("unique (channel, product_id)") &&
+      schema.includes("status in ('pending', 'succeeded', 'ambiguous', 'failed')") &&
+      schema.includes("delivery_mode in ('draft', 'publish')") &&
+      schema.includes("Preserve successful Blogger deliveries") &&
+      schema.includes("on conflict (channel, product_id) do nothing") &&
+      schema.includes("create or replace function list_distribution_candidate_ids") &&
+      schema.includes("p_after_score integer default null"),
+    "schema.sql preserves legacy Blogger successes, records draft/publish state, and enforces one durable delivery claim per channel and product",
+    "required"
+  );
+  check(
+    "schema customer-ready distribution queue",
+      schema.includes("create or replace function is_distribution_customer_ready") &&
+      schema.includes("conservative superset") &&
+      schema.includes("btrim(coalesce(affiliate_value, '')) ~*") &&
+      schema.includes("btrim(coalesce(image_value, '')) <> ''") &&
+      schema.includes("prices.deal_price <> 0") &&
+      schema.includes("delivery.status <> 'failed'") &&
+      schema.includes("delivery.provider_post_id is not null") &&
+      schema.includes("candidate.candidate_score < p_after_score") &&
+      schema.includes("candidate.product_id > p_after_id") &&
+      distributionQueueSource.includes("DISTRIBUTION_CANDIDATE_PAGE_SIZE = 100") &&
+      distributionQueueSource.includes("findNextReadyDistributionCandidate") &&
+      distributionQueueSource.includes("there is no fixed row ceiling"),
+    "the scheduler keyset-pages a conservative database prefilter and applies the authoritative customer-ready gate without a fixed starvation ceiling",
     "required"
   );
   check(
@@ -1918,6 +1964,7 @@ if (fileExists("sql/schema.sql")) {
     "deal_scores",
     "sourcing_runs",
     "telegram_logs",
+    "distribution_deliveries",
     "affiliate_events",
     "product_snapshots"
   ]) {
@@ -1985,6 +2032,8 @@ if (fileExists("sql/schema.sql")) {
     "telegram_logs_created_idx",
     "telegram_logs_product_created_idx",
     "telegram_logs_target_created_idx",
+    "distribution_deliveries_channel_status_idx",
+    "distribution_deliveries_product_idx",
     "affiliate_events_created_idx",
     "affiliate_events_product_created_idx",
     "affiliate_events_type_created_idx",
@@ -3469,7 +3518,11 @@ if (fileExists("lib/apiReadiness.ts")) {
   );
   check(
     "readiness: supabase schema column test",
-    readiness.includes("requiredSchemaChecks") && readiness.includes("keyword_key") && readiness.includes("SCHEMA_VERSION_MISMATCH"),
+    readiness.includes("requiredSchemaChecks") &&
+      readiness.includes("keyword_key") &&
+      readiness.includes("distribution_deliveries") &&
+      readiness.includes("distribution_ledger_unique_channel_product") &&
+      readiness.includes("SCHEMA_VERSION_MISMATCH"),
     "admin readiness verifies required Supabase columns",
     "required"
   );
@@ -3498,10 +3551,18 @@ if (fileExists("lib/apiReadiness.ts")) {
   check(
     "readiness: supabase schema version marker",
     readiness.includes("EXPECTED_SCHEMA_VERSION") &&
-      readiness.includes("2026-08-01-public-column-boundary") &&
+      readiness.includes("2026-08-09-blogger-keyset-queue") &&
       readiness.includes("returnpick_schema_meta") &&
       readiness.includes("schema_version"),
     "admin readiness verifies the deployed DB has the latest schema.sql marker",
+    "required"
+  );
+  check(
+    "readiness: distribution delivery ledger smoke test",
+    readiness.includes("runDistributionDeliveryLedgerSmokeCheck") &&
+      readiness.includes("distribution_delivery_ledger_smoke") &&
+      readiness.includes('error?.code === "23505"'),
+    "admin readiness verifies the durable Blogger delivery table and rejects duplicate channel/product claims",
     "required"
   );
   check(
@@ -5393,23 +5454,11 @@ if (fileExists("app/api/admin/editorial-campaign/route.ts")) {
 }
 
 if (fileExists("components/AdminEditorialTelegramCampaign.tsx") && fileExists("app/admin/page.tsx")) {
-  const editorialCampaign = readText("components/AdminEditorialTelegramCampaign.tsx");
   const adminPage = readText("app/admin/page.tsx");
   check(
-    "admin: editorial channel kit preview-first flow",
-    editorialCampaign.includes('/api/admin/editorial-campaign') &&
-      editorialCampaign.includes("navigator.clipboard.writeText") &&
-      editorialCampaign.includes('activeChannel') &&
-      editorialCampaign.includes('"naverBlog"') &&
-      editorialCampaign.includes("네이버 블로그 원고") &&
-      editorialCampaign.includes("본문 복사") &&
-      editorialCampaign.includes('campaign: "editorial_pick"') &&
-      editorialCampaign.includes('mode: "send"') &&
-      editorialCampaign.includes("if (!kit) return") &&
-      editorialCampaign.includes("TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID") &&
-      editorialCampaign.includes('role="status"') &&
-      adminPage.includes("<AdminEditorialTelegramCampaign password={password} />"),
-    "admins can preview and copy fixed Telegram or Naver Blog copy before an explicit Telegram send",
+    "admin: legacy approval campaign is not duplicated",
+    !adminPage.includes("<AdminEditorialTelegramCampaign") && adminPage.includes("<AdminProductDistributionKit password={password}"),
+    "published product distribution is handled by the Blogger/Telegram kit while the legacy fixed approval panel remains API-compatible but is not rendered twice",
     "required"
   );
 }
@@ -5435,12 +5484,15 @@ if (fileExists("app/api/admin/content-kit/route.ts") && fileExists("components/A
       contentKit.includes("customer_ready=true") &&
       contentKit.includes("navigator.clipboard.writeText") &&
       contentKit.includes("/api/admin/telegram") &&
+      contentKit.includes("/api/admin/blogger") &&
       contentKit.includes("productId: kit.productId") &&
-      contentKit.includes("네이버 블로그 원고") &&
+      contentKit.includes("Blogger 원고") &&
+      contentKit.includes("Blogger 초안 저장") &&
+      contentKit.includes("Blogger 공개 게시") &&
       contentKit.includes("제휴 안내") &&
       contentKit.includes('id="admin-product-distribution"') &&
       adminPage.includes("<AdminProductDistributionKit password={password} refreshToken={refreshToken} />"),
-    "admins can select a public product, review tracked channel copy, copy it, or explicitly send Telegram",
+    "admins can select a public product, review tracked Telegram/Blogger copy, copy it, or explicitly distribute it",
     "required"
   );
   check(
@@ -5449,8 +5501,11 @@ if (fileExists("app/api/admin/content-kit/route.ts") && fileExists("components/A
       productDistributionKit.includes("utm_source") &&
       productDistributionKit.includes("utm_campaign") &&
       productDistributionKit.includes("buildTelegramMessage(product, { detailUrl: telegramUrl })") &&
-      productDistributionKit.includes("approvalSampleProduct.registeredNaverBlogUrl"),
-    "generated channel copy keeps affiliate disclosure and sends users to the ReturnPick detail page with attribution",
+      productDistributionKit.includes("approvalSampleProduct.registeredNaverBlogUrl") &&
+      productDistributionKit.includes("buildBloggerHtml") &&
+      productDistributionKit.includes("escapeHtml") &&
+      productDistributionKit.includes('trackedDetailUrl(product.id, "blogger")'),
+    "generated Telegram, legacy Naver, and Blogger copy keeps affiliate disclosure and sends users to the ReturnPick detail page with attribution",
     "required"
   );
 }
@@ -5485,6 +5540,12 @@ if (fileExists("vercel.json")) {
     "cron: telegram digest Vercel deployable fallback",
     crons.some((cron) => cron.path === "/api/cron/telegram-digest" && cron.schedule === "10 0 * * *"),
     "/api/cron/telegram-digest 10 0 * * *",
+    "required"
+  );
+  check(
+    "cron: Blogger digest Vercel deployable fallback",
+    crons.some((cron) => cron.path === "/api/cron/blogger-digest" && cron.schedule === "15 0 * * *"),
+    "/api/cron/blogger-digest 15 0 * * *",
     "required"
   );
 }
@@ -5880,6 +5941,25 @@ checkEnvGroup("env: supabase", ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABAS
 checkEnvGroup("env: coupang partners api", ["COUPANG_ACCESS_KEY", "COUPANG_SECRET_KEY", "COUPANG_PARTNER_ID"], "warning");
 checkEnvGroup("env: naver shopping api", ["NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET"], "warning");
 checkEnvGroup("env: telegram", ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"], "warning");
+const bloggerEnabled = envValue("BLOGGER_DISTRIBUTION_ENABLED") === "true";
+const bloggerEnvSeverity = bloggerEnabled ? "required" : "warning";
+checkEnvGroup(
+  "env: Blogger distribution",
+  ["BLOGGER_BLOG_ID", "BLOGGER_BLOG_URL", "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_OAUTH_REFRESH_TOKEN"],
+  bloggerEnvSeverity
+);
+check(
+  "env value: Blogger distribution flag",
+  !hasEnv("BLOGGER_DISTRIBUTION_ENABLED") || ["true", "false"].includes(envValue("BLOGGER_DISTRIBUTION_ENABLED")),
+  "BLOGGER_DISTRIBUTION_ENABLED must be exactly true or false; only true enables the daily Blogger Cron",
+  "warning"
+);
+check(
+  "env value: Blogger publish mode",
+  !hasEnv("BLOGGER_PUBLISH_MODE") || ["draft", "publish"].includes(envValue("BLOGGER_PUBLISH_MODE")),
+  "BLOGGER_PUBLISH_MODE should be draft or publish; unexpected values fail closed to draft",
+  "warning"
+);
 if (envValue("PUBLIC_WEB_CRAWL_ENABLED") === "true") {
   checkEnvGroup("env: public web crawl", ["PUBLIC_WEB_ALLOWED_HOSTS", "PUBLIC_WEB_SEARCH_TEMPLATES"], "required");
 }
@@ -5973,6 +6053,32 @@ if (hasEnv("TELEGRAM_CHAT_ID")) {
     "TELEGRAM_CHAT_ID must be a numeric chat id or @channel username",
     optionalLaunchValueSeverity
   );
+}
+if (hasEnv("BLOGGER_BLOG_ID")) {
+  check(
+    "env value: Blogger blog id",
+    !/\s/.test(envValue("BLOGGER_BLOG_ID")) && !looksLikePlaceholderValue(envValue("BLOGGER_BLOG_ID")),
+    "BLOGGER_BLOG_ID must be copied without whitespace or placeholder text",
+    bloggerEnvSeverity
+  );
+}
+if (hasEnv("BLOGGER_BLOG_URL")) {
+  check(
+    "env value: Blogger blog url",
+    isPublicHttpsSiteUrl(envValue("BLOGGER_BLOG_URL")),
+    "BLOGGER_BLOG_URL must be an external https URL without credentials",
+    bloggerEnvSeverity
+  );
+}
+for (const bloggerSecretName of ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_OAUTH_REFRESH_TOKEN"]) {
+  if (hasEnv(bloggerSecretName)) {
+    check(
+      `env value: ${bloggerSecretName.toLowerCase()}`,
+      isLikelyProviderSecretValue(envValue(bloggerSecretName), 8),
+      `${bloggerSecretName} must be copied without whitespace or placeholder text`,
+      bloggerEnvSeverity
+    );
+  }
 }
 if (hasEnv("NEXT_PUBLIC_SUPABASE_URL")) {
   check(

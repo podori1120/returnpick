@@ -6,11 +6,6 @@ create table if not exists returnpick_schema_meta (
   updated_at timestamptz default now()
 );
 
-insert into returnpick_schema_meta (key, value, updated_at)
-values ('schema_version', '2026-08-01-public-column-boundary', now())
-on conflict (key)
-do update set value = excluded.value, updated_at = now();
-
 create table if not exists sourcing_keywords (
   id uuid primary key default gen_random_uuid(),
   keyword text not null,
@@ -69,6 +64,184 @@ returns boolean as $$
     and lower(value) not like 'https://link.coupang.com/a/dpyguokdsm%';
 $$ language sql immutable;
 
+create or replace function distribution_coupang_product_id(value text)
+returns text
+language sql
+immutable
+set search_path = public
+as $$
+  select case
+    when btrim(coalesce(value, '')) ~* '^https://([a-z0-9-]+\.)*coupang\.com/vp/products/[0-9]+/?([?#].*)?$'
+    then regexp_replace(btrim(value), '^https://[^/]+/vp/products/([0-9]+)/?([?#].*)?$', E'\\1', 1, 0, 'i')
+    else null
+  end;
+$$;
+
+create or replace function distribution_timestamptz(value text)
+returns timestamptz
+language plpgsql
+immutable
+set search_path = public
+as $$
+declare
+  parsed timestamptz;
+begin
+  if value is null or value !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})$' then
+    return null;
+  end if;
+
+  begin
+    parsed := value::timestamptz;
+  exception when others then
+    return null;
+  end;
+
+  return parsed;
+end;
+$$;
+
+create or replace function is_distribution_timestamp(value text)
+returns boolean
+language sql
+immutable
+set search_path = public
+as $$
+  select distribution_timestamptz(value) is not null;
+$$;
+
+create or replace function is_fresh_distribution_manual_review(source_value text, raw_value jsonb)
+returns boolean
+language sql
+stable
+set search_path = public
+as $$
+  select lower(btrim(coalesce(source_value, ''))) not in ('manual_admin', 'manual_affiliate_link')
+    or (
+      jsonb_typeof(coalesce(raw_value, '{}'::jsonb)->'manual_catalog_review') = 'object'
+      and (coalesce(raw_value, '{}'::jsonb)->'manual_catalog_review'->>'status') = 'approved'
+      and (coalesce(raw_value, '{}'::jsonb)->'manual_catalog_review'->>'method') = 'manual'
+      and is_distribution_timestamp(coalesce(raw_value, '{}'::jsonb)->'manual_catalog_review'->>'reviewed_at')
+      and distribution_timestamptz(coalesce(raw_value, '{}'::jsonb)->'manual_catalog_review'->>'reviewed_at') <= now()
+      and distribution_timestamptz(coalesce(raw_value, '{}'::jsonb)->'manual_catalog_review'->>'reviewed_at') >= now() - interval '7 days'
+    );
+$$;
+
+create or replace function is_distribution_affiliate_identity_verified(
+  affiliate_value text,
+  coupang_value text,
+  source_value text,
+  raw_value jsonb
+)
+returns boolean
+language sql
+stable
+set search_path = public
+as $$
+  with ids as (
+    select
+      distribution_coupang_product_id(coupang_value) as coupang_id,
+      distribution_coupang_product_id(source_value) as source_id
+  ), expected as (
+    select
+      coalesce(coupang_id, source_id) as product_id,
+      case when coupang_id is not null then 'coupang_url' else 'source_url' end as id_source
+    from ids
+  ), evidence as (
+    select coalesce(raw_value, '{}'::jsonb)->'affiliate_verification' as evidence_json
+  )
+  select expected.product_id is not null
+    and jsonb_typeof(evidence.evidence_json) = 'object'
+    and evidence.evidence_json->>'affiliate_url' = btrim(coalesce(affiliate_value, ''))
+    and evidence.evidence_json->>'expected_product_id' = expected.product_id
+    and evidence.evidence_json->>'expected_id_source' = expected.id_source
+    and evidence.evidence_json->>'resolution_code' is not null
+    and btrim(evidence.evidence_json->>'resolution_code') <> ''
+    and is_distribution_timestamp(evidence.evidence_json->>'checked_at')
+    and (
+      (
+        evidence.evidence_json->>'status' = 'MATCH'
+        and evidence.evidence_json->>'method' = 'automatic'
+        and evidence.evidence_json->>'resolved_product_id' = expected.product_id
+      )
+      or (
+        evidence.evidence_json->>'status' = 'MANUAL_CONFIRMED'
+        and evidence.evidence_json->>'method' = 'manual'
+        and (
+          evidence.evidence_json->>'resolved_product_id' is null
+          or evidence.evidence_json->>'resolved_product_id' = expected.product_id
+        )
+      )
+    )
+  from expected
+  cross join evidence;
+$$;
+
+create or replace function is_usable_distribution_image_url(value text)
+returns boolean
+language sql
+immutable
+set search_path = public
+as $$
+  select btrim(coalesce(value, '')) <> ''
+    and length(btrim(value)) <= 2000
+    and btrim(value) ~ '^https://[A-Za-z0-9.-]+\.[A-Za-z]{2,}([/?#].*)?$'
+    and lower(btrim(value)) !~ '^https://([^/?#]+\.)*coupang\.com([/?#]|$)';
+$$;
+
+-- This SQL predicate is intentionally a conservative superset of the
+-- TypeScript isPublicDealReady gate. The scheduler performs the authoritative
+-- check while walking the complete score-ordered keyset, so future gate drift
+-- cannot permanently hide a valid product.
+create or replace function is_distribution_customer_ready(
+  source_value text,
+  source_product_id_value text,
+  raw_value jsonb,
+  published_value boolean,
+  sourcing_status_value text,
+  affiliate_value text,
+  coupang_value text,
+  source_url_value text,
+  image_value text,
+  return_price_value integer,
+  source_price_value integer,
+  new_price_value integer,
+  naver_price_value integer,
+  condition_value text,
+  stock_value integer
+)
+returns boolean
+language sql
+stable
+set search_path = public
+as $$
+  with payload as (
+    select coalesce(raw_value, '{}'::jsonb) as raw
+  ), prices as (
+    select coalesce(return_price_value, source_price_value, new_price_value) as deal_price
+  )
+  select published_value is true
+    and sourcing_status_value = 'published'
+    and lower(btrim(coalesce(source_value, ''))) <> ''
+    and lower(btrim(coalesce(source_value, ''))) not like '%mock%'
+    and lower(btrim(coalesce(source_value, ''))) not like '%demo%'
+    and lower(coalesce(payload.raw->>'provider', '')) not like '%mock%'
+    and lower(coalesce(payload.raw->>'provider', '')) not like '%demo%'
+    and (
+      jsonb_typeof(payload.raw->'demo_seed') is distinct from 'boolean'
+      or payload.raw->>'demo_seed' is distinct from 'true'
+    )
+    and coalesce(jsonb_typeof(payload.raw->'demo_seed'), 'null') <> 'string'
+    and coalesce(source_product_id_value, '') not like 'seed-%'
+    and coalesce(source_value, '') <> 'algumon_discovery'
+    and btrim(coalesce(affiliate_value, '')) ~* '^https://link\.coupang\.com/a/[A-Za-z0-9]{6,16}([?#].*)?$'
+    and btrim(coalesce(image_value, '')) <> ''
+    and prices.deal_price is not null
+    and prices.deal_price <> 0
+    and stock_value is distinct from 0
+  from payload
+  cross join prices;
+$$;
+
 alter table sourced_products drop constraint if exists sourced_products_public_affiliate_url_check;
 alter table sourced_products
   add constraint sourced_products_public_affiliate_url_check
@@ -121,9 +294,147 @@ create table if not exists telegram_logs (
   created_at timestamptz default now()
 );
 
+create table if not exists distribution_deliveries (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid not null references sourced_products(id) on delete cascade,
+  channel text not null,
+  status text not null check (status in ('pending', 'succeeded', 'ambiguous', 'failed')),
+  delivery_mode text not null,
+  request_key text not null,
+  provider_post_id text,
+  provider_url text,
+  last_error text,
+  attempt_count integer not null default 1 check (attempt_count > 0),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique (channel, product_id)
+);
+
+alter table distribution_deliveries
+  add column if not exists delivery_mode text;
+
+update distribution_deliveries
+set delivery_mode = 'draft'
+where delivery_mode is null;
+
+alter table distribution_deliveries
+  alter column delivery_mode set not null;
+
+alter table distribution_deliveries drop constraint if exists distribution_deliveries_delivery_mode_check;
+alter table distribution_deliveries
+  add constraint distribution_deliveries_delivery_mode_check
+  check (delivery_mode in ('draft', 'publish'));
+
 alter table telegram_logs
   add column if not exists target_type text,
   add column if not exists target_key text;
+
+create index if not exists distribution_deliveries_channel_status_idx on distribution_deliveries (channel, status, updated_at desc);
+create index if not exists distribution_deliveries_product_idx on distribution_deliveries (product_id, updated_at desc);
+
+-- Preserve successful Blogger deliveries created before the durable ledger existed.
+-- The insert is idempotent and only uses the product id already stored in the audit log.
+insert into distribution_deliveries (product_id, channel, status, delivery_mode, request_key, attempt_count, created_at, updated_at)
+select
+  product_id,
+  'blogger',
+  'succeeded',
+  case when bool_or(status = 'published') then 'publish' else 'draft' end,
+  'legacy:' || product_id::text,
+  1,
+  min(created_at),
+  max(created_at)
+from telegram_logs
+where target_type = 'blogger'
+  and product_id is not null
+  and status in ('draft', 'published')
+group by product_id
+on conflict (channel, product_id) do nothing;
+
+drop function if exists list_distribution_candidate_ids(text, integer, integer);
+
+create or replace function list_distribution_candidate_ids(
+  p_channel text,
+  p_limit integer default 50,
+  p_after_score integer default null,
+  p_after_created_at timestamptz default null,
+  p_after_id uuid default null
+)
+returns table(product_id uuid, candidate_score integer, candidate_created_at timestamptz)
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  with candidates as (
+    select
+      product.id as product_id,
+      coalesce(latest_score.total_score, -2147483648)::integer as candidate_score,
+      coalesce(product.created_at, 'epoch'::timestamptz) as candidate_created_at
+    from sourced_products as product
+    left join lateral (
+      select score.total_score
+      from deal_scores as score
+      where score.product_id = product.id
+      order by score.created_at desc, score.id desc
+      limit 1
+    ) as latest_score on true
+    where is_distribution_customer_ready(
+        product.source,
+        product.source_product_id,
+        product.raw_json,
+        product.is_published,
+        product.sourcing_status,
+        product.affiliate_url,
+        product.coupang_url,
+        product.source_url,
+        product.image_url,
+        product.return_price,
+        product.source_price,
+        product.new_price,
+        product.naver_lowest_price,
+        product.condition_grade,
+        product.stock_count
+      )
+      and not exists (
+        select 1
+        from distribution_deliveries as delivery
+        where delivery.channel = p_channel
+          and delivery.product_id = product.id
+          and (
+            delivery.status <> 'failed'
+            or delivery.provider_post_id is not null
+          )
+      )
+  )
+  select candidate.product_id, candidate.candidate_score, candidate.candidate_created_at
+  from candidates as candidate
+  where (
+      p_after_score is null
+      and p_after_created_at is null
+      and p_after_id is null
+    )
+    or (
+      p_after_score is not null
+      and p_after_created_at is not null
+      and p_after_id is not null
+      and (
+        candidate.candidate_score < p_after_score
+        or (
+          candidate.candidate_score = p_after_score
+          and candidate.candidate_created_at < p_after_created_at
+        )
+        or (
+          candidate.candidate_score = p_after_score
+          and candidate.candidate_created_at = p_after_created_at
+          and candidate.product_id > p_after_id
+        )
+      )
+    )
+  order by candidate.candidate_score desc, candidate.candidate_created_at desc, candidate.product_id
+  limit least(greatest(coalesce(p_limit, 50), 1), 100)
+  ;
+$$;
 
 create table if not exists affiliate_events (
   id uuid primary key default gen_random_uuid(),
@@ -235,6 +546,11 @@ create trigger deal_scores_updated_at
 before update on deal_scores
 for each row execute function set_updated_at();
 
+drop trigger if exists distribution_deliveries_updated_at on distribution_deliveries;
+create trigger distribution_deliveries_updated_at
+before update on distribution_deliveries
+for each row execute function set_updated_at();
+
 alter table sourcing_keywords enable row level security;
 alter table sourced_products enable row level security;
 alter table deal_scores enable row level security;
@@ -242,6 +558,7 @@ alter table sourcing_runs enable row level security;
 alter table telegram_logs enable row level security;
 alter table product_snapshots enable row level security;
 alter table affiliate_events enable row level security;
+alter table distribution_deliveries enable row level security;
 alter table returnpick_schema_meta enable row level security;
 
 drop policy if exists "Public can read published products" on sourced_products;
@@ -288,6 +605,7 @@ revoke all on table
   deal_scores,
   sourcing_runs,
   telegram_logs,
+  distribution_deliveries,
   product_snapshots,
   affiliate_events
 from anon, authenticated;
@@ -351,3 +669,13 @@ grant select (
   condition_grade,
   change_flags
 ) on table product_snapshots to anon, authenticated;
+
+revoke all on function list_distribution_candidate_ids(text, integer, integer, timestamptz, uuid) from public, anon, authenticated;
+grant execute on function list_distribution_candidate_ids(text, integer, integer, timestamptz, uuid) to service_role;
+
+-- Record the version only after every table, migration, policy, grant, and
+-- compatibility backfill above has completed successfully.
+insert into returnpick_schema_meta (key, value, updated_at)
+values ('schema_version', '2026-08-09-blogger-keyset-queue', now())
+on conflict (key)
+do update set value = excluded.value, updated_at = now();

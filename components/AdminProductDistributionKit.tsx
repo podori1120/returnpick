@@ -12,6 +12,7 @@ type ApiResponse = {
   kit?: ProductDistributionKit;
   products?: ProductWithScore[];
   status?: string;
+  operation?: "insert" | "retry_failed" | "promote_draft";
   message?: string;
   error?: string;
   blockers?: string[];
@@ -32,9 +33,9 @@ export default function AdminProductDistributionKit({ password, refreshToken }: 
   const [products, setProducts] = useState<ProductWithScore[]>([]);
   const [selectedProductId, setSelectedProductId] = useState("");
   const [kit, setKit] = useState<ProductDistributionKit | null>(null);
-  const [activeChannel, setActiveChannel] = useState<"telegram" | "naverBlog">("telegram");
+  const [activeChannel, setActiveChannel] = useState<"telegram" | "blogger">("telegram");
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [running, setRunning] = useState<"load" | "kit" | "copy" | "send" | null>(null);
+  const [running, setRunning] = useState<"load" | "kit" | "copy" | "send" | "blogger-draft" | "blogger-publish" | null>(null);
 
   const loadProducts = useCallback(async () => {
     setRunning("load");
@@ -81,7 +82,7 @@ export default function AdminProductDistributionKit({ password, refreshToken }: 
         return;
       }
       setKit(data.kit);
-      setNotice({ type: "success", message: "상품별 텔레그램·네이버 블로그 원고를 확인했습니다." });
+      setNotice({ type: "success", message: "상품별 텔레그램·Blogger 원고를 확인했습니다." });
     } catch {
       setNotice({ type: "error", message: "네트워크 문제로 배포 원고를 만들지 못했습니다." });
     } finally {
@@ -130,6 +131,37 @@ export default function AdminProductDistributionKit({ password, refreshToken }: 
     }
   }
 
+  async function sendBlogger(mode: "draft" | "publish") {
+    if (!kit) return;
+    setRunning(mode === "draft" ? "blogger-draft" : "blogger-publish");
+    setNotice({ type: "info", message: mode === "draft" ? "Blogger 초안을 저장하는 중입니다." : "Blogger에 공개 게시하는 중입니다." });
+    try {
+      const response = await fetch("/api/admin/blogger", {
+        method: "POST",
+        headers: headers(password),
+        body: JSON.stringify({ productId: kit.productId, mode })
+      });
+      const data = (await response.json().catch(() => ({}))) as ApiResponse;
+      if (!response.ok) {
+        setNotice({ type: "error", message: data.message ?? data.error ?? "Blogger 배포에 실패했습니다." });
+        return;
+      }
+      setNotice({
+        type: "success",
+        message:
+          data.status === "published"
+            ? data.operation === "promote_draft"
+              ? "기존 Blogger 초안을 새 글 중복 없이 공개했습니다."
+              : "Blogger 공개 게시가 완료되었습니다."
+            : "Blogger 초안 저장이 완료되었습니다."
+      });
+    } catch {
+      setNotice({ type: "error", message: "네트워크 문제로 Blogger 배포를 완료하지 못했습니다." });
+    } finally {
+      setRunning(null);
+    }
+  }
+
   const channel = kit?.[activeChannel];
 
   return (
@@ -142,7 +174,7 @@ export default function AdminProductDistributionKit({ password, refreshToken }: 
           </div>
           <h2 className="mt-1 text-lg font-black">상품별 채널 배포 키트</h2>
           <p className="mt-2 text-sm font-semibold leading-6 text-steel">
-            공개 품질을 통과한 상품을 골라 상세 페이지로 연결되는 텔레그램·네이버 블로그 원고를 만듭니다. 쿠팡 직링크를 숨기지 않고, 제휴 고지와 가격 변동 안내를 원고에 함께 넣습니다.
+            공개 품질을 통과한 상품을 골라 상세 페이지로 연결되는 텔레그램·Blogger 원고를 만듭니다. 쿠팡 직링크를 숨기지 않고, 제휴 고지와 가격 변동 안내를 원고에 함께 넣습니다.
           </p>
         </div>
         <Link className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-black hover:bg-mist" href="#admin-candidate-review">
@@ -200,8 +232,8 @@ export default function AdminProductDistributionKit({ password, refreshToken }: 
             <button className={`focus-ring inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-black ${activeChannel === "telegram" ? "bg-white text-ink shadow-sm" : "text-steel"}`} onClick={() => setActiveChannel("telegram")} role="tab" aria-selected={activeChannel === "telegram"} type="button">
               <MessageCircle size={16} aria-hidden /> 텔레그램
             </button>
-            <button className={`focus-ring inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-black ${activeChannel === "naverBlog" ? "bg-white text-ink shadow-sm" : "text-steel"}`} onClick={() => setActiveChannel("naverBlog")} role="tab" aria-selected={activeChannel === "naverBlog"} type="button">
-              <FileText size={16} aria-hidden /> 네이버 블로그
+            <button className={`focus-ring inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-black ${activeChannel === "blogger" ? "bg-white text-ink shadow-sm" : "text-steel"}`} onClick={() => setActiveChannel("blogger")} role="tab" aria-selected={activeChannel === "blogger"} type="button">
+              <FileText size={16} aria-hidden /> Blogger
             </button>
           </div>
 
@@ -225,26 +257,42 @@ export default function AdminProductDistributionKit({ password, refreshToken }: 
             <div className="mt-4" role="tabpanel">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-black text-steel">네이버 블로그 제목</p>
-                  <p className="mt-1 break-words text-sm font-black">{kit.naverBlog.title}</p>
+                  <p className="text-xs font-black text-steel">Blogger 제목</p>
+                  <p className="mt-1 break-words text-sm font-black">{kit.blogger.title}</p>
                 </div>
-                <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-black hover:bg-mist disabled:opacity-60" disabled={running !== null} onClick={() => copyText(kit.naverBlog.title, "블로그 제목")} type="button">
+                <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-black hover:bg-mist disabled:opacity-60" disabled={running !== null} onClick={() => copyText(kit.blogger.title, "Blogger 제목")} type="button">
                   <Copy size={15} aria-hidden /> 제목 복사
                 </button>
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-black">네이버 블로그 원고</p>
+                <p className="text-sm font-black">Blogger 원고</p>
                 <div className="flex flex-wrap gap-2">
-                  <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-black hover:bg-mist disabled:opacity-60" disabled={running !== null} onClick={() => copyText(kit.naverBlog.body, "블로그 본문")} type="button">
+                  <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-black hover:bg-mist disabled:opacity-60" disabled={running !== null} onClick={() => copyText(kit.blogger.body, "Blogger 본문")} type="button">
                     <Copy size={15} aria-hidden /> 본문 복사
                   </button>
-                  <a className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-black hover:bg-mist" href={kit.naverBlog.publisherUrl} target="_blank" rel="noopener noreferrer">
-                    등록 채널 열기 <ExternalLink size={15} aria-hidden />
-                  </a>
+                  <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-black hover:bg-mist disabled:opacity-60" disabled={running !== null} onClick={() => copyText(kit.blogger.html, "Blogger HTML")} type="button">
+                    <Copy size={15} aria-hidden /> HTML 복사
+                  </button>
+                  {kit.blogger.publisherUrl ? (
+                    <a className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-black hover:bg-mist" href={kit.blogger.publisherUrl} target="_blank" rel="noopener noreferrer">
+                      Blogger 열기 <ExternalLink size={15} aria-hidden />
+                    </a>
+                  ) : null}
                 </div>
               </div>
-              <pre className="mt-3 max-h-[32rem] overflow-auto whitespace-pre-wrap bg-mist p-4 text-sm leading-6 text-ink">{kit.naverBlog.body}</pre>
-              <p className="mt-2 break-all text-xs font-semibold text-steel">추적 링크: {kit.naverBlog.trackedUrl}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-black hover:bg-mist disabled:opacity-60" disabled={running !== null} onClick={() => void sendBlogger("draft")} type="button">
+                  <Send size={15} aria-hidden /> {running === "blogger-draft" ? "초안 저장 중" : "Blogger 초안 저장"}
+                </button>
+                <button className="focus-ring inline-flex items-center gap-2 rounded-lg bg-ink px-3 py-2 text-sm font-black text-white hover:bg-pine disabled:opacity-60" disabled={running !== null} onClick={() => void sendBlogger("publish")} type="button">
+                  <Send size={15} aria-hidden /> {running === "blogger-publish" ? "게시 중" : "Blogger 공개 게시"}
+                </button>
+              </div>
+              <p className="mt-2 text-xs font-semibold leading-5 text-steel">
+                이 상품의 초안이 이미 있으면 공개 게시 버튼은 새 글을 만들지 않고 기록된 Blogger 초안을 공개로 전환합니다.
+              </p>
+              <pre className="mt-3 max-h-[24rem] overflow-auto whitespace-pre-wrap bg-mist p-4 text-sm leading-6 text-ink">{kit.blogger.body}</pre>
+              <p className="mt-2 break-all text-xs font-semibold text-steel">추적 링크: {kit.blogger.trackedUrl}</p>
             </div>
           )}
 

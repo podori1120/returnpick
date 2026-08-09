@@ -83,6 +83,14 @@ function validateBooleanString(value) {
   return value === "true" || value === "false";
 }
 
+function validateBloggerBlogId(value) {
+  return /^\d{5,30}$/.test(value);
+}
+
+function validateBloggerPublishMode(value) {
+  return value === "draft" || value === "publish";
+}
+
 const BOOTSTRAP_CATALOG_MAX_BYTES = 28_000;
 const BOOTSTRAP_CATALOG_MAX_PRODUCTS = 40;
 const BOOTSTRAP_CATALOG_CATEGORIES = new Set(["laptop", "monitor", "robot_vacuum", "cordless_vacuum", "air_purifier", "dehumidifier"]);
@@ -591,6 +599,13 @@ const checks = [
   { name: "NAVER_CLIENT_SECRET", required: false, validate: (value) => validateProviderSecret(value, 5), hint: "optional Naver client secret for price comparison" },
   { name: "TELEGRAM_BOT_TOKEN", required: false, validate: validateTelegramBotToken, hint: "optional 123456:bot-token for Telegram delivery" },
   { name: "TELEGRAM_CHAT_ID", required: false, validate: validateTelegramChatId, hint: "optional numeric chat ID or @channel for Telegram delivery" },
+  { name: "BLOGGER_BLOG_ID", required: false, validate: validateBloggerBlogId, hint: "optional numeric Blogger blog ID" },
+  { name: "BLOGGER_BLOG_URL", required: false, validate: validatePublicHttpsUrl, hint: "optional public Blogger HTTPS URL" },
+  { name: "GOOGLE_OAUTH_CLIENT_ID", required: false, validate: (value) => validateProviderSecret(value, 12), hint: "optional server-only Google OAuth client ID" },
+  { name: "GOOGLE_OAUTH_CLIENT_SECRET", required: false, validate: (value) => validateProviderSecret(value, 12), hint: "optional server-only Google OAuth client secret" },
+  { name: "GOOGLE_OAUTH_REFRESH_TOKEN", required: false, validate: (value) => validateProviderSecret(value, 20), hint: "optional server-only Google OAuth refresh token" },
+  { name: "BLOGGER_DISTRIBUTION_ENABLED", required: false, validate: validateBooleanString, hint: "true or false" },
+  { name: "BLOGGER_PUBLISH_MODE", required: false, validate: validateBloggerPublishMode, hint: "draft or publish" },
   { name: "CRON_USE_MOCK_FALLBACK", required: false, validate: validateBooleanString, hint: "true or false" },
   { name: "SOURCING_TIME_BUDGET_MS", required: false, validate: validatePositiveInteger, hint: "positive integer milliseconds" },
   { name: "SOURCING_KEYWORD_LIMIT", required: false, validate: validatePositiveInteger, hint: "positive integer" },
@@ -627,6 +642,18 @@ const envGroups = [
   {
     label: "Telegram",
     names: ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"]
+  },
+  {
+    label: "Blogger distribution",
+    names: [
+      "BLOGGER_BLOG_ID",
+      "BLOGGER_BLOG_URL",
+      "GOOGLE_OAUTH_CLIENT_ID",
+      "GOOGLE_OAUTH_CLIENT_SECRET",
+      "GOOGLE_OAUTH_REFRESH_TOKEN",
+      "BLOGGER_DISTRIBUTION_ENABLED",
+      "BLOGGER_PUBLISH_MODE"
+    ]
   },
   {
     label: "public web optional source",

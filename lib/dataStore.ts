@@ -13,6 +13,8 @@ import { compareProductIdsEqual } from "@/lib/compareIdentity";
 import { calculateDealScore, getLatestScore } from "@/lib/scoring";
 import { isSourcingExecutionRun } from "@/lib/sourcingRunKinds";
 import { getSupabaseServiceClient } from "@/lib/supabase";
+import { planDistributionClaim, type DistributionClaimOperation } from "@/lib/distributionDeliveryState";
+import type { DistributionCandidateCursor, DistributionCandidatePage } from "@/lib/distributionQueue";
 import { parseSpecsFromTitle } from "@/lib/specParser";
 import { normalizeKeywordKey } from "@/lib/keywordCoverage";
 import type {
@@ -21,6 +23,9 @@ import type {
   Category,
   ConditionGrade,
   DealScore,
+  DistributionDelivery,
+  DistributionDeliveryMode,
+  DistributionDeliveryStatus,
   ProductWithScore,
   ProductSnapshot,
   SnapshotChangeFlag,
@@ -943,6 +948,190 @@ export async function listTelegramLogs(limit = 100) {
   }
 
   return [...memoryTelegramLogs].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, limit);
+}
+
+async function getDistributionDelivery(client: NonNullable<ReturnType<typeof getSupabaseServiceClient>>, productId: string, channel: string) {
+  const { data, error } = await client
+    .from("distribution_deliveries")
+    .select("*")
+    .eq("product_id", productId)
+    .eq("channel", channel)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as DistributionDelivery | null) ?? null;
+}
+
+export async function claimDistributionDelivery(productId: string, channel: string, mode: DistributionDeliveryMode) {
+  const client = getSupabaseServiceClient();
+  if (!client) throw new Error("DISTRIBUTION_LEDGER_NOT_CONFIGURED");
+
+  const requestKey = randomUUID();
+  const { data, error } = await client
+    .from("distribution_deliveries")
+    .insert({ product_id: productId, channel, status: "pending", delivery_mode: mode, request_key: requestKey, attempt_count: 1 })
+    .select("*")
+    .single();
+
+  if (!error && data) {
+    return { claimed: true as const, operation: "insert" as const, delivery: data as DistributionDelivery };
+  }
+  if (!error || error.code !== "23505") throw error ?? new Error("DISTRIBUTION_LEDGER_INSERT_FAILED");
+
+  const existing = await getDistributionDelivery(client, productId, channel);
+  if (!existing) throw new Error("DISTRIBUTION_LEDGER_CONFLICT");
+
+  const plan = planDistributionClaim(existing, mode);
+  if (plan.action === "reject") return { claimed: false as const, reason: plan.reason, delivery: existing };
+
+  const nextAttemptCount = Math.max(1, existing.attempt_count) + 1;
+  const update: Record<string, unknown> = {
+    status: "pending",
+    delivery_mode: mode,
+    request_key: requestKey,
+    last_error: null,
+    attempt_count: nextAttemptCount
+  };
+  if (plan.operation === "retry_failed") {
+    update.provider_post_id = null;
+    update.provider_url = null;
+  }
+
+  const { data: claimed, error: claimError } = await client
+    .from("distribution_deliveries")
+    .update(update)
+    .eq("id", existing.id)
+    .eq("status", existing.status)
+    .eq("delivery_mode", existing.delivery_mode)
+    .eq("request_key", existing.request_key)
+    .select("*")
+    .maybeSingle();
+  if (claimError) throw claimError;
+  if (claimed) {
+    return {
+      claimed: true as const,
+      operation: plan.operation as DistributionClaimOperation,
+      delivery: claimed as DistributionDelivery
+    };
+  }
+
+  const current = await getDistributionDelivery(client, productId, channel);
+  if (!current) throw new Error("DISTRIBUTION_LEDGER_CONFLICT");
+  const currentPlan = planDistributionClaim(current, mode);
+  return {
+    claimed: false as const,
+    reason: currentPlan.action === "reject" ? currentPlan.reason : "pending" as const,
+    delivery: current
+  };
+}
+
+export async function updateDistributionDelivery(input: {
+  id: string;
+  request_key: string;
+  status: DistributionDeliveryStatus;
+  delivery_mode: DistributionDeliveryMode;
+  provider_post_id?: string | null;
+  provider_url?: string | null;
+  last_error?: string | null;
+}) {
+  const client = getSupabaseServiceClient();
+  if (!client) throw new Error("DISTRIBUTION_LEDGER_NOT_CONFIGURED");
+
+  const update: Record<string, unknown> = {
+    status: input.status,
+    delivery_mode: input.delivery_mode,
+    last_error: input.last_error ?? null
+  };
+  if ("provider_post_id" in input) update.provider_post_id = input.provider_post_id ?? null;
+  if ("provider_url" in input) update.provider_url = input.provider_url ?? null;
+
+  const { data, error } = await client
+    .from("distribution_deliveries")
+    .update(update)
+    .eq("id", input.id)
+    .eq("status", "pending")
+    .eq("request_key", input.request_key)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("DISTRIBUTION_LEDGER_UPDATE_CONFLICT");
+  return data as DistributionDelivery;
+}
+
+export async function restoreDistributionDraftAfterPrewriteFailure(input: { id: string; request_key: string; last_error: string }) {
+  const client = getSupabaseServiceClient();
+  if (!client) throw new Error("DISTRIBUTION_LEDGER_NOT_CONFIGURED");
+
+  const { data, error } = await client
+    .from("distribution_deliveries")
+    .update({ status: "succeeded", delivery_mode: "draft", last_error: input.last_error })
+    .eq("id", input.id)
+    .eq("status", "pending")
+    .eq("delivery_mode", "publish")
+    .eq("request_key", input.request_key)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("DISTRIBUTION_LEDGER_UPDATE_CONFLICT");
+  return data as DistributionDelivery;
+}
+
+export async function listDistributionCandidateProductPage(
+  channel: string,
+  limit = 50,
+  afterCursor: DistributionCandidateCursor | null = null
+): Promise<DistributionCandidatePage> {
+  const client = getSupabaseServiceClient();
+  if (!client) throw new Error("DISTRIBUTION_LEDGER_NOT_CONFIGURED");
+  const boundedLimit = Math.max(1, Math.min(100, Math.floor(limit)));
+  const { data, error } = await client.rpc("list_distribution_candidate_ids", {
+    p_channel: channel,
+    p_limit: boundedLimit,
+    p_after_score: afterCursor?.score ?? null,
+    p_after_created_at: afterCursor?.createdAt ?? null,
+    p_after_id: afterCursor?.productId ?? null
+  });
+  if (error) throw error;
+
+  const rows = Array.isArray(data) ? data : [];
+  const items = rows.map((row) => {
+    if (!row || typeof row !== "object") throw new Error("DISTRIBUTION_CANDIDATE_PAGE_INVALID");
+    const productId = "product_id" in row && typeof row.product_id === "string" ? row.product_id : null;
+    const score = "candidate_score" in row ? Number(row.candidate_score) : Number.NaN;
+    const createdAt = "candidate_created_at" in row && typeof row.candidate_created_at === "string" ? row.candidate_created_at : null;
+    if (!productId || !Number.isInteger(score) || !createdAt || !Number.isFinite(Date.parse(createdAt))) {
+      throw new Error("DISTRIBUTION_CANDIDATE_PAGE_INVALID");
+    }
+    return { productId, cursor: { score, createdAt, productId } };
+  });
+  return { items };
+}
+
+export async function getDistributionCandidateProducts(productIds: readonly string[]) {
+  const client = getSupabaseServiceClient();
+  if (!client) throw new Error("DISTRIBUTION_LEDGER_NOT_CONFIGURED");
+  const ids = Array.from(new Set(productIds.filter(Boolean))).slice(0, 100);
+  if (!ids.length) return [] as ProductWithScore[];
+
+  const { data, error } = await client
+    .from("sourced_products")
+    .select("*, deal_scores(*)")
+    .in("id", ids);
+  if (error) throw error;
+  return (data ?? []) as ProductWithScore[];
+}
+
+export async function listDistributionDeliveries(channel: string, limit = 100) {
+  const client = getSupabaseServiceClient();
+  if (!client) throw new Error("DISTRIBUTION_LEDGER_NOT_CONFIGURED");
+
+  const { data, error } = await client
+    .from("distribution_deliveries")
+    .select("*")
+    .eq("channel", channel)
+    .order("updated_at", { ascending: false })
+    .limit(Math.max(1, Math.min(500, Math.floor(limit))));
+  if (error) throw error;
+  return (data ?? []) as DistributionDelivery[];
 }
 
 function safeEventText(value: string | null | undefined, maxLength = 300) {

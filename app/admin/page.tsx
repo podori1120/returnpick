@@ -6,7 +6,6 @@ import AdminAffiliateLinkQueue from "@/components/AdminAffiliateLinkQueue";
 import AdminAffiliateLinkIntake from "@/components/AdminAffiliateLinkIntake";
 import AdminBootstrapCatalogPanel from "@/components/AdminBootstrapCatalogPanel";
 import AdminCandidateTable from "@/components/AdminCandidateTable";
-import AdminEditorialTelegramCampaign from "@/components/AdminEditorialTelegramCampaign";
 import AdminKeywordManager from "@/components/AdminKeywordManager";
 import AdminLaunchRunner from "@/components/AdminLaunchRunner";
 import AdminLaunchStatusBar from "@/components/AdminLaunchStatusBar";
@@ -104,7 +103,6 @@ export default function AdminPage() {
       <AdminLaunchRunner password={password} onCompleted={() => setRefreshToken((value) => value + 1)} />
       <AdminOpsDashboard password={password} refreshToken={refreshToken} />
       <AdminProductDistributionKit password={password} refreshToken={refreshToken} />
-      <AdminEditorialTelegramCampaign password={password} />
       <AdminSchedulerPanel password={password} refreshToken={refreshToken} onCompleted={() => setRefreshToken((value) => value + 1)} />
       <AdminPriceBackfillPanel password={password} onCompleted={() => setRefreshToken((value) => value + 1)} />
       <AdminAffiliateLinkQueue password={password} refreshToken={refreshToken} onCompleted={() => setRefreshToken((value) => value + 1)} />

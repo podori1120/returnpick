@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/telegram-digest",
       "schedule": "10 0 * * *"
+    },
+    {
+      "path": "/api/cron/blogger-digest",
+      "schedule": "15 0 * * *"
     }
   ]
 }

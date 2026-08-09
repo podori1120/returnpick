@@ -6,7 +6,7 @@ import { envValue, loadEnvFiles } from "./load-env-files.mjs";
 
 loadEnvFiles();
 
-const EXPECTED_SCHEMA_VERSION = "2026-08-01-public-column-boundary";
+const EXPECTED_SCHEMA_VERSION = "2026-08-09-blogger-keyset-queue";
 const requiredTables = [
   "returnpick_schema_meta",
   "sourcing_keywords",
@@ -14,6 +14,7 @@ const requiredTables = [
   "deal_scores",
   "sourcing_runs",
   "telegram_logs",
+  "distribution_deliveries",
   "affiliate_events",
   "product_snapshots"
 ];
@@ -22,6 +23,7 @@ const requiredSchemaChecks = [
   { table: "sourced_products", columns: "id,affiliate_url,naver_lowest_price,condition_grade,sourcing_status,last_observed_at" },
   { table: "deal_scores", columns: "id,product_id,total_score,risk_flags,score_detail" },
   { table: "telegram_logs", columns: "id,product_id,target_type,target_key,status,created_at" },
+  { table: "distribution_deliveries", columns: "id,product_id,channel,status,delivery_mode,request_key,provider_post_id,attempt_count,updated_at" },
   { table: "affiliate_events", columns: "id,event_type,channel,context,utm_source,anon_session_id" },
   { table: "product_snapshots", columns: "id,product_id,change_flags,observed_at" }
 ];
@@ -122,6 +124,115 @@ async function writeSmokeCheck(client) {
   if (cleanupErrors.length) return result(false, "write:cleanup", cleanupErrors.join(" | "));
 
   return result(true, "write:smoke", "sourcing_runs and affiliate_events insert/delete ok");
+}
+
+async function distributionDeliverySmokeCheck(client) {
+  const productId = randomUUID();
+  const firstInsert = await client
+    .from("sourced_products")
+    .insert({
+      id: productId,
+      source: "schema_verifier",
+      source_product_id: `distribution-ledger-${productId}`,
+      category: "laptop",
+      title: "ReturnPick distribution ledger smoke",
+      sourcing_status: "candidate",
+      is_published: false,
+      raw_json: { verifier: true, smoke_test: "distribution_ledger" }
+    })
+    .select("id")
+    .single();
+  if (firstInsert.error) return result(false, "write:distribution_ledger", `product insert: ${firstInsert.error.message}`);
+
+  const firstDelivery = await client
+    .from("distribution_deliveries")
+    .insert({
+      product_id: productId,
+      channel: "schema_verifier",
+      status: "pending",
+      delivery_mode: "draft",
+      request_key: randomUUID(),
+      attempt_count: 1
+    })
+    .select("id,request_key,attempt_count")
+    .single();
+  const duplicateDelivery = firstDelivery.error
+    ? null
+    : await client
+        .from("distribution_deliveries")
+        .insert({
+          product_id: productId,
+          channel: "schema_verifier",
+          status: "pending",
+          delivery_mode: "draft",
+          request_key: randomUUID(),
+          attempt_count: 1
+        })
+        .select("id")
+        .single();
+  const duplicateRejected = duplicateDelivery?.error?.code === "23505";
+  const failedTransition = firstDelivery.error
+    ? null
+    : await client
+        .from("distribution_deliveries")
+        .update({ status: "failed", last_error: "OAUTH_PREWRITE_SMOKE" })
+        .eq("id", firstDelivery.data.id)
+        .eq("status", "pending")
+        .eq("request_key", firstDelivery.data.request_key)
+        .select("id,request_key,attempt_count")
+        .maybeSingle();
+  const retryKey = randomUUID();
+  const retryClaim = failedTransition?.data
+    ? await client
+        .from("distribution_deliveries")
+        .update({ status: "pending", request_key: retryKey, attempt_count: 2, last_error: null })
+        .eq("id", failedTransition.data.id)
+        .eq("status", "failed")
+        .eq("request_key", failedTransition.data.request_key)
+        .select("id,request_key,attempt_count")
+        .maybeSingle()
+    : null;
+  const staleRequestRejected = retryClaim?.data
+    ? await client
+        .from("distribution_deliveries")
+        .update({ status: "succeeded" })
+        .eq("id", retryClaim.data.id)
+        .eq("status", "pending")
+        .eq("request_key", firstDelivery.data.request_key)
+        .select("id")
+        .maybeSingle()
+    : null;
+  const candidateRpc = await client.rpc("list_distribution_candidate_ids", {
+    p_channel: "schema_verifier",
+    p_limit: 5,
+    p_after_score: null,
+    p_after_created_at: null,
+    p_after_id: null
+  });
+  const cleanupDelivery = await client.from("distribution_deliveries").delete().eq("product_id", productId);
+  const cleanupProduct = await client.from("sourced_products").delete().eq("id", productId);
+  const errors = [
+    firstDelivery.error ? `first delivery insert: ${firstDelivery.error.message}` : null,
+    duplicateRejected ? null : duplicateDelivery?.error?.message ?? "duplicate delivery insert was accepted",
+    failedTransition?.error ? `failed transition: ${failedTransition.error.message}` : null,
+    failedTransition && !failedTransition.error && !failedTransition.data ? "failed transition CAS returned no row" : null,
+    retryClaim?.error ? `failed retry claim: ${retryClaim.error.message}` : null,
+    retryClaim && !retryClaim.error && (!retryClaim.data || retryClaim.data.request_key !== retryKey || retryClaim.data.attempt_count !== 2)
+      ? "failed retry CAS did not rotate request_key and increment attempt_count"
+      : null,
+    staleRequestRejected?.error ? `stale request-key probe: ${staleRequestRejected.error.message}` : null,
+    staleRequestRejected?.data ? "stale request_key updated a newer attempt" : null,
+    candidateRpc.error ? `candidate RPC: ${candidateRpc.error.message}` : null,
+    !candidateRpc.error && !Array.isArray(candidateRpc.data) ? "candidate RPC did not return an array" : null,
+    cleanupDelivery.error ? `delivery cleanup: ${cleanupDelivery.error.message}` : null,
+    cleanupProduct.error ? `product cleanup: ${cleanupProduct.error.message}` : null
+  ].filter(Boolean);
+
+  return result(
+    !errors.length,
+    "write:distribution_ledger",
+    errors.length ? errors.join(" | ") : "unique claim, request-key CAS retry, stale-worker rejection, keyset candidate RPC, and cleanup passed"
+  );
 }
 
 async function publicColumnBoundaryCheck(url, serviceClient, anonKey) {
@@ -236,11 +347,60 @@ async function publicColumnBoundaryCheck(url, serviceClient, anonKey) {
     .maybeSingle();
   checks.push(privateSnapshot.error ? "internal snapshot columns denied" : "internal snapshot columns unexpectedly readable");
 
+  const anonCandidateRpc = await anonClient.rpc("list_distribution_candidate_ids", {
+    p_channel: "schema_verifier_anon",
+    p_limit: 1,
+    p_after_score: null,
+    p_after_created_at: null,
+    p_after_id: null
+  });
+  checks.push(anonCandidateRpc.error ? "anon candidate RPC denied" : "anon candidate RPC unexpectedly executable");
+
   const cleanup = await serviceClient.from("sourced_products").delete().eq("id", productId);
   if (cleanup.error) checks.push(`cleanup: ${cleanup.error.message}`);
 
   const failed = checks.filter((check) => check.includes("unexpectedly") || check.includes(": ") || check.startsWith("public product columns") || check.startsWith("public score columns") || check.startsWith("public snapshot columns") || check.startsWith("cleanup"));
   return result(!failed.length, "public:column_boundary", checks.join("; "));
+}
+
+async function authenticatedCandidateRpcBoundaryCheck(url, serviceClient, anonKey) {
+  const userIdSuffix = randomUUID();
+  const email = `returnpick-schema-${userIdSuffix}@example.invalid`;
+  const password = `Rp!${randomUUID()}-${randomUUID()}`;
+  const created = await serviceClient.auth.admin.createUser({ email, password, email_confirm: true });
+  if (created.error || !created.data.user) {
+    return result(false, "authenticated:candidate_rpc_denied", `temporary auth user: ${created.error?.message ?? "not created"}`);
+  }
+
+  let detail = "authenticated candidate RPC was unexpectedly executable";
+  let ok = false;
+  try {
+    const authenticatedClient = createClient(url, anonKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+    const signedIn = await authenticatedClient.auth.signInWithPassword({ email, password });
+    if (signedIn.error || !signedIn.data.session) {
+      detail = `temporary auth sign-in: ${signedIn.error?.message ?? "no session"}`;
+    } else {
+      const candidateRpc = await authenticatedClient.rpc("list_distribution_candidate_ids", {
+        p_channel: "schema_verifier_authenticated",
+        p_limit: 1,
+        p_after_score: null,
+        p_after_created_at: null,
+        p_after_id: null
+      });
+      ok = Boolean(candidateRpc.error);
+      detail = ok ? "authenticated candidate RPC denied" : detail;
+    }
+  } finally {
+    const deleted = await serviceClient.auth.admin.deleteUser(created.data.user.id);
+    if (deleted.error) {
+      ok = false;
+      detail = `${detail}; temporary auth cleanup: ${deleted.error.message}`;
+    }
+  }
+
+  return result(ok, "authenticated:candidate_rpc_denied", detail);
 }
 
 async function main() {
@@ -269,8 +429,10 @@ async function main() {
   for (const check of requiredSchemaChecks) checks.push(await columnCheck(client, check));
   checks.push(await schemaVersionCheck(client));
   checks.push(await strictAffiliateFunctionCheck(client));
+  checks.push(await distributionDeliverySmokeCheck(client));
   checks.push(await writeSmokeCheck(client));
   checks.push(await publicColumnBoundaryCheck(url, client, anonKey));
+  checks.push(await authenticatedCandidateRpcBoundaryCheck(url, client, anonKey));
 
   for (const check of checks) {
     console.log(`${check.ok ? "PASS" : "FAIL"} ${check.name} - ${check.detail}`);

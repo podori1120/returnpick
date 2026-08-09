@@ -13,6 +13,10 @@ const requiredFragments = [
   { label: "scoring table", text: "create table if not exists deal_scores" },
   { label: "sourcing run log table", text: "create table if not exists sourcing_runs" },
   { label: "Telegram log table", text: "create table if not exists telegram_logs" },
+  { label: "distribution delivery ledger table", text: "create table if not exists distribution_deliveries" },
+  { label: "distribution delivery state machine", text: "delivery_mode in ('draft', 'publish')" },
+  { label: "distribution delivery legacy backfill", text: "Preserve successful Blogger deliveries" },
+  { label: "keyset distribution candidate RPC", text: "p_after_score integer default null" },
   { label: "affiliate event table", text: "create table if not exists affiliate_events" },
   { label: "product snapshot table", text: "create table if not exists product_snapshots" },
   { label: "published affiliate constraint", text: "sourced_products_public_affiliate_url_check" },
@@ -75,14 +79,19 @@ console.log("Supabase SQL apply steps");
 console.log("1. Open Supabase Dashboard > SQL Editor > New query.");
 console.log("2. Copy the entire local file `C:\\projects\\returnpick\\sql\\schema.sql`.");
 console.log("3. Paste the full SQL, run it once, and wait until it finishes without errors.");
-console.log("4. Redeploy Vercel Production so server functions use the same env and schema assumptions.");
-console.log("5. Run `npm run schema:production` with production Supabase env values available.");
-console.log("6. Run `npm run doctor:production:launch` before first live sourcing.");
+console.log("4. Run the same full SQL a second time; the second clean run is the migration idempotence proof.");
+console.log("5. Redeploy Vercel Production so server functions use the same env and schema assumptions.");
+console.log("6. Run `npm run schema:production` with production Supabase env values available.");
+console.log("7. Run `npm run doctor:production:launch` before first live sourcing.");
 console.log("");
 console.log("Expected live schema checks");
 console.log("- returnpick_schema_meta has the schema_version row shown above.");
 console.log("- sourcing, scoring, Telegram, affiliate event, and product snapshot tables exist.");
+console.log("- distribution_deliveries exists with the channel/product uniqueness guard and legacy Blogger success backfill.");
+console.log("- distribution delivery rows retain draft/publish mode, request key, attempt count, and safe failure state.");
+console.log("- list_distribution_candidate_ids applies the conservative customer-ready SQL gate, performs a service-role-only anti-join and bounded keyset page, and the application rechecks the authoritative gate across every page.");
 console.log("- is_strict_coupang_partners_url accepts only product-level Coupang Partners short links.");
 console.log("- published products are public only when they have a strict product affiliate URL.");
 console.log("- service role writes and anon public RLS reads both pass.");
+console.log("- the live schema verifier rejects duplicate claims, enforces request-key CAS retries, probes the keyset candidate RPC and role denials, and cleans up its private smoke row.");
 console.log("- anon/authenticated can read customer-facing columns only; raw_json and admin-only fields are denied.");

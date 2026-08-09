@@ -163,6 +163,24 @@ export interface TelegramLog {
   created_at: string;
 }
 
+export type DistributionDeliveryStatus = "pending" | "succeeded" | "ambiguous" | "failed";
+export type DistributionDeliveryMode = "draft" | "publish";
+
+export interface DistributionDelivery {
+  id: string;
+  product_id: string;
+  channel: string;
+  status: DistributionDeliveryStatus;
+  delivery_mode: DistributionDeliveryMode;
+  request_key: string;
+  provider_post_id: string | null;
+  provider_url: string | null;
+  last_error: string | null;
+  attempt_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ProductSnapshot {
   id: string;
   product_id: string;

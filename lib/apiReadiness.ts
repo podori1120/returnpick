@@ -29,7 +29,7 @@ import { isStrongAdminPassword } from "@/lib/validators";
 type ReadinessState = "ready" | "missing" | "partial" | "disabled";
 type ReadinessMode = "pre_approval" | "manual_launch_ready" | "api_ready" | "launch_ready";
 
-const EXPECTED_SCHEMA_VERSION = "2026-08-01-public-column-boundary";
+const EXPECTED_SCHEMA_VERSION = "2026-08-09-blogger-keyset-queue";
 
 export type ApiReadinessItem = {
   id: string;
@@ -462,7 +462,7 @@ function describeSupabaseIssue(detail: Record<string, JsonValue>, fallbackMessag
     return {
       code: "SUPABASE_SCHEMA_VERSION_MISMATCH",
       message: "Supabase 테이블은 연결됐지만 최신 schema.sql 버전 표식이 맞지 않습니다. 오래된 SQL이 적용된 상태일 수 있습니다.",
-      nextAction: "Supabase SQL Editor에서 C:\\projects\\returnpick\\sql\\schema.sql 전체를 다시 실행한 뒤 Vercel을 재배포하고 실제 연결 테스트를 다시 누르세요."
+      nextAction: "Supabase SQL Editor에서 C:\\projects\\returnpick\\sql\\schema.sql 전체를 연속 두 번 오류 없이 실행한 뒤 Vercel을 재배포하고 실제 연결 테스트를 다시 누르세요."
     };
   }
 
@@ -470,7 +470,7 @@ function describeSupabaseIssue(detail: Record<string, JsonValue>, fallbackMessag
     return {
       code: "SUPABASE_TABLE_OR_COLUMN_MISSING",
       message: "Supabase 필수 테이블 또는 컬럼 일부가 없습니다. API 키가 있어도 후보 저장, 점수 저장, 클릭 추적이 바로 실패할 수 있습니다.",
-      nextAction: "Supabase SQL Editor에서 최신 sql/schema.sql을 전체 실행해 테이블과 컬럼을 맞춘 뒤 다시 테스트하세요."
+      nextAction: "Supabase SQL Editor에서 최신 sql/schema.sql을 연속 두 번 오류 없이 실행해 테이블과 컬럼을 맞춘 뒤 다시 테스트하세요."
     };
   }
 
@@ -1121,6 +1121,143 @@ async function runSupabaseWriteSmokeCheck(client: NonNullable<ReturnType<typeof 
   };
 }
 
+async function runDistributionDeliveryLedgerSmokeCheck(client: NonNullable<ReturnType<typeof getSupabaseServiceClient>>) {
+  const productId = randomUUID();
+  const requestKey = randomUUID();
+  const steps: Array<{ step: string; ok: boolean; error: string | null }> = [];
+
+  const productInsert = await client
+    .from("sourced_products")
+    .insert({
+      id: productId,
+      source: "api_readiness",
+      source_product_id: `distribution-ledger-${productId}`,
+      category: "laptop",
+      title: `ReturnPick distribution ledger smoke ${productId}`,
+      sourcing_status: "candidate",
+      is_published: false,
+      raw_json: { source: "api_readiness", smoke_test: "distribution_ledger" }
+    })
+    .select("id")
+    .single();
+  steps.push({ step: "distribution_ledger_product_insert", ok: !productInsert.error, error: productInsert.error?.message ?? null });
+
+  let firstDeliveryInserted = false;
+  if (!productInsert.error) {
+    const firstDelivery = await client
+      .from("distribution_deliveries")
+      .insert({
+        product_id: productId,
+        channel: "api_readiness",
+        status: "pending",
+        delivery_mode: "draft",
+        request_key: requestKey,
+        attempt_count: 1
+      })
+      .select("id,request_key,attempt_count")
+      .single();
+    firstDeliveryInserted = !firstDelivery.error;
+    steps.push({ step: "distribution_ledger_first_claim", ok: firstDeliveryInserted, error: firstDelivery.error?.message ?? null });
+
+    if (firstDelivery.data && !firstDelivery.error) {
+      const duplicateDelivery = await client
+        .from("distribution_deliveries")
+        .insert({
+          product_id: productId,
+          channel: "api_readiness",
+          status: "pending",
+          delivery_mode: "draft",
+          request_key: randomUUID(),
+          attempt_count: 1
+        })
+        .select("id")
+        .single();
+      const duplicateRejected = duplicateDelivery.error?.code === "23505";
+      steps.push({
+        step: "distribution_ledger_unique_channel_product",
+        ok: duplicateRejected,
+        error: duplicateRejected
+          ? null
+          : duplicateDelivery.error?.message ?? "DISTRIBUTION_LEDGER_DUPLICATE_INSERT_ACCEPTED"
+      });
+
+      const failedTransition = await client
+        .from("distribution_deliveries")
+        .update({ status: "failed", last_error: "OAUTH_PREWRITE_SMOKE" })
+        .eq("id", firstDelivery.data.id)
+        .eq("status", "pending")
+        .eq("request_key", firstDelivery.data.request_key)
+        .select("id,request_key,attempt_count")
+        .maybeSingle();
+      steps.push({
+        step: "distribution_ledger_prewrite_failure_cas",
+        ok: !failedTransition.error && Boolean(failedTransition.data),
+        error: failedTransition.error?.message ?? (failedTransition.data ? null : "DISTRIBUTION_LEDGER_PREWRITE_CAS_MISSED")
+      });
+
+      if (failedTransition.data) {
+        const retryKey = randomUUID();
+        const retryClaim = await client
+          .from("distribution_deliveries")
+          .update({ status: "pending", request_key: retryKey, attempt_count: 2, last_error: null })
+          .eq("id", failedTransition.data.id)
+          .eq("status", "failed")
+          .eq("request_key", failedTransition.data.request_key)
+          .select("id,request_key,attempt_count")
+          .maybeSingle();
+        const retryClaimed = !retryClaim.error && retryClaim.data?.request_key === retryKey && retryClaim.data?.attempt_count === 2;
+        steps.push({
+          step: "distribution_ledger_failed_retry_cas",
+          ok: retryClaimed,
+          error: retryClaim.error?.message ?? (retryClaimed ? null : "DISTRIBUTION_LEDGER_RETRY_CAS_MISSED")
+        });
+
+        if (retryClaim.data) {
+          const staleUpdate = await client
+            .from("distribution_deliveries")
+            .update({ status: "succeeded" })
+            .eq("id", retryClaim.data.id)
+            .eq("status", "pending")
+            .eq("request_key", requestKey)
+            .select("id")
+            .maybeSingle();
+          const staleRejected = !staleUpdate.error && !staleUpdate.data;
+          steps.push({
+            step: "distribution_ledger_stale_request_rejected",
+            ok: staleRejected,
+            error: staleUpdate.error?.message ?? (staleRejected ? null : "DISTRIBUTION_LEDGER_STALE_REQUEST_UPDATED")
+          });
+        }
+      }
+    }
+  }
+
+  const candidateRpc = await client.rpc("list_distribution_candidate_ids", {
+    p_channel: "api_readiness",
+    p_limit: 5,
+    p_after_score: null,
+    p_after_created_at: null,
+    p_after_id: null
+  });
+  steps.push({
+    step: "distribution_ledger_keyset_candidate_rpc",
+    ok: !candidateRpc.error && Array.isArray(candidateRpc.data),
+    error: candidateRpc.error?.message ?? (Array.isArray(candidateRpc.data) ? null : "DISTRIBUTION_CANDIDATE_RPC_INVALID")
+  });
+
+  if (!productInsert.error) {
+    const deliveryCleanup = await client.from("distribution_deliveries").delete().eq("product_id", productId);
+    steps.push({ step: "distribution_ledger_cleanup", ok: !deliveryCleanup.error, error: deliveryCleanup.error?.message ?? null });
+  }
+  const productCleanup = await client.from("sourced_products").delete().eq("id", productId);
+  steps.push({ step: "distribution_ledger_product_cleanup", ok: !productCleanup.error, error: productCleanup.error?.message ?? null });
+
+  return {
+    ok: steps.every((step) => step.ok),
+    steps
+  };
+}
+
 async function runStrictAffiliateSqlFunctionSmokeCheck(client: NonNullable<ReturnType<typeof getSupabaseServiceClient>>) {
   const probes = [
     {
@@ -1726,16 +1863,17 @@ export async function getSupabaseStorageReadiness(): Promise<SupabaseStorageRead
   }
 
   try {
-    const [schemaVersion, products] = await Promise.all([
+    const [schemaVersion, products, distributionLedger] = await Promise.all([
       client.from("returnpick_schema_meta").select("value").eq("key", "schema_version").maybeSingle(),
-      client.from("sourced_products").select("id", { count: "exact", head: true }).limit(1)
+      client.from("sourced_products").select("id", { count: "exact", head: true }).limit(1),
+      client.from("distribution_deliveries").select("id,product_id,channel,status,delivery_mode,request_key", { count: "exact", head: true }).limit(1)
     ]);
     const schemaVersionValue =
       schemaVersion.data && typeof schemaVersion.data === "object" && "value" in schemaVersion.data
         ? String(schemaVersion.data.value ?? "")
         : "";
 
-    if (schemaVersion.error || products.error || schemaVersionValue !== EXPECTED_SCHEMA_VERSION) {
+    if (schemaVersion.error || products.error || distributionLedger.error || schemaVersionValue !== EXPECTED_SCHEMA_VERSION) {
       return {
         status: "unverified",
         message: "Supabase에 연결됐지만 최신 schema.sql 또는 핵심 테이블 확인이 필요합니다.",
@@ -1971,6 +2109,7 @@ export async function runApiConnectionChecks(): Promise<ApiConnectionCheck[]> {
       "deal_scores",
       "sourcing_runs",
       "telegram_logs",
+      "distribution_deliveries",
       "affiliate_events",
       "product_snapshots"
     ];
@@ -1979,6 +2118,7 @@ export async function runApiConnectionChecks(): Promise<ApiConnectionCheck[]> {
       { table: "sourced_products", columns: "id,affiliate_url,naver_lowest_price,condition_grade,sourcing_status,last_observed_at" },
       { table: "deal_scores", columns: "id,product_id,total_score,risk_flags,score_detail" },
       { table: "telegram_logs", columns: "id,product_id,target_type,target_key,status,created_at" },
+      { table: "distribution_deliveries", columns: "id,product_id,channel,status,delivery_mode,request_key,provider_post_id,attempt_count,updated_at" },
       { table: "affiliate_events", columns: "id,event_type,channel,utm_source,anon_session_id" },
       { table: "product_snapshots", columns: "id,product_id,change_flags,observed_at" }
     ];
@@ -2020,6 +2160,8 @@ export async function runApiConnectionChecks(): Promise<ApiConnectionCheck[]> {
     const failedSchema = schemaChecks.filter((check) => check.error);
     const strictAffiliateFunction =
       client && !failedTables.length && !failedSchema.length ? await runStrictAffiliateSqlFunctionSmokeCheck(client) : null;
+    const distributionLedgerSmoke =
+      client && !failedTables.length && !failedSchema.length ? await runDistributionDeliveryLedgerSmokeCheck(client) : null;
     const writeSmoke =
       client && !failedTables.length && !failedSchema.length && strictAffiliateFunction?.ok ? await runSupabaseWriteSmokeCheck(client) : null;
     const anonRlsSmoke =
@@ -2027,6 +2169,7 @@ export async function runApiConnectionChecks(): Promise<ApiConnectionCheck[]> {
         ? await runAnonPublicRlsSmokeCheck(client)
         : null;
     const failedStrictAffiliateFunctionSteps = strictAffiliateFunction?.steps.filter((step) => !step.ok) ?? [];
+    const failedDistributionLedgerSteps = distributionLedgerSmoke?.steps.filter((step) => !step.ok) ?? [];
     const failedWriteSteps = writeSmoke?.steps.filter((step) => !step.ok) ?? [];
     const failedAnonRlsSteps = anonRlsSmoke?.steps.filter((step) => !step.ok) ?? [];
     const failedCount =
@@ -2034,6 +2177,7 @@ export async function runApiConnectionChecks(): Promise<ApiConnectionCheck[]> {
       failedSchema.length +
       schemaVersionFailures.length +
       failedStrictAffiliateFunctionSteps.length +
+      failedDistributionLedgerSteps.length +
       failedWriteSteps.length +
       failedAnonRlsSteps.length;
     checks.push({
@@ -2057,6 +2201,7 @@ export async function runApiConnectionChecks(): Promise<ApiConnectionCheck[]> {
           errors: schemaVersionFailures
         },
         strict_affiliate_function: strictAffiliateFunction,
+        distribution_delivery_ledger_smoke: distributionLedgerSmoke,
         write_smoke: writeSmoke,
         anon_public_rls_smoke: anonRlsSmoke
       }

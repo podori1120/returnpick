@@ -7,6 +7,8 @@ import { getSiteUrl } from "@/lib/siteUrl";
 import "./globals.css";
 
 const siteUrl = getSiteUrl();
+const googleSiteVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim();
+const naverSiteVerification = process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION?.trim();
 
 const siteIdentityJsonLd = {
   "@context": "https://schema.org",
@@ -62,7 +64,15 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "ReturnPick | 리턴픽",
     description: "반품 디지털 딜을 자동 수집하고 검수해 보여주는 리턴픽"
-  }
+  },
+  ...(googleSiteVerification || naverSiteVerification
+    ? {
+        verification: {
+          ...(googleSiteVerification ? { google: googleSiteVerification } : {}),
+          ...(naverSiteVerification ? { other: { "naver-site-verification": naverSiteVerification } } : {})
+        }
+      }
+    : {})
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

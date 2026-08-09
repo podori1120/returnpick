@@ -1,4 +1,4 @@
-import { listProducts, listTelegramLogs } from "@/lib/dataStore";
+import { getDistributionCandidateProducts, listDistributionCandidateProductPage, listProducts, listTelegramLogs } from "@/lib/dataStore";
 import { getDiscountRate } from "@/lib/dealIntelligence";
 import { getApiReadinessSummary, type ApiReadinessSummary } from "@/lib/apiReadiness";
 import { isCapabilityReady } from "@/lib/launchCapabilityPolicy";
@@ -10,6 +10,13 @@ import { getNextSourcingKeywordOffset, getRunNextKeywordOffset } from "@/lib/sou
 import { hasSupabaseConfig } from "@/lib/supabase";
 import { sendTelegramForProduct } from "@/lib/telegram";
 import { backfillCoupangAffiliateLinks } from "@/lib/affiliateLinkBackfill";
+import { getBloggerPublishMode, isBloggerConfigured, isBloggerDistributionEnabled, sendBloggerForProduct } from "@/lib/blogger";
+import {
+  DISTRIBUTION_CANDIDATE_MAX_ATTEMPTS,
+  DISTRIBUTION_CANDIDATE_PAGE_SIZE,
+  findNextReadyDistributionCandidate,
+  type DistributionCandidateCursor
+} from "@/lib/distributionQueue";
 
 export function getScheduledMockFallback() {
   const value = process.env.CRON_USE_MOCK_FALLBACK;
@@ -393,6 +400,184 @@ export async function runScheduledTelegramDigest(limit = 1) {
     sent_count: sentCount,
     error_count: errorCount,
     skipped_reason: candidates.length ? null : "NO_UNSENT_PUBLIC_CUSTOMER_READY_DEALS",
+    results
+  };
+}
+
+function safeBloggerDigestError(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  return /^(BLOGGER|GOOGLE_OAUTH)_/.test(message) ? message.slice(0, 120) : "BLOGGER_DIGEST_FAILED";
+}
+
+export async function runScheduledBloggerDigest() {
+  const baseResult = {
+    type: "blogger_digest" as const,
+    candidate_count: 0,
+    scanned_count: 0,
+    sent_count: 0,
+    error_count: 0,
+    results: [] as Array<Record<string, string | null>>
+  };
+
+  if (!hasSupabaseConfig()) {
+    return {
+      ...baseResult,
+      status: "not_ready",
+      skipped_reason: "PERSISTENT_STORAGE_NOT_CONFIGURED",
+      persistent_storage: false,
+      enabled: isBloggerDistributionEnabled(),
+      publish_mode: getBloggerPublishMode()
+    };
+  }
+
+  if (!isBloggerDistributionEnabled()) {
+    return {
+      ...baseResult,
+      status: "disabled",
+      skipped_reason: "BLOGGER_DISTRIBUTION_DISABLED",
+      persistent_storage: true,
+      enabled: false,
+      publish_mode: getBloggerPublishMode()
+    };
+  }
+
+  if (!isBloggerConfigured()) {
+    return {
+      ...baseResult,
+      status: "not_ready",
+      skipped_reason: "BLOGGER_NOT_CONFIGURED",
+      persistent_storage: true,
+      enabled: true,
+      publish_mode: getBloggerPublishMode()
+    };
+  }
+
+  const mode = getBloggerPublishMode();
+  const results: Array<Record<string, string | null>> = [];
+  const claimConflictCodes = new Set([
+    "BLOGGER_ALREADY_DISTRIBUTED",
+    "BLOGGER_DISTRIBUTION_PENDING",
+    "BLOGGER_DISTRIBUTION_AMBIGUOUS",
+    "BLOGGER_DISTRIBUTION_FAILED"
+  ]);
+  let scanCursor: DistributionCandidateCursor | null = null;
+  let scannedCount = 0;
+  let scannedPages = 0;
+  let candidateCount = 0;
+
+  while (candidateCount < DISTRIBUTION_CANDIDATE_MAX_ATTEMPTS) {
+    let scan;
+    try {
+      scan = await findNextReadyDistributionCandidate({
+        afterCursor: scanCursor,
+        pageSize: DISTRIBUTION_CANDIDATE_PAGE_SIZE,
+        loadPage: (limit, afterCursor) => listDistributionCandidateProductPage("blogger", limit, afterCursor),
+        loadCandidates: (productIds) => getDistributionCandidateProducts(productIds),
+        getCandidateId: (product) => product.id,
+        isReady: isPublicDealReady
+      });
+    } catch {
+      return {
+        ...baseResult,
+        status: "error",
+        skipped_reason: "BLOGGER_QUEUE_READ_FAILED",
+        persistent_storage: true,
+        enabled: true,
+        publish_mode: mode,
+        candidate_count: candidateCount,
+        scanned_count: scannedCount,
+        scanned_pages: scannedPages,
+        error_count: 1,
+        results: results.length
+          ? results
+          : [{ product_id: null, title: null, status: "error", error: "BLOGGER_QUEUE_READ_FAILED" }]
+      };
+    }
+
+    scannedCount += scan.scannedCount;
+    scannedPages += scan.pageCount;
+    scanCursor = scan.nextCursor;
+    const candidate = scan.candidate;
+    if (!candidate) {
+      return {
+        ...baseResult,
+        status: "skipped",
+        skipped_reason: candidateCount ? "NO_CLAIMABLE_PUBLIC_CUSTOMER_READY_DEALS" : "NO_UNSENT_PUBLIC_CUSTOMER_READY_DEALS",
+        persistent_storage: true,
+        enabled: true,
+        publish_mode: mode,
+        candidate_count: candidateCount,
+        scanned_count: scannedCount,
+        scanned_pages: scannedPages,
+        results
+      };
+    }
+
+    candidateCount += 1;
+    try {
+      const result = await sendBloggerForProduct(candidate.id, mode);
+      if (result.status === "API_NOT_CONFIGURED") {
+        return {
+          ...baseResult,
+          status: "not_ready",
+          skipped_reason: "BLOGGER_NOT_CONFIGURED",
+          persistent_storage: true,
+          enabled: true,
+          publish_mode: mode,
+          candidate_count: candidateCount,
+          scanned_count: scannedCount,
+          scanned_pages: scannedPages,
+          error_count: 1,
+          results: [{ product_id: candidate.id, title: candidate.title, status: result.status, error: "BLOGGER_API_NOT_CONFIGURED" }]
+        };
+      }
+
+      return {
+        ...baseResult,
+        status: "ok",
+        skipped_reason: null,
+        persistent_storage: true,
+        enabled: true,
+        publish_mode: mode,
+        candidate_count: candidateCount,
+        scanned_count: scannedCount,
+        scanned_pages: scannedPages,
+        sent_count: 1,
+        results: [...results, { product_id: candidate.id, title: candidate.title, status: result.status, error: null }]
+      };
+    } catch (error) {
+      const rawError = error instanceof Error ? error.message : "";
+      const safeError = safeBloggerDigestError(error);
+      results.push({ product_id: candidate.id, title: candidate.title, status: "error", error: safeError });
+      if (claimConflictCodes.has(rawError)) continue;
+
+      return {
+        ...baseResult,
+        status: "error",
+        skipped_reason: null,
+        persistent_storage: true,
+        enabled: true,
+        publish_mode: mode,
+        candidate_count: candidateCount,
+        scanned_count: scannedCount,
+        scanned_pages: scannedPages,
+        error_count: 1,
+        results
+      };
+    }
+  }
+
+  return {
+    ...baseResult,
+    status: "skipped",
+    skipped_reason: "NO_CLAIMABLE_PUBLIC_CUSTOMER_READY_DEALS",
+    persistent_storage: true,
+    enabled: true,
+    publish_mode: mode,
+    candidate_count: candidateCount,
+    scanned_count: scannedCount,
+    scanned_pages: scannedPages,
+    error_count: 0,
     results
   };
 }

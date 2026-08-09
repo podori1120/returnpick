@@ -61,8 +61,17 @@ NAVER_CLIENT_ID=
 NAVER_CLIENT_SECRET=
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
+BLOGGER_BLOG_ID=
+BLOGGER_BLOG_URL=
+GOOGLE_OAUTH_CLIENT_ID=
+GOOGLE_OAUTH_CLIENT_SECRET=
+GOOGLE_OAUTH_REFRESH_TOKEN=
+BLOGGER_DISTRIBUTION_ENABLED=false
+BLOGGER_PUBLISH_MODE=draft
 NEXT_PUBLIC_SITE_URL=
 NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL=
+NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION=
+NEXT_PUBLIC_NAVER_SITE_VERIFICATION=
 RETURNPICK_DEMO_MODE=
 CRON_SECRET=
 CRON_USE_MOCK_FALLBACK=false
@@ -71,13 +80,15 @@ PUBLIC_WEB_ALLOWED_HOSTS=
 PUBLIC_WEB_SEARCH_TEMPLATES=
 ```
 
-운영 배포용 환경변수 초안은 아래 명령으로 만들 수 있습니다. 쿠팡, 네이버, Supabase, 텔레그램의 실제 키는 빈칸으로 남기고, `ADMIN_PASSWORD`와 `CRON_SECRET`만 로컬에서 새 랜덤 값으로 출력합니다.
+운영 배포용 환경변수 초안은 아래 명령으로 만들 수 있습니다. 쿠팡, 네이버, Supabase, 텔레그램, Blogger와 Google OAuth의 실제 키는 빈칸으로 남기고, `ADMIN_PASSWORD`와 `CRON_SECRET`만 로컬에서 새 랜덤 값으로 출력합니다.
 
 ```powershell
 npm run env:production -- https://returnpick.vercel.app https://link.coupang.com/a/승인용코드
 ```
 
 직접 Node로 실행할 때는 `node scripts/print-production-env-template.mjs --site https://returnpick.vercel.app --approval-url https://link.coupang.com/a/승인용코드`처럼 옵션형 인자도 사용할 수 있습니다. 출력된 `ADMIN_PASSWORD`와 `CRON_SECRET`은 Vercel에 붙여넣은 뒤 따로 보관하세요. 같은 출력의 `RETURNPICK_CRON_SECRET`과 `RETURNPICK_SITE_URL`은 GitHub Actions 1시간 스케줄러용 값입니다. 실제 API 키 값은 공식 대시보드에서 복사해 Vercel에 직접 넣고, 파일에 커밋하지 마세요.
+
+Blogger 연동은 서버 전용 환경변수 `BLOGGER_BLOG_ID`, `BLOGGER_BLOG_URL`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN`을 사용합니다. `GOOGLE_OAUTH_CLIENT_SECRET`과 `GOOGLE_OAUTH_REFRESH_TOKEN`은 `NEXT_PUBLIC_` 접두사를 붙이지 말고 브라우저 코드·응답·로그에 넣지 않습니다. `BLOGGER_DISTRIBUTION_ENABLED`가 정확히 `true`일 때만 일일 Cron이 동작하고, `BLOGGER_PUBLISH_MODE`가 정확히 `publish`일 때만 예약 게시하며 그 외 값은 초안으로 닫힙니다. 사이트 소유권 확인이 필요할 때만 `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION`과 `NEXT_PUBLIC_NAVER_SITE_VERIFICATION`을 채우며 빈 값은 메타 태그로 출력하지 않습니다.
 
 API 키가 없어도 로컬에서는 확장된 검수 샘플 카탈로그, mock provider, 로컬 JSON 저장소로 UI를 확인할 수 있습니다. 이 샘플은 개발용 화면 확인용이며 실제 공개 상품이나 수익 상품 수를 뜻하지 않습니다. 비교함에서는 `전체 균형`, `최저 실구매가`, `반품 안정성` 기준을 바꿔 보면서 구매 결정을 연습할 수 있지만, 확인필요 정보를 확인된 반품 상태로 바꾸지는 않습니다. 개발 서버(`npm run dev`)에서는 `RETURNPICK_DEMO_MODE`를 비워도 데모 모드가 켜지며, `RETURNPICK_DEMO_MODE=false`로 비활성화할 수 있습니다. 데모 상품에는 실제 쿠팡 가격·재고·반품등급·파트너스 링크가 없고 구매 버튼도 비활성화됩니다. Production에서는 환경변수 값을 `true`로 넣어도 데모가 강제로 숨겨집니다. Supabase가 없을 때 생성·수정한 mock 데이터는 `.returnpick/local-db.json`에 저장됩니다.
 
@@ -96,7 +107,7 @@ npm run git:check
 ## 5. Supabase 설정
 
 1. Supabase 프로젝트를 만듭니다.
-2. SQL Editor에서 `sql/schema.sql`을 실행합니다.
+2. SQL Editor에서 `sql/schema.sql` 전체를 연속 두 번 오류 없이 실행해 마이그레이션 멱등성을 확인합니다.
 3. 초기 키워드는 `sql/seed.sql`로 넣을 수 있습니다. 운영 DB가 완전히 비어 있어도 첫 소싱 실행 시 기본 키워드가 자동으로 한 번 주입됩니다.
 4. 프로젝트 URL, anon key, service role key를 `.env.local`에 넣습니다.
 
@@ -121,7 +132,7 @@ npm run schema:setup
 
 `schema.sql`은 새로 공개되는 상품이 `https://link.coupang.com/a/짧은코드` 형태의 엄격한 쿠팡 파트너스 단축 링크 없이 `published` 상태가 되는 것을 DB 레벨에서도 막습니다. 테스트·샘플처럼 보이는 단축 코드는 서버와 DB 양쪽에서 거부합니다. 이 제약은 `not valid`로 추가되어 기존 레거시 데이터 때문에 SQL 적용이 중단되지는 않지만, 이후 새로 저장하거나 수정하는 공개 상품에는 바로 적용됩니다. 기존 문제 데이터는 `/admin` 실제 연결 테스트의 `공개 데이터 품질` 항목에서 찾아 정리하세요.
 
-`schema.sql`은 `returnpick_schema_meta` 테이블에 `schema_version=2026-08-01-public-column-boundary` 표식도 기록합니다. `/admin`의 실제 연결 테스트는 이 값을 확인하므로, Supabase 테이블은 있어도 최신 SQL을 다시 적용하지 않은 경우 `Supabase 운영 DB` 카드에서 바로 드러납니다. `last_observed_at`은 자동 소싱이 상품을 다시 찾은 시각만 기록하며, 관리자 수정 시각과 섞이지 않습니다. 관리자 수동 후보는 자동 관측 시각을 부여하지 않으므로, 수동 입력만으로 `24시간 내 수집` 상태가 되지 않고 구매 전 쿠팡 페이지 재확인이 계속 표시됩니다. 다만 관리자가 상품별 링크·이미지·가격을 확인해 명시적으로 게시하면 `manual_catalog_review` 증거를 남기고, 승인 대기용 임시 카탈로그에는 그 수동 검토 시각을 사용합니다. 수동 검토 증거는 7일 뒤 만료되어 다시 게시 검토와 카탈로그 내보내기가 필요합니다.
+`schema.sql`은 `returnpick_schema_meta` 테이블에 `schema_version=2026-08-09-blogger-keyset-queue` 표식도 기록합니다. `/admin`의 실제 연결 테스트는 이 값을 확인하므로, Supabase 테이블은 있어도 최신 SQL을 다시 적용하지 않은 경우 `Supabase 운영 DB` 카드에서 바로 드러납니다. `last_observed_at`은 자동 소싱이 상품을 다시 찾은 시각만 기록하며, 관리자 수정 시각과 섞이지 않습니다. 관리자 수동 후보는 자동 관측 시각을 부여하지 않으므로, 수동 입력만으로 `24시간 내 수집` 상태가 되지 않고 구매 전 쿠팡 페이지 재확인이 계속 표시됩니다. 다만 관리자가 상품별 링크·이미지·가격을 확인해 명시적으로 게시하면 `manual_catalog_review` 증거를 남기고, 승인 대기용 임시 카탈로그에는 그 수동 검토 시각을 사용합니다. 수동 검토 증거는 7일 뒤 만료되어 다시 게시 검토와 카탈로그 내보내기가 필요합니다.
 
 또한 실제 연결 테스트는 Supabase RPC로 `is_strict_coupang_partners_url` 함수를 직접 호출해 정상 파트너스 단축 링크는 허용하고, 테스트 코드처럼 보이는 링크와 일반 쿠팡 상품 URL은 거부하는지 확인합니다. 버전 표식만 맞고 DB 함수가 빠졌거나 다르게 적용된 상태도 이 단계에서 막힙니다.
 
@@ -648,7 +659,7 @@ API 자동 보강 중 특정 상품의 DB 저장만 실패해도 전체 배치�
 
 `수익 회복 플랜`은 같은 지표를 운영 순서로 다시 정렬합니다. 상품별 링크가 빠져 숨겨진 게시 상품, 고객공개 품질 보강이 필요한 상품, 검토 대기 후보, 텔레그램 유입이 아직 없는 공개 가능 상품을 차례로 보여주며, 후보 테이블로 이동하는 버튼은 기존 검색·가격·카테고리 필터를 초기화하고 `검토 대기`, `공개 보강 대기` 같은 정확한 큐 필터를 즉시 엽니다.
 
-`상품별 채널 배포 키트`는 실제 공개 가능 상품만 목록에 넣고, 선택한 상품의 상세 URL에 텔레그램·네이버 블로그 UTM을 붙여 채널별 원고를 생성합니다. 원고 복사와 네이버 블로그 등록 채널 열기는 수동으로 확인할 수 있고, 텔레그램은 기존 상품 발송 API로 운영자가 확인한 뒤 명시적으로 보냅니다. 상품이 품질 게이트를 통과하지 못하면 API가 원고 생성 자체를 거절합니다.
+`상품별 채널 배포 키트`는 실제 공개 가능 상품만 목록에 넣고, 선택한 상품의 상세 URL에 텔레그램·Blogger UTM을 붙여 채널별 원고를 생성합니다. 기존 `naverBlog` 출력은 호환성을 위해 유지하지만 관리자 화면은 Telegram과 Blogger를 보여주며, Blogger는 HTML 복사·초안 저장·공개 게시를 운영자가 직접 선택합니다. 텔레그램은 기존 상품 발송 API로 운영자가 확인한 뒤 명시적으로 보냅니다. 상품이 품질 게이트를 통과하지 못하면 API가 원고 생성 자체를 거절합니다.
 
 ## 11. 상품 게시 방법
 
@@ -690,9 +701,9 @@ NEXT_PUBLIC_SITE_URL=
 
 관리자에서 게시된 상품을 선택한 뒤 텔레그램 미리보기를 확인하고 발송합니다. 텔레그램 메시지는 쿠팡 직링크가 아니라 `/deals/[id]?utm_source=telegram` 상세 페이지 링크를 사용하며, 발송 결과는 `telegram_logs`에 저장됩니다. 메시지가 길어지면 Telegram 제한보다 짧게 줄이되 상세 페이지 링크와 제휴 안내는 유지합니다. 발송 요청은 10초 안에 응답하지 않으면 timeout으로 처리하고, Telegram HTTP 오류·네트워크 오류·timeout은 토큰을 노출하지 않는 요약 메시지로 로그에 남깁니다.
 
-API 승인 전 첫 매출 유입은 `/admin`의 `채널별 첫 매출 배포 키트`에서 준비할 수 있습니다. 실제 승인용 파트너스 링크가 설정된 경우에만 Novatech S1 추천 콘텐츠의 텔레그램 원고와 등록된 네이버 블로그용 제목·본문을 서버가 생성합니다. 두 원고 모두 가격·재고를 고정하지 않고 제휴 고지를 포함하며, 쿠팡 직링크 대신 `utm_source=telegram` 또는 `utm_source=naver_blog`가 붙은 ReturnPick 상세 페이지로 연결합니다. Bot token이 없어도 원고를 복사해 수동 게시할 수 있고, Bot 설정이 끝나면 확인한 텔레그램 원고를 같은 패널에서 명시적으로 발송할 수 있습니다.
+API 승인 전 첫 매출 유입은 공개된 `/products/approval-sample` 페이지를 등록한 채널에 직접 게시하는 방식으로 준비할 수 있습니다. 기존 고정 승인 캠페인 API는 호환성을 위해 남아 있지만 관리자 화면에는 중복 패널로 렌더링하지 않으며, 실제 공개 상품의 운영 배포는 `/admin`의 `상품별 채널 배포 키트`에서 Telegram과 Blogger를 사용합니다. 모든 채널 원고는 가격·재고를 고정하지 않고 제휴 고지를 포함하며, 쿠팡 직링크 대신 ReturnPick 상세 페이지로 연결합니다.
 
-실제 공개 상품이 게시된 뒤에는 같은 관리자 화면의 `상품별 채널 배포 키트`에서 상품을 선택합니다. 이 키트는 `published`이면서 상품별 파트너스 링크·가격·이미지·목적지 확인을 통과한 상품만 대상으로 하며, 공개 상세 URL에 `utm_source`, `utm_medium`, `utm_campaign=deal_distribution`을 붙인 텔레그램 원고와 네이버 블로그 제목·본문을 만듭니다. 원고에는 반품 정보 확인 상태, 리턴픽 판단, 점수, 추천 이유, 구매 전 주의점, 제휴 고지가 함께 들어갑니다. 공개 품질 기준을 통과하지 못한 상품은 원고 생성 단계에서 다시 차단하므로 링크 보강 전 상품이 외부 채널에 퍼지지 않습니다. 텔레그램은 기존 상품별 발송 API를 통해 운영자가 확인 후 명시적으로 발송하며, 봇이 없으면 원고 복사로 수동 게시할 수 있습니다.
+실제 공개 상품이 게시된 뒤에는 같은 관리자 화면의 `상품별 채널 배포 키트`에서 상품을 선택합니다. 이 키트는 `published`이면서 상품별 파트너스 링크·가격·이미지·목적지 확인을 통과한 상품만 대상으로 하며, 공개 상세 URL에 `utm_source`, `utm_medium`, `utm_campaign=deal_distribution`을 붙인 텔레그램 원고와 Blogger 제목·본문·HTML을 만듭니다. Blogger 원고는 짧은 자체 요약과 현재 ReturnPick 상세 URL, 가격·변동 주의, 상단·하단 제휴 고지를 포함하고 원격 설명이나 이미지를 복사하지 않습니다. 기존 `naverBlog` 출력은 호환성을 위해 유지하지만 상품별 관리자 화면에는 Telegram과 Blogger만 표시합니다. 공개 품질 기준을 통과하지 못한 상품은 원고 생성·Blogger preview·초안·게시 단계에서 다시 차단하므로 `needs_review`나 링크 보강 전 상품이 외부 채널에 퍼지지 않습니다. 텔레그램은 기존 상품별 발송 API를 통해 운영자가 확인 후 명시적으로 발송하고, Blogger는 운영자가 `초안 저장` 또는 `공개 게시`를 직접 선택합니다. Blogger 쓰기 전에 `distribution_deliveries` 원장을 원자적으로 선점하므로 같은 상품의 동시·반복 요청은 중복 게시되지 않습니다. 이미 성공한 초안에서 공개 게시를 선택하면 새 글을 삽입하지 않고 원장에 기록된 게시물 ID로 Blogger `Posts.publish`를 호출합니다.
 
 공개 Novatech S1 추천 상세의 `추천 링크 공유`와 `링크 복사`도 쿠팡 직링크가 아니라 제휴 고지와 구매 전 체크가 함께 있는 ReturnPick 상세 주소를 전달합니다. 공유 주소에는 `utm_source=customer_share`가 붙고 성공한 공유 동작만 익명 `share_copy` 이벤트로 기록되어, 관리자 수익 퍼널에서 고객 추천 유입을 구분할 수 있습니다.
 
@@ -745,8 +756,9 @@ ReturnPick은 Vercel Cron 또는 외부 스케줄러로 반복 운영할 수 있
 - `/api/cron/sourcing`: 기본 Vercel Cron은 매일 00:00 UTC에 활성 키워드 기준으로 후보를 다시 수집하고 점수화합니다.
 - `/api/cron/affiliate-backfill`: 기본 Vercel Cron은 매일 00:05 UTC에 승인 후 상품별 쿠팡 상품 URL을 파트너스 딥링크로 보강합니다. 수집 함수와 분리해 새 후보가 수익 링크 없이 계속 쌓이는 일을 줄입니다.
 - `/api/cron/telegram-digest`: 기본 Vercel Cron은 매일 00:10 UTC에 아직 텔레그램에 보낸 적 없는 고객공개 가능 상품 중 점수 높은 상품을 1건 발송합니다.
+- `/api/cron/blogger-digest`: 기본 Vercel Cron은 매일 00:15 UTC에 Blogger 설정과 `BLOGGER_DISTRIBUTION_ENABLED=true`가 준비된 경우, 아직 Blogger 배포 원장이 없는 고객공개 가능 상품 중 점수 높은 상품을 최대 1건 처리합니다. `BLOGGER_PUBLISH_MODE`가 `publish`가 아니면 초안으로 저장합니다.
 
-1시간마다 자동 수집, 상품별 제휴 링크 보강과 텔레그램 후보 발송을 유지하려면 Vercel Pro 이상에서 작업을 `0 * * * *`로 바꾸거나, cron-job.org, GitHub Actions, 서버 Cron 같은 외부 스케줄러가 아래 세 주소를 순서대로 호출하게 설정하세요. 이때 `Authorization: Bearer CRON_SECRET값` 헤더를 반드시 넣어야 합니다.
+1시간마다 자동 수집, 상품별 제휴 링크 보강, 텔레그램 후보 발송과 Blogger 배포를 유지하려면 Vercel Pro 이상에서 작업을 `0 * * * *`로 바꾸거나, cron-job.org, GitHub Actions, 서버 Cron 같은 외부 스케줄러가 네 Cron 주소를 순서대로 호출하게 설정하세요. 이때 `Authorization: Bearer CRON_SECRET값` 헤더를 반드시 넣어야 합니다.
 
 - `https://배포주소/api/cron/sourcing`
 - `https://배포주소/api/cron/affiliate-backfill`
@@ -783,13 +795,15 @@ SOURCING_TIME_BUDGET_MS=52000
 SOURCING_KEYWORD_LIMIT=
 SOURCING_ENRICHMENT_CONCURRENCY=2
 AFFILIATE_BACKFILL_LIMIT=10
+BLOGGER_DISTRIBUTION_ENABLED=false
+BLOGGER_PUBLISH_MODE=draft
 ```
 
 `CRON_SECRET`은 Vercel 프로젝트 환경변수에 16자 이상 랜덤 문자열로 설정합니다. Vercel Cron이 호출할 때 이 값이 `Authorization: Bearer ...` 헤더로 전달되며, API는 이 헤더가 맞을 때만 실행됩니다. 로컬 개발 환경에서는 `CRON_SECRET`이 없어도 테스트 호출이 가능합니다.
 
-Cron 라우트는 `?probe=1`을 붙이면 인증만 확인하고 실제 소싱·링크 보강·텔레그램 발송은 시작하지 않습니다. `/admin`의 실제 연결 테스트는 `NEXT_PUBLIC_SITE_URL/api/cron/sourcing?probe=1`, `/api/cron/affiliate-backfill?probe=1`, `/api/cron/telegram-digest?probe=1`을 `CRON_SECRET`으로 호출해, 배포 alias와 Cron 인증이 맞는지 첫 가동 전에 확인합니다. `AFFILIATE_BACKFILL_LIMIT`은 매시 링크 보강 최대 건수이며 기본값 10, 최대 20입니다. 링크 보강과 목적지 검증은 한 번에 최대 52초로 제한되며, 남은 후보는 다음 시간 실행으로 넘겨 Vercel 함수 시간 초과가 전체 예약 흐름을 끊지 않도록 합니다.
+Cron 라우트는 `?probe=1`을 붙이면 인증만 확인하고 실제 소싱·링크 보강·텔레그램·Blogger 발송은 시작하지 않습니다. `/admin`의 실제 연결 테스트는 `NEXT_PUBLIC_SITE_URL/api/cron/sourcing?probe=1`, `/api/cron/affiliate-backfill?probe=1`, `/api/cron/telegram-digest?probe=1`, `/api/cron/blogger-digest?probe=1`을 `CRON_SECRET`으로 호출해, 배포 alias와 Cron 인증이 맞는지 첫 가동 전에 확인합니다. `AFFILIATE_BACKFILL_LIMIT`은 매시 링크 보강 최대 건수이며 기본값 10, 최대 20입니다. 링크 보강과 목적지 검증은 한 번에 최대 52초로 제한되며, 남은 후보는 다음 시간 실행으로 넘겨 Vercel 함수 시간 초과가 전체 예약 흐름을 끊지 않도록 합니다.
 
-예약 실행 중 예외가 발생해도 Cron 라우트는 일반 HTML 오류 대신 `CRON_SOURCING_FAILED`, `CRON_AFFILIATE_BACKFILL_FAILED` 또는 `CRON_TELEGRAM_DIGEST_FAILED` JSON을 반환합니다. 응답에는 실행 시각, 작업 종류, 안전하게 잘린 오류 메시지만 포함되며 API 키나 토큰 원문은 노출하지 않습니다.
+예약 실행 중 예외가 발생해도 Cron 라우트는 일반 HTML 오류 대신 `CRON_SOURCING_FAILED`, `CRON_AFFILIATE_BACKFILL_FAILED`, `CRON_TELEGRAM_DIGEST_FAILED` 또는 `CRON_BLOGGER_DIGEST_FAILED` JSON을 반환합니다. 응답에는 실행 시각, 작업 종류, 안전하게 잘린 오류 메시지만 포함되며 API 키나 토큰 원문은 노출하지 않습니다.
 
 운영 배포의 Cron 소싱은 기본적으로 실제 API/허용 소스만 사용합니다. 승인 전 테스트 목적으로만 목업 후보를 자동 수집에 섞고 싶다면 `CRON_USE_MOCK_FALLBACK=true`를 명시하고, 최종승인 후에는 `false`로 돌리세요. 관리자 페이지의 `자동 운영 센터`에서 현재 Cron이 `실제 소스만 사용` 상태인지 바로 확인할 수 있습니다.
 
@@ -801,7 +815,7 @@ Cron 라우트는 `?probe=1`을 붙이면 인증만 확인하고 실제 소싱·
 
 관리자 `승인 후 운영 즉시 가동 준비` 패널은 상태를 `승인 대기`, `수동 출시 가능`, `API 키 입력됨`, `운영 준비 완료`로 구분합니다. `수동 출시 가능`은 승인용 링크와 Supabase·관리자·Cron·사이트 URL 같은 운영 필수 설정이 갖춰져 상품별 파트너스 링크를 검수·게시할 수 있는 상태입니다. `API 키 입력됨`은 쿠팡 API 자동화 키는 있지만 운영 필수 설정이 남은 상태이고, `운영 준비 완료`는 자동화까지 포함한 운영 필수 환경변수가 모두 채워진 상태입니다. 쿠팡 API·네이버·텔레그램은 별도의 `선택 연동 대기`로 표시되어 핵심 차단 항목과 섞이지 않습니다. 실제 연결 테스트는 Supabase 테이블/컬럼 조회뿐 아니라 `is_strict_coupang_partners_url` DB 함수가 정상 단축 링크만 통과시키는지, `sourcing_runs` 실행 로그와 `affiliate_events` 클릭 이벤트에 짧은 테스트 레코드를 쓸 수 있는지 확인한 뒤 바로 정리합니다. 또한 anon key로 공개 상품·점수·가격 스냅샷이 읽히는지, 비공개로 돌린 뒤에는 다시 숨겨지는지 확인해 실제 사용자 권한 기준 RLS도 검증합니다. 공개 상품 중 제휴 링크가 없거나 `https://link.coupang.com/a/짧은코드` 기준을 만족하지 않는 링크, 승인용 샘플 링크를 재사용한 상품이 있으면 첫 가동을 막아 수익 추적이 깨진 상태로 운영되는 일을 방지합니다. 같은 검사에서 테스트 문자열이 들어간 가짜 파트너스 단축 링크를 공개 상품으로 짧게 저장해 보고 DB 제약이 거부되는지도 확인하므로, `schema.sql`을 최신으로 적용하지 않은 상태도 바로 드러납니다. 마지막으로 공개 Cron 엔드포인트가 `CRON_SECRET`으로 인증되는지 probe 모드로 확인해, Vercel 배포 주소와 예약 실행 인증이 어긋난 상태도 첫 가동 전에 잡습니다. 각 연결 테스트 카드에는 HTTP 상태, 실패 단계, 조회 건수, RLS smoke 결과처럼 비밀키를 제외한 안전한 진단 세부정보가 표시되어 API 키를 넣은 직후 어떤 설정을 고쳐야 하는지 바로 확인할 수 있습니다.
 
-Supabase schema version이 맞지 않으면 관리자 패널에 `Supabase 최신 SQL 적용 필요` 카드가 따로 표시됩니다. 이 카드에는 기대 버전과 현재 DB 버전이 같이 나오므로, Supabase SQL Editor에서 `sql/schema.sql` 전체를 다시 실행하고 Vercel을 재배포한 뒤 실제 연결 테스트를 다시 누르면 됩니다. 카드의 `SQL 적용 체크리스트 복사`를 누르면 로컬 `C:\projects\returnpick\sql\schema.sql` 파일 전체를 실행해야 한다는 안내와 확인 항목을 바로 복사할 수 있습니다.
+Supabase schema version이 맞지 않으면 관리자 패널에 `Supabase 최신 SQL 적용 필요` 카드가 따로 표시됩니다. 이 카드에는 기대 버전과 현재 DB 버전이 같이 나오므로, Supabase SQL Editor에서 `sql/schema.sql` 전체를 연속 두 번 오류 없이 실행하고 Vercel을 재배포한 뒤 실제 연결 테스트를 다시 누르면 됩니다. 카드의 `SQL 적용 체크리스트 복사`를 누르면 로컬 `C:\projects\returnpick\sql\schema.sql` 파일 전체를 실행해야 한다는 안내와 확인 항목을 바로 복사할 수 있습니다.
 
 Supabase 실제 연결 테스트는 실패 유형을 `SUPABASE_SCHEMA_VERSION_MISMATCH`, `SUPABASE_TABLE_OR_COLUMN_MISSING`, `SUPABASE_WRITE_SMOKE_FAILED`, `SUPABASE_PUBLIC_RLS_FAILED`처럼 나눠 표시합니다. 따라서 승인 후 첫 가동 전에 최신 SQL 재적용, service role key 확인, 공개 RLS 정책 재적용 중 무엇을 해야 하는지 관리자 화면에서 바로 볼 수 있습니다.
 
@@ -842,9 +856,12 @@ Vercel Cron은 플랜별 실행 주기 제한이 있습니다. Hobby 계정에�
 ```bash
 curl http://localhost:3000/api/cron/sourcing
 curl http://localhost:3000/api/cron/telegram-digest
+curl http://localhost:3000/api/cron/blogger-digest
 ```
 
 텔레그램 다이제스트는 예약 실행 때마다 중복 발송을 피하기 위해 `telegram_logs`에서 이미 `sent` 처리된 상품을 제외합니다. 기본 실행은 고객공개 가능 후보 1건만 발송하므로 새 딜이 있을 때만 천천히 채널에 흘러가고, `TELEGRAM_BOT_TOKEN` 또는 `TELEGRAM_CHAT_ID`가 없으면 상품 조회나 로그 쓰기를 시작하지 않고 `TELEGRAM_NOT_READY`로 안전하게 대기합니다. 예약 다이제스트 응답에는 `status`, `sent_count`, `error_count`가 함께 들어가므로 일부 상품 발송이 실패해도 관리자 자동 운영 센터가 성공으로 오해하지 않고 오류 건수를 바로 보여줍니다.
+
+Blogger 다이제스트는 `distribution_deliveries` 테이블을 영속 중복 방지 원장으로 사용하고, `telegram_logs`에는 운영 감사용 상태와 게시물 ID·URL·제목 요약만 남깁니다. 외부 요청 전에 상품·채널 조합을 원자적으로 `pending`으로 선점하며, 성공은 `succeeded`, 전송 결과를 단정할 수 없는 timeout·응답 오류는 `ambiguous`로 기록합니다. `pending`·`ambiguous`는 자동 재전송을 막으므로 응답 유실 뒤 같은 글이 중복으로 만들어지지 않습니다. Blogger 호출 전 OAuth 단계에서 확실히 실패한 건만 `request_key` 비교·교환으로 다시 선점하고 `attempt_count`를 올려 재시도합니다. 설정이 없으면 외부 호출 없이 `BLOGGER_NOT_CONFIGURED`로 대기합니다. OAuth refresh token으로 짧은 수명의 Google access token을 서버에서만 발급해 새 글에는 Blogger v3 `Posts.insert`, 기록된 초안 공개에는 `Posts.publish`를 사용하며 토큰은 응답이나 로그에 남기지 않습니다. 예약 후보는 `list_distribution_candidate_ids` DB 함수가 명백한 비공개·데모·링크·가격·재고 부적격과 기존 배포 원장을 먼저 제외하고, 애플리케이션의 `isPublicDealReady`가 상품 일치 확인·안전한 이미지·최신 수동 검토를 포함한 최종 공개 게이트를 적용합니다. 후보는 점수·생성시각·ID 키셋으로 페이지당 최대 100개씩 끝까지 순회하므로 첫 100개가 부적격이어도 뒤의 유효 상품이 영구적으로 굶지 않으며, 전체 상품·원장 테이블을 한 응답이나 메모리 배열로 읽지 않습니다. 예약 작업은 Supabase 영속 저장소가 없거나 `BLOGGER_DISTRIBUTION_ENABLED`가 정확히 `true`가 아니면 실행하지 않으며, 관리자 수동 초안·게시 API도 같은 flag를 서버에서 강제합니다. 관리자 `preview`는 HTML payload만 반환하고 외부 쓰기를 하지 않으며, `draft`·`publish`는 고객공개 품질을 통과한 상품에만 명시적으로 실행됩니다. 초안으로 이미 배포된 상품에서 공개를 선택하면 같은 게시물을 승격하고 새 글을 만들지 않습니다.
 
 텔레그램 수동 발송과 예약 다이제스트는 모두 고객공개 기준을 통과한 상품만 보냅니다. `is_published=true`, `sourcing_status=published`, 상품별 `https://link.coupang.com/...` 파트너스 링크, 판매 가격, 공개 이미지와 목적지 확인이 준비되지 않은 상품은 미리보기와 발송 API에서 거절됩니다. 반품가·반품등급이 없는 상품은 메시지에 확인필요를 표시한 가격·스펙 검수 모드로 발송할 수 있습니다. 메시지 링크는 쿠팡 직링크가 아니라 `NEXT_PUBLIC_SITE_URL/deals/{id}?utm_source=telegram` 상세 페이지로 보내 신뢰 근거와 제휴 고지를 먼저 보게 합니다.
 
