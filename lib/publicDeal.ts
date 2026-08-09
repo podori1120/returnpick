@@ -6,6 +6,7 @@ import { getLatestScore } from "@/lib/scoring";
 import { getNaverPriceTrust, type NaverPriceTrustStatus } from "@/lib/naverPriceTrust";
 import { getProductDiscoveryObservation } from "@/lib/discoveryUpdates";
 import { isFreshManualCatalogReview, isManualCatalogSource } from "@/lib/manualCatalogReview";
+import { getProductPriceSource, getRecentPricePosition, type RecentPricePositionStatus } from "@/lib/priceTrend";
 import type { Category, ConditionGrade, RiskFlag, Verdict, ProductWithScore, JsonValue, SnapshotChangeFlag } from "@/lib/types";
 
 export type PublicDealChangeSummary = {
@@ -53,6 +54,16 @@ export type PublicDeal = {
     reason: string;
   } | null;
   change_summary: PublicDealChangeSummary;
+  price_timing: {
+    days: number;
+    status: RecentPricePositionStatus;
+    label: string;
+    description: string;
+    current_price: number | null;
+    lowest_price: number | null;
+    average_price: number | null;
+    sample_count: number;
+  };
   detail_url: string;
 };
 
@@ -134,6 +145,23 @@ export function toPublicDeal(product: ProductWithScore): PublicDeal {
   const quality = getDealQuality(product);
   const useCase = getPrimaryUseCase(product);
   const naverPrice = getNaverPriceTrust(product);
+  const dealPrice = getDealPrice(product);
+  const currentSource = getProductPriceSource(product);
+  const priceTiming = getRecentPricePosition(
+    product.snapshots ?? product.product_snapshots,
+    dealPrice,
+    currentSource,
+    30
+  );
+  const freshness = getDealFreshness(product);
+  const publicPriceTiming = freshness.status !== "fresh"
+    ? {
+        ...priceTiming,
+        status: "unknown" as const,
+        label: "가격 시점 확인필요",
+        description: "마지막 가격 관찰이 오래되었거나 확인되지 않아 가격 시점을 판단하지 않습니다. 동일 가격 기준 관찰이 최근 30일 안에 2회 이상이고 최신 확인가가 신선할 때만 표시합니다. 쿠팡에서 현재 가격·재고·반품 조건을 다시 확인하세요."
+      }
+    : priceTiming;
 
   return {
     id: product.id,
@@ -153,7 +181,7 @@ export function toPublicDeal(product: ProductWithScore): PublicDeal {
     new_price: product.new_price,
     naver_lowest_price: naverPrice.trustedPrice,
     naver_price_status: naverPrice.status,
-    deal_price: getDealPrice(product),
+    deal_price: dealPrice,
     reference_price: getReferencePrice(product),
     discount_rate: getDiscountRate(product),
     score: score?.total_score ?? null,
@@ -168,6 +196,16 @@ export function toPublicDeal(product: ProductWithScore): PublicDeal {
     },
     primary_use_case: useCase,
     change_summary: getPublicChangeSummary(product),
+    price_timing: {
+      days: publicPriceTiming.days,
+      status: publicPriceTiming.status,
+      label: publicPriceTiming.label,
+      description: publicPriceTiming.description,
+      current_price: publicPriceTiming.currentPrice,
+      lowest_price: publicPriceTiming.lowestPrice,
+      average_price: publicPriceTiming.averagePrice,
+      sample_count: publicPriceTiming.sampleCount
+    },
     detail_url: `/deals/${product.id}`
   };
 }

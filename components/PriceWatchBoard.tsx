@@ -42,6 +42,28 @@ function getWatchStatus(currentPrice: number | null, targetPrice: number) {
   };
 }
 
+function getPriceTimingTone(status: PublicDeal["price_timing"]["status"]) {
+  if (status === "lowest" || status === "good") {
+    return {
+      box: "border-pine/20 bg-pine/5",
+      label: "text-pine",
+      badge: "bg-white text-pine"
+    };
+  }
+  if (status === "unknown") {
+    return {
+      box: "border-line bg-mist",
+      label: "text-ink",
+      badge: "bg-white text-ink"
+    };
+  }
+  return {
+    box: "border-lemon bg-lemon/15",
+    label: "text-ink",
+    badge: "bg-white text-ink"
+  };
+}
+
 export default function PriceWatchBoard() {
   const [items, setItems] = useState<PriceWatchItem[]>([]);
   const [products, setProducts] = useState<PublicDeal[]>([]);
@@ -207,6 +229,7 @@ export default function PriceWatchBoard() {
           const StatusIcon = status.icon;
           const outboundLink = getCoupangOutboundLink(product);
           const priceDelta = getPriceWatchPriceDelta(currentPrice, item.baselinePrice);
+          const priceTimingTone = getPriceTimingTone(product.price_timing.status);
 
           return (
             <article className="overflow-hidden rounded-lg border border-line bg-white shadow-soft" key={item.productId}>
@@ -241,6 +264,19 @@ export default function PriceWatchBoard() {
                 <div className={`rounded-lg border px-3 py-3 text-sm font-bold leading-5 ${status.tone}`} role="status">
                   <p className="flex items-center gap-2 font-black"><StatusIcon size={16} aria-hidden /> {status.label}</p>
                   <p className="mt-1">{status.detail}</p>
+                </div>
+
+                <div className={`min-w-0 rounded-lg border p-3 ${priceTimingTone.box}`} data-price-timing={product.price_timing.status} role="status">
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                    <p className={`text-xs font-black ${priceTimingTone.label}`}>가격 시점</p>
+                    <span className={`max-w-full rounded-md px-2 py-1 text-xs font-black ${priceTimingTone.badge}`}>{product.price_timing.label}</span>
+                  </div>
+                  <p className="mt-1 break-words text-xs font-bold leading-5 text-steel">{product.price_timing.description}</p>
+                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-bold text-steel">
+                    {product.price_timing.average_price != null ? <span>관찰 평균 {formatPrice(product.price_timing.average_price)}</span> : null}
+                    {product.price_timing.lowest_price != null ? <span>관찰 최저 {formatPrice(product.price_timing.lowest_price)}</span> : null}
+                    <span>동일 기준 관찰 {product.price_timing.sample_count}회</span>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2 text-xs font-bold text-steel">

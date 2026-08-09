@@ -1280,6 +1280,30 @@ if (
   );
 }
 
+const publicPriceTimingCheck = readText("scripts/verify-public-price-timing.mjs");
+const publicPriceTimingBoard = readText("components/PriceWatchBoard.tsx");
+const publicCompareBoard = readText("components/CompareBoard.tsx");
+const publicPriceTimingPackage = readText("package.json");
+check(
+  "public UX: watchlist and compare price timing",
+  fileExists("scripts/verify-public-price-timing.mjs") &&
+    fileExists("components/PriceWatchBoard.tsx") &&
+    fileExists("components/CompareBoard.tsx") &&
+    publicPriceTimingCheck.includes("getRecentPricePosition") &&
+    publicPriceTimingCheck.includes("price_timing") &&
+    publicPriceTimingCheck.includes("staleFixtureContract") &&
+    publicPriceTimingCheck.includes("2회 이상") &&
+    publicPriceTimingBoard.includes("product.price_timing") &&
+    publicPriceTimingBoard.includes("동일 기준 관찰") &&
+    publicPriceTimingBoard.includes("formatPrice(product.price_timing.average_price)") &&
+    publicCompareBoard.includes("product.price_timing") &&
+    publicCompareBoard.includes("[\"가격 시점\"") &&
+    publicCompareBoard.includes("확인필요") &&
+    publicPriceTimingPackage.includes('"public-price-timing:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-public-price-timing.mjs"'),
+  "watchlist and compare expose only fresh, same-basis ReturnPick timing evidence with neutral unknown and non-positive tones",
+  "required"
+);
+
 if (
   fileExists("app/deals/category/[category]/page.tsx") &&
   fileExists("lib/category.ts") &&

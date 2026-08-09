@@ -73,6 +73,28 @@ function valueClass(isBest: boolean) {
   return isBest ? "font-black text-pine" : "font-black text-ink";
 }
 
+function getPriceTimingTone(status: PublicDeal["price_timing"]["status"]) {
+  if (status === "lowest" || status === "good") {
+    return {
+      box: "border-pine/20 bg-pine/5",
+      label: "text-pine",
+      badge: "bg-white text-pine"
+    };
+  }
+  if (status === "unknown") {
+    return {
+      box: "border-line bg-mist",
+      label: "text-ink",
+      badge: "bg-white text-ink"
+    };
+  }
+  return {
+    box: "border-lemon bg-lemon/15",
+    label: "text-ink",
+    badge: "bg-white text-ink"
+  };
+}
+
 function readStoredPriority(): ComparePriority {
   if (typeof window === "undefined") return "balanced";
   try {
@@ -426,6 +448,7 @@ export default function CompareBoard() {
       <section className="grid gap-4 lg:grid-cols-3">
         {products.map((product) => {
           const outboundLink = getCoupangOutboundLink(product);
+          const priceTimingTone = getPriceTimingTone(product.price_timing.status);
           return (
           <article key={product.id} className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">
             <Link href={product.detail_url} className="block">
@@ -465,6 +488,18 @@ export default function CompareBoard() {
                 <div className="rounded-lg bg-mist p-3">
                   <p className="text-xs font-bold text-steel">반품등급</p>
                   <p className="font-black">{product.condition_grade}</p>
+                </div>
+              </div>
+              <div className={`min-w-0 rounded-lg border p-3 ${priceTimingTone.box}`} data-price-timing={product.price_timing.status}>
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                  <p className={`text-xs font-black ${priceTimingTone.label}`}>가격 시점</p>
+                  <span className={`max-w-full rounded-md px-2 py-1 text-xs font-black ${priceTimingTone.badge}`}>{product.price_timing.label}</span>
+                </div>
+                <p className="mt-1 break-words text-xs font-bold leading-5 text-steel">{product.price_timing.description}</p>
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-bold text-steel">
+                  {product.price_timing.average_price != null ? <span>관찰 평균 {formatPrice(product.price_timing.average_price)}</span> : null}
+                  {product.price_timing.lowest_price != null ? <span>관찰 최저 {formatPrice(product.price_timing.lowest_price)}</span> : null}
+                  <span>동일 기준 관찰 {product.price_timing.sample_count}회</span>
                 </div>
               </div>
               <div className="rounded-lg border border-line p-3 text-xs font-bold leading-5 text-steel">
@@ -516,6 +551,7 @@ export default function CompareBoard() {
                 ["점수", (product: PublicDeal) => `${product.score ?? 0}점`],
                 ["판정", (product: PublicDeal) => product.verdict ?? "판정대기"],
                 ["구매가", (product: PublicDeal) => formatPrice(product.deal_price)],
+                ["가격 시점", (product: PublicDeal) => product.price_timing.status === "unknown" ? "확인필요" : product.price_timing.label],
                 ["기준가", (product: PublicDeal) => formatPrice(product.reference_price)],
                 ["할인율", (product: PublicDeal) => formatPercent(product.discount_rate)],
                 ["반품등급", (product: PublicDeal) => product.condition_grade],
