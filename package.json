@@ -34,6 +34,7 @@
     "home-purpose:guides:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-home-purpose-guides.mjs",
     "recommendation:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-recommendation-workflow.mjs",
     "price-watch:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-price-watch.mjs",
+    "price-trend:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-price-trend.mjs",
     "admin-launch-path:check": "node scripts/verify-admin-launch-path.mjs",
     "freshness:check": "node scripts/verify-deal-freshness.mjs",
     "discovery-updates:check": "node scripts/verify-discovery-updates.mjs",
