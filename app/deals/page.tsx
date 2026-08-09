@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, RefreshCw, ShieldCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, RefreshCw, Search, ShieldCheck } from "lucide-react";
 import DealRadar from "@/components/DealRadar";
 import DealCard from "@/components/DealCard";
 import AffiliateNotice from "@/components/AffiliateNotice";
@@ -166,7 +166,39 @@ function EmptyDealsCatalog() {
             검수 추천 모음 <ArrowRight size={16} aria-hidden />
           </Link>
         </div>
+        <div className="mt-6 grid gap-4 rounded-lg border border-line bg-mist p-4 sm:grid-cols-[minmax(0,1fr)_300px] sm:items-center sm:p-5">
+          <form action="/deals" className="min-w-0" role="search">
+            <label className="text-sm font-black text-ink" htmlFor="empty-deals-search">
+              찾는 상품을 먼저 저장해두세요
+            </label>
+            <p className="mt-1 text-xs font-semibold leading-5 text-steel">상품이 공개되면 같은 검색 조건으로 바로 다시 들어올 수 있습니다.</p>
+            <div className="mt-3 flex min-w-0 gap-2">
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-steel" size={17} aria-hidden />
+                <input
+                  id="empty-deals-search"
+                  className="focus-ring h-11 w-full rounded-lg border border-line bg-white pl-10 pr-3 text-sm font-bold text-ink placeholder:text-steel"
+                  name="search"
+                  placeholder="갤럭시북·QHD 모니터·로봇청소기"
+                  type="search"
+                />
+              </div>
+              <button className="focus-ring inline-flex h-11 shrink-0 items-center gap-2 rounded-lg bg-ink px-4 text-sm font-black text-white hover:bg-pine" type="submit">
+                검색 <ArrowRight size={16} aria-hidden />
+              </button>
+            </div>
+          </form>
+          <div className="border-t border-line pt-4 text-sm sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+            <p className="font-black text-ink">현재 할 수 있는 것</p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-steel">검색 결과 페이지에서 관심 조건 저장을 누르면 이 브라우저에만 안전하게 보관됩니다.</p>
+            <Link className="focus-ring mt-3 inline-flex items-center gap-1 text-xs font-black text-pine hover:text-ink" href="/recommend">
+              용도별 추천 조건 열기 <ArrowRight size={14} aria-hidden />
+            </Link>
+          </div>
+        </div>
       </header>
+
+      <SavedFilterBar />
 
       <section className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center" aria-labelledby="direct-review-title">
         <div>
