@@ -3,6 +3,7 @@ export type PriceWatchItem = {
   title: string;
   targetPrice: number;
   createdAt: string;
+  baselinePrice?: number | null;
 };
 
 export const priceWatchStorageKey = "returnpick_price_watches";
@@ -13,6 +14,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function normalizeOptionalPrice(value: unknown) {
+  const price = typeof value === "number" ? value : Number(value);
+  return Number.isSafeInteger(price) && price > 0 ? price : null;
+}
+
 function normalizePriceWatch(value: unknown): PriceWatchItem | null {
   if (!isRecord(value)) return null;
 
@@ -20,12 +26,13 @@ function normalizePriceWatch(value: unknown): PriceWatchItem | null {
   const title = typeof value.title === "string" ? value.title.trim() : "";
   const targetPrice = typeof value.targetPrice === "number" ? value.targetPrice : Number(value.targetPrice);
   const createdAt = typeof value.createdAt === "string" ? value.createdAt : "";
+  const baselinePrice = normalizeOptionalPrice(value.baselinePrice);
 
   if (!productId || !title || !Number.isSafeInteger(targetPrice) || targetPrice <= 0 || !createdAt || Number.isNaN(Date.parse(createdAt))) {
     return null;
   }
 
-  return { productId, title, targetPrice, createdAt };
+  return { productId, title, targetPrice, createdAt, baselinePrice };
 }
 
 function normalizeItems(items: unknown[]) {
@@ -81,4 +88,19 @@ export function removePriceWatch(productId: string) {
 export function evaluatePriceWatch(currentPrice: number | null | undefined, targetPrice: number | null | undefined) {
   if (typeof currentPrice !== "number" || typeof targetPrice !== "number" || !Number.isSafeInteger(currentPrice) || !Number.isSafeInteger(targetPrice) || currentPrice <= 0 || targetPrice <= 0) return "unknown" as const;
   return currentPrice <= targetPrice ? "hit" as const : "above" as const;
+}
+
+export function getPriceWatchPriceDelta(currentPrice: number | null | undefined, baselinePrice: number | null | undefined) {
+  if (
+    typeof currentPrice !== "number" ||
+    typeof baselinePrice !== "number" ||
+    !Number.isSafeInteger(currentPrice) ||
+    !Number.isSafeInteger(baselinePrice) ||
+    currentPrice <= 0 ||
+    baselinePrice <= 0
+  ) {
+    return null;
+  }
+
+  return currentPrice - baselinePrice;
 }

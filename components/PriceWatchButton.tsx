@@ -67,7 +67,8 @@ export default function PriceWatchButton({ productId, title, currentPrice }: Pri
       productId,
       title,
       targetPrice,
-      createdAt: watch?.createdAt ?? new Date().toISOString()
+      createdAt: watch?.createdAt ?? new Date().toISOString(),
+      baselinePrice: watch?.baselinePrice ?? currentPrice
     } satisfies PriceWatchItem;
     upsertPriceWatch(next);
     setWatch(next);

@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, CheckCircle2, Loader2, Target, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, Loader2, RefreshCw, Target, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import AffiliateButton from "@/components/AffiliateButton";
 import AffiliateInlineDisclosure from "@/components/AffiliateInlineDisclosure";
 import { getCoupangOutboundLink } from "@/lib/coupangLink";
 import { formatDate, formatPrice } from "@/lib/format";
-import { evaluatePriceWatch, getPriceWatchItems, maxPriceWatches, priceWatchChangeEvent, removePriceWatch, setPriceWatchItems, type PriceWatchItem } from "@/lib/priceWatch";
+import { evaluatePriceWatch, getPriceWatchItems, getPriceWatchPriceDelta, maxPriceWatches, priceWatchChangeEvent, removePriceWatch, setPriceWatchItems, type PriceWatchItem } from "@/lib/priceWatch";
 import type { PublicDeal } from "@/lib/publicDeal";
 
 type CompareResponse = {
@@ -47,6 +47,8 @@ export default function PriceWatchBoard() {
   const [products, setProducts] = useState<PublicDeal[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(null);
 
   useEffect(() => {
     function sync() {
@@ -70,6 +72,7 @@ export default function PriceWatchBoard() {
       if (!items.length) {
         setProducts([]);
         setLoading(false);
+        setLastCheckedAt(null);
         return;
       }
 
@@ -86,7 +89,10 @@ export default function PriceWatchBoard() {
           }
           return;
         }
-        if (active) setProducts(body.products ?? []);
+        if (active) {
+          setProducts(body.products ?? []);
+          setLastCheckedAt(new Date().toISOString());
+        }
       } catch {
         if (active) {
           setError("네트워크 문제로 가격 기준 상품을 불러오지 못했습니다.");
@@ -101,7 +107,7 @@ export default function PriceWatchBoard() {
     return () => {
       active = false;
     };
-  }, [items]);
+  }, [items, refreshKey]);
 
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
   const unavailableItems = items.filter((item) => !productMap.has(item.productId));
@@ -156,16 +162,22 @@ export default function PriceWatchBoard() {
             <p className="text-xs font-black text-pine">Browser Price Watch</p>
             <h2 className="mt-1 text-xl font-black">저장한 가격 기준 {items.length}개</h2>
             <p className="mt-1 text-sm font-semibold leading-6 text-steel">
-              로그인 없이 이 브라우저에만 저장합니다. 자동 문자·푸시·이메일 알림은 보내지 않으므로, 다시 방문해 현재 조건을 확인하세요.
+              로그인 없이 이 브라우저에만 저장합니다. 자동 문자·푸시·이메일 알림은 보내지 않으므로, 아래 버튼으로 현재 확인가를 다시 조회하세요.
             </p>
           </div>
-          <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-sm font-black hover:bg-mist" onClick={clearAll} type="button">
-            <Trash2 size={16} aria-hidden /> 모두 비우기
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button aria-label="저장한 상품의 최신 확인가 다시 조회" className="focus-ring inline-flex items-center gap-2 rounded-lg border border-pine/30 px-4 py-2 text-sm font-black text-pine hover:bg-pine/5 disabled:cursor-not-allowed disabled:opacity-50" disabled={loading} onClick={() => setRefreshKey((value) => value + 1)} title="최신 확인가 다시 조회" type="button">
+              <RefreshCw className={loading ? "animate-spin" : ""} size={16} aria-hidden /> 다시 확인
+            </button>
+            <button className="focus-ring inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-sm font-black hover:bg-mist" onClick={clearAll} type="button">
+              <Trash2 size={16} aria-hidden /> 모두 비우기
+            </button>
+          </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold text-steel">
           <span className="rounded-md bg-mist px-2.5 py-1.5">최대 {maxPriceWatches}개 저장</span>
           <Link className="rounded-md bg-pine/10 px-2.5 py-1.5 text-pine hover:text-ink" href="/deals">새 딜 찾기</Link>
+          {lastCheckedAt ? <span className="rounded-md bg-mist px-2.5 py-1.5">화면 확인 {formatDate(lastCheckedAt)}</span> : null}
         </div>
         {loading ? <p className="mt-4 inline-flex items-center gap-2 rounded-lg border border-line bg-mist px-3 py-2 text-xs font-bold text-steel" role="status"><Loader2 className="animate-spin" size={14} aria-hidden /> 공개 상품의 최신 확인값을 불러오는 중입니다.</p> : null}
         {error ? <p className="mt-4 rounded-lg border border-coral/30 bg-coral/10 px-3 py-2 text-sm font-bold text-coral" role="alert">{error}</p> : null}
@@ -194,6 +206,7 @@ export default function PriceWatchBoard() {
           const status = getWatchStatus(currentPrice, item.targetPrice);
           const StatusIcon = status.icon;
           const outboundLink = getCoupangOutboundLink(product);
+          const priceDelta = getPriceWatchPriceDelta(currentPrice, item.baselinePrice);
 
           return (
             <article className="overflow-hidden rounded-lg border border-line bg-white shadow-soft" key={item.productId}>
@@ -221,6 +234,7 @@ export default function PriceWatchBoard() {
                   <div className="rounded-md bg-mist p-3">
                     <p className="text-xs font-bold text-steel">현재 확인가</p>
                     <p className="mt-1 font-black">{formatPrice(currentPrice)}</p>
+                    {priceDelta !== null ? <p className={`mt-1 text-[11px] font-bold ${priceDelta < 0 ? "text-pine" : priceDelta > 0 ? "text-coral" : "text-steel"}`}>{priceDelta === 0 ? "저장 당시와 동일" : `저장 당시 대비 ${priceDelta < 0 ? "하락" : "상승"} ${formatPrice(Math.abs(priceDelta))}`}</p> : null}
                   </div>
                 </div>
 
