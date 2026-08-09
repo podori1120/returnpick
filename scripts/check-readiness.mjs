@@ -246,6 +246,7 @@ const requiredFiles = [
   "lib/searchIntentMatcher.ts",
   "lib/searchLandings.ts",
   "lib/recommendation.ts",
+  "lib/compareDecision.ts",
   "lib/priceBand.ts",
   "lib/impressionTracking.ts",
   "lib/clientTracking.ts",
@@ -301,6 +302,7 @@ const requiredFiles = [
   "scripts/verify-home-purpose-selection.mjs",
   "scripts/verify-home-purpose-guides.mjs",
   "scripts/verify-recommendation-workflow.mjs",
+  "scripts/verify-compare-decision.mjs",
   "scripts/sitemapContract.mjs",
   "scripts/verify-keyword-coverage-api.mjs",
   "scripts/verify-public-web-config.mjs",
@@ -2942,6 +2944,29 @@ if (fileExists("app/recommend/page.tsx") && fileExists("lib/recommendation.ts") 
       layout.includes('href="/recommend"') &&
       layout.includes("맞춤 추천"),
     "the pure helper, deterministic check script, npm command, home CTA, and primary navigation are all wired",
+    "required"
+  );
+}
+
+if (fileExists("lib/compareDecision.ts") && fileExists("components/CompareBoard.tsx") && fileExists("scripts/verify-compare-decision.mjs") && fileExists("package.json")) {
+  const compareDecision = readText("lib/compareDecision.ts");
+  const compareBoard = readText("components/CompareBoard.tsx");
+  const compareCheck = readText("scripts/verify-compare-decision.mjs");
+  const packageJson = readText("package.json");
+  check(
+    "compare decision: customer choice controls",
+    compareDecision.includes('"balanced"') &&
+      compareDecision.includes('"lowest_price"') &&
+      compareDecision.includes('"return_safety"') &&
+      compareDecision.includes("확인필요 정보는 안정성이 확인된 것으로 계산하지 않았습니다") &&
+      compareDecision.includes("stock_count !== 0") &&
+      compareDecision.includes("구매가가 확인된 후보가 없어") &&
+      compareBoard.includes("comparePriorityOptions") &&
+      compareBoard.includes('name="compare-priority"') &&
+      compareBoard.includes("getCompareDecision") &&
+      compareCheck.includes("unknown return data should not outrank") &&
+      packageJson.includes('"compare:decision:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-compare-decision.mjs"'),
+    "the compare surface lets customers choose a transparent decision priority and keeps unknown return data from becoming a safety claim",
     "required"
   );
 }

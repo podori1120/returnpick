@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Loader2, Scale, Share2, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, Scale, Share2, ShieldCheck, Trash2 } from "lucide-react";
 import AffiliateButton from "@/components/AffiliateButton";
 import AffiliateInlineDisclosure from "@/components/AffiliateInlineDisclosure";
 import AffiliateNotice from "@/components/AffiliateNotice";
@@ -10,6 +10,7 @@ import CompareProductPicker, { type CompareProductSuggestion } from "@/component
 import { getStoredJsonArray, setStoredJsonArray, trackAffiliateEvent } from "@/lib/clientTracking";
 import { getCoupangOutboundLink } from "@/lib/coupangLink";
 import { COMPARE_UUID_PATTERN, compareProductIdsEqual, MAX_COMPARE_ITEMS, normalizeCompareProductId } from "@/lib/compareIdentity";
+import { comparePriorityOptions, getCompareDecision, getComparePriority, type ComparePriority } from "@/lib/compareDecision";
 import { formatPercent, formatPrice } from "@/lib/format";
 import { formatProductSpecSummary } from "@/lib/productSpecs";
 import type { PublicDeal } from "@/lib/publicDeal";
@@ -23,6 +24,7 @@ const storageKey = "returnpick_compare_deals";
 const maxCompareItems = MAX_COMPARE_ITEMS;
 const uuidPattern = COMPARE_UUID_PATTERN;
 const sharedCompareTitle = "공유된 비교 상품";
+const priorityStorageKey = "returnpick_compare_priority";
 
 function readCompareItems(): StoredCompareItem[] {
   return getStoredJsonArray<StoredCompareItem>(storageKey).filter(
@@ -71,6 +73,15 @@ function valueClass(isBest: boolean) {
   return isBest ? "font-black text-pine" : "font-black text-ink";
 }
 
+function readStoredPriority(): ComparePriority {
+  if (typeof window === "undefined") return "balanced";
+  try {
+    return getComparePriority(window.localStorage.getItem(priorityStorageKey));
+  } catch {
+    return "balanced";
+  }
+}
+
 export default function CompareBoard() {
   const [items, setItems] = useState<StoredCompareItem[]>([]);
   const [products, setProducts] = useState<PublicDeal[]>([]);
@@ -78,6 +89,7 @@ export default function CompareBoard() {
   const [error, setError] = useState("");
   const [shareStatus, setShareStatus] = useState("");
   const [pickerStatus, setPickerStatus] = useState("");
+  const [priority, setPriority] = useState<ComparePriority>(() => readStoredPriority());
 
   useEffect(() => {
     const sharedItems = readUrlCompareItems(new URL(window.location.href));
@@ -137,9 +149,11 @@ export default function CompareBoard() {
     const byDiscount = [...products].sort((a, b) => (b.discount_rate ?? -1) - (a.discount_rate ?? -1))[0] ?? null;
     return { byScore, byPrice, byDiscount };
   }, [products]);
+  const decision = useMemo(() => getCompareDecision(products, priority), [products, priority]);
 
   const unavailableItems = error ? [] : items.filter((item) => !products.some((product) => compareProductIdsEqual(product.id, item.id)));
-  const recommendedOutboundLink = best.byScore ? getCoupangOutboundLink(best.byScore) : null;
+  const recommendedProduct = decision.product ?? best.byScore;
+  const recommendedOutboundLink = recommendedProduct ? getCoupangOutboundLink(recommendedProduct) : null;
   const shareableProductIds = products
     .filter((product) => uuidPattern.test(product.id))
     .map((product) => product.id);
@@ -197,6 +211,15 @@ export default function CompareBoard() {
   function clearItems() {
     writeCompareItems([]);
     setItems([]);
+  }
+
+  function changePriority(nextPriority: ComparePriority) {
+    setPriority(nextPriority);
+    try {
+      window.localStorage.setItem(priorityStorageKey, nextPriority);
+    } catch {
+      // The preference is optional and must not block comparison.
+    }
   }
 
   function addCompareProduct(product: CompareProductSuggestion) {
@@ -324,7 +347,32 @@ export default function CompareBoard() {
           <CompareProductPicker currentCount={items.length} maxItems={maxCompareItems} onSelect={addCompareProduct} />
           {pickerStatus ? <p className="mt-2 text-xs font-bold text-steel" role="status" aria-live="polite">{pickerStatus}</p> : null}
         </div>
-        {best.byScore ? (
+        <fieldset className="mt-5 rounded-lg border border-line bg-mist p-3">
+          <legend className="px-1 text-xs font-black text-pine">어떤 기준으로 고를까요?</legend>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {comparePriorityOptions.map((option) => (
+              <label key={option.id} className="focus-within:ring-2 focus-within:ring-pine/30 cursor-pointer rounded-lg border border-line bg-white p-3 has-[:checked]:border-pine has-[:checked]:bg-pine/5">
+                <input
+                  className="sr-only"
+                  checked={priority === option.id}
+                  name="compare-priority"
+                  onChange={() => changePriority(option.id)}
+                  type="radio"
+                  value={option.id}
+                />
+                <span className="flex items-center gap-2 text-sm font-black text-ink">
+                  {option.id === "return_safety" ? <ShieldCheck size={16} className="text-pine" aria-hidden /> : null}
+                  {option.label}
+                </span>
+                <span className="mt-1 block text-xs font-semibold leading-5 text-steel">{option.description}</span>
+              </label>
+            ))}
+          </div>
+          <p className="mt-3 text-xs font-bold leading-5 text-steel" role="status" aria-live="polite">
+            {decision.label}: {decision.reason}
+          </p>
+        </fieldset>
+        {best.byScore && recommendedProduct ? (
           <div className="mt-4 space-y-3">
             <div className="grid gap-3 md:grid-cols-3">
               <div className="rounded-lg bg-pine/10 p-4">
@@ -347,13 +395,14 @@ export default function CompareBoard() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-xs font-black text-pine">비교 후 다음 단계</p>
-                  <p className="mt-1 text-sm font-black">추천 상품의 가격·재고·반품등급을 다시 확인한 뒤 구매하세요.</p>
-                  <Link className="focus-ring mt-2 inline-flex text-xs font-black text-pine underline decoration-pine/30 underline-offset-4 hover:text-ink" href={best.byScore.detail_url}>
+                  <p className="mt-1 text-sm font-black">{decision.label} 기준 후보: {recommendedProduct.title}</p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-steel">{decision.reason}</p>
+                  <Link className="focus-ring mt-2 inline-flex text-xs font-black text-pine underline decoration-pine/30 underline-offset-4 hover:text-ink" href={recommendedProduct.detail_url}>
                     추천 이유와 확인 항목 보기
                   </Link>
                 </div>
                 <AffiliateButton
-                  productId={best.byScore.id}
+                  productId={recommendedProduct.id}
                   href={recommendedOutboundLink?.href}
                   label="쿠팡에서 추천 상품 가격 확인"
                   disabledLabel="링크 확인필요 · 구매 전 확인"
