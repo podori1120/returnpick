@@ -1282,13 +1282,15 @@ if (
     "public deal cards expose the latest observation state before a visitor opens a deal, while the detail page keeps the full verification strip",
     "required"
   );
-  if (fileExists("lib/priceTrend.ts") && fileExists("scripts/verify-price-trend.mjs") && fileExists("components/PriceHistory.tsx") && fileExists("components/PurchaseDecisionPanel.tsx") && fileExists("components/PriceTimingSignal.tsx") && fileExists("scripts/verify-price-timing-signal.mjs") && fileExists("package.json")) {
+  if (fileExists("lib/priceTrend.ts") && fileExists("scripts/verify-price-trend.mjs") && fileExists("components/PriceHistory.tsx") && fileExists("components/PurchaseDecisionPanel.tsx") && fileExists("components/PriceTimingSignal.tsx") && fileExists("scripts/verify-price-timing-signal.mjs") && fileExists("scripts/verify-price-timing-sort.mjs") && fileExists("package.json")) {
     const priceTrend = readText("lib/priceTrend.ts");
     const priceTrendCheck = readText("scripts/verify-price-trend.mjs");
     const priceHistory = readText("components/PriceHistory.tsx");
     const purchaseDecisionPanel = readText("components/PurchaseDecisionPanel.tsx");
     const priceTimingSignal = readText("components/PriceTimingSignal.tsx");
     const priceTimingSignalCheck = readText("scripts/verify-price-timing-signal.mjs");
+    const priceTimingSortCheck = readText("scripts/verify-price-timing-sort.mjs");
+    const dealsPage = readText("app/deals/page.tsx");
     const packageJson = readText("package.json");
     check(
       "public UX: conservative observed price timing",
@@ -1311,7 +1313,13 @@ if (
         purchaseDecisionPanel.includes("가격 시점 신호") &&
         purchaseDecisionPanel.includes("decision.freshness.status === \"fresh\"") &&
         purchaseDecisionPanel.includes("pricePositionPositive") &&
-        purchaseDecisionPanel.includes("data-price-position={decision.pricePosition.status}"),
+        purchaseDecisionPanel.includes("data-price-position={decision.pricePosition.status}") &&
+        priceTrend.includes("getRecentPriceTimingRank") &&
+        priceTimingSortCheck.includes("price timing sort rules: 7 passed") &&
+        packageJson.includes('"price-timing-sort:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-price-timing-sort.mjs"') &&
+        dealsPage.includes('sort === "timing"') &&
+        dealsPage.includes('value="timing">가격 시점 좋은 순') &&
+        dealsPage.includes('getRecentPriceTimingRank(position, getDealFreshness(product).status === "fresh")'),
       "customer-facing price timing uses only two or more same-basis observations, is caveated as ReturnPick evidence, and stays hidden when the current observation is stale",
       "required"
     );

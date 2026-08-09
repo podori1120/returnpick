@@ -38,6 +38,7 @@
     "price-watch:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-price-watch.mjs",
     "price-trend:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-price-trend.mjs",
     "price-timing-signal:check": "node scripts/verify-price-timing-signal.mjs",
+    "price-timing-sort:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-price-timing-sort.mjs",
     "public-price-timing:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-public-price-timing.mjs",
     "saved-filters:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-saved-filters.mjs",
     "admin-launch-path:check": "node scripts/verify-admin-launch-path.mjs",

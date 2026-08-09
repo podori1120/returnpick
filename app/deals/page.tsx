@@ -12,6 +12,7 @@ import RecentDealsRail from "@/components/RecentDealsRail";
 import SavedFilterBar from "@/components/SavedFilterBar";
 import SearchIntentRail from "@/components/SearchIntentRail";
 import { categoryOptions } from "@/lib/category";
+import { getDealFreshness } from "@/lib/dealFreshness";
 import {
   getDealPrice,
   getDiscountRate,
@@ -30,6 +31,7 @@ import { getProductDiscoveryObservation } from "@/lib/discoveryUpdates";
 import { homeCategoryDetails } from "@/lib/homeDiscovery";
 import { isDemoProduct, isPublicDealVisible } from "@/lib/publicDeal";
 import { matchesProductSearch } from "@/lib/productSearch";
+import { getProductPriceSource, getRecentPricePosition, getRecentPriceTimingRank } from "@/lib/priceTrend";
 import { getDealQuality, type DealQualityStatus } from "@/lib/quality";
 import { getSiteUrl } from "@/lib/siteUrl";
 import type { Category, ConditionGrade, ProductWithScore } from "@/lib/types";
@@ -83,6 +85,16 @@ function isQuality(value: string | undefined): value is DealQualityStatus {
   return Boolean(value && ["ready", "manual_check", "watch_price", "hold"].includes(value));
 }
 
+function getTimingRank(product: ProductWithScore) {
+  const position = getRecentPricePosition(
+    product.snapshots ?? product.product_snapshots,
+    getDealPrice(product),
+    getProductPriceSource(product),
+    30
+  );
+  return getRecentPriceTimingRank(position, getDealFreshness(product).status === "fresh");
+}
+
 function sortProducts(products: ProductWithScore[], sort: string | undefined, useCase?: UseCaseId) {
   return [...products].sort((a, b) => {
     if (sort === "fit" && useCase) {
@@ -98,6 +110,11 @@ function sortProducts(products: ProductWithScore[], sort: string | undefined, us
     if (sort === "price") return (getDealPrice(b) ?? 0) - (getDealPrice(a) ?? 0);
     if (sort === "low_price") return (getDealPrice(a) ?? 0) - (getDealPrice(b) ?? 0);
     if (sort === "confidence") return getDealQuality(b).confidence - getDealQuality(a).confidence;
+    if (sort === "timing") {
+      return getTimingRank(b) - getTimingRank(a)
+        || (getDiscountRate(b) ?? -1) - (getDiscountRate(a) ?? -1)
+        || (b.latest_score?.total_score ?? 0) - (a.latest_score?.total_score ?? 0);
+    }
     if (sort === "latest") {
       const aObservedAt = getProductDiscoveryObservation(a)?.observedAt ?? a.created_at;
       const bObservedAt = getProductDiscoveryObservation(b)?.observedAt ?? b.created_at;
@@ -367,6 +384,7 @@ export default async function DealsPage({
   const quickFilters = [
     { label: "80점 이상", description: "강력추천급 먼저 보기", href: hrefWith({ minScore: 80, page: 1 }) },
     { label: "20% 이상", description: "할인폭 큰 상품만", href: hrefWith({ minDiscount: 20, page: 1 }) },
+    { label: "가격 시점", description: "최근 관찰 기준이 좋은 딜", href: hrefWith({ sort: "timing", page: 1 }) },
     { label: "게시 적합", description: "반품 근거가 안정적인 딜", href: hrefWith({ quality: "ready", page: 1 }) },
     { label: "확인필요", description: "관리자 보완 대상", href: hrefWith({ condition: "확인필요", page: 1 }) },
     { label: "재고 1개", description: "빠르게 확인할 상품", href: hrefWith({ stock: "one", page: 1 }) }
@@ -426,6 +444,7 @@ export default async function DealsPage({
           <option value="fit">용도 적합 순</option>
           <option value="discount">할인율 높은 순</option>
           <option value="confidence">검수 신뢰도 순</option>
+          <option value="timing">가격 시점 좋은 순</option>
           <option value="latest">최근 검증순</option>
           <option value="price">가격 높은 순</option>
           <option value="low_price">가격 낮은 순</option>
@@ -497,7 +516,7 @@ export default async function DealsPage({
               전체 보기
             </Link>
           </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
             {quickFilters.map((filter) => (
               <Link key={filter.label} className="rounded-lg border border-line p-3 text-sm hover:border-pine hover:bg-mist" href={filter.href}>
                 <span className="block font-black text-ink">{filter.label}</span>

@@ -176,3 +176,19 @@ export function getRecentPricePosition(
     description: `최근 ${windowDays}일 동일 가격 기준 관찰 평균 이상입니다. 급하지 않다면 가격을 더 비교해 보세요.`
   };
 }
+
+/** Rank only positive, fresh timing evidence for conservative public sorting. */
+export function getRecentPriceTimingRank(
+  position: Pick<RecentPricePosition, "status" | "currentPrice">,
+  isFresh: boolean
+) {
+  if (!isFresh || position.currentPrice == null) return 0;
+
+  return {
+    lowest: 4,
+    good: 3,
+    below_average: 2,
+    average_or_above: 1,
+    unknown: 0
+  }[position.status];
+}
