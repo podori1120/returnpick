@@ -101,6 +101,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/saved">
                 찜함
               </Link>
+              <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/watchlist">
+                가격 기준
+              </Link>
               <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/guide/return-checklist">
                 수령 체크
               </Link>
@@ -129,6 +132,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </Link>
               <Link className="text-pine hover:text-ink" href="/saved">
                 찜한 딜
+              </Link>
+              <Link className="text-pine hover:text-ink" href="/watchlist">
+                가격 기준함
               </Link>
               <Link className="text-pine hover:text-ink" href="/picks/novatech-s1-window-cleaner">
                 직접 검수 추천 상품

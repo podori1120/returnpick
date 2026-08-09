@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, Target, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatPrice } from "@/lib/format";
 import { evaluatePriceWatch, getPriceWatchItem, priceWatchChangeEvent, removePriceWatch, upsertPriceWatch, type PriceWatchItem } from "@/lib/priceWatch";
@@ -133,6 +134,11 @@ export default function PriceWatchButton({ productId, title, currentPrice }: Pri
           <p className="font-black">{watchStatus.title}</p>
           <p className="mt-1">{watchStatus.detail}</p>
         </div>
+      ) : null}
+      {watch ? (
+        <Link className="mt-3 inline-flex text-xs font-black text-pine underline decoration-pine/30 underline-offset-4 hover:text-ink" href="/watchlist">
+          가격 기준함에서 저장 목록 다시 보기
+        </Link>
       ) : null}
       {status ? <p className="mt-3 text-xs font-bold text-steel" role="status" aria-live="polite">{status}</p> : null}
     </section>

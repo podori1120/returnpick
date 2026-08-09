@@ -18,7 +18,7 @@ export default function SavedDealsBoard() {
   const [products, setProducts] = useState<PublicDeal[]>([]);
   const [removedCount, setRemovedCount] = useState(0);
   const [priceWatches, setPriceWatches] = useState<PriceWatchItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {

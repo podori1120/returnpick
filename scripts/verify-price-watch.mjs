@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 
 globalThis.window = {
   localStorage: {
@@ -30,4 +31,14 @@ setPriceWatchItems([
 ]);
 assert.deepEqual(getPriceWatchItems().map((item) => item.productId), ["product-a"]);
 
-console.log("price watch rules: 8 passed");
+const boardSource = await readFile(new URL("../components/PriceWatchBoard.tsx", import.meta.url), "utf8");
+const pageSource = await readFile(new URL("../app/watchlist/page.tsx", import.meta.url), "utf8");
+const layoutSource = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
+assert.match(boardSource, /\/api\/products\/compare\?ids=/);
+assert.match(boardSource, /자동 문자·푸시·이메일 알림은 보내지 않으므로/);
+assert.match(boardSource, /현재 공개 목록에서 다시 확인되지 않는 상품/);
+assert.match(boardSource, /상품별 파트너스 링크가 확인되기 전에는 구매 버튼을 활성화하지 않습니다/);
+assert.match(pageSource, /robots: \{ index: false, follow: false \}/);
+assert.match(layoutSource, /href="\/watchlist"[\s\S]*?가격 기준/);
+
+console.log("price watch rules: 14 passed");
