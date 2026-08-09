@@ -10,7 +10,7 @@ import { getPurchaseDecision } from "@/lib/purchaseDecision";
 import { getDealFreshness } from "@/lib/dealFreshness";
 import { getLatestScore } from "@/lib/scoring";
 import { getPriceReferenceInfo } from "@/lib/priceReference";
-import { summarizeRecentPriceWindow } from "@/lib/priceTrend";
+import { getProductPriceSource, getRecentPricePosition } from "@/lib/priceTrend";
 import type { ProductWithScore } from "@/lib/types";
 import CompareButton from "@/components/CompareButton";
 import SavedDealButton from "@/components/SavedDealButton";
@@ -32,8 +32,8 @@ export default function DealCard({ product }: { product: ProductWithScore }) {
   const primaryCheck = quality.blockers[0] ?? quality.warnings[0];
   const riskCount = score?.risk_flags?.length ?? 0;
   const outboundLink = getCoupangOutboundLink(product);
-  const recentPriceWindow = summarizeRecentPriceWindow(product.snapshots ?? product.product_snapshots, 30);
-  const recentLowSignal = recentPriceWindow.points.length > 1 && deal != null && recentPriceWindow.latestPrice === deal && recentPriceWindow.lowestPrice != null && deal <= recentPriceWindow.lowestPrice;
+  const pricePosition = getRecentPricePosition(product.snapshots ?? product.product_snapshots, deal, getProductPriceSource(product), 30);
+  const pricePositionTone = pricePosition.status === "lowest" || pricePosition.status === "good" ? "bg-pine/10 text-pine" : "bg-lemon/25 text-ink";
 
   return (
     <article className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">
@@ -76,7 +76,11 @@ export default function DealCard({ product }: { product: ProductWithScore }) {
           >
             {freshness.label}
           </span>
-          {recentLowSignal ? <span className="rounded-md bg-pine/10 px-2.5 py-1 text-xs font-bold text-pine" title="ReturnPick 최근 30일 관찰 기록 기준">최근 30일 최저 관찰</span> : null}
+          {freshness.status === "fresh" && pricePosition.status !== "unknown" ? (
+            <span className={`rounded-md px-2.5 py-1 text-xs font-bold ${pricePositionTone}`} data-price-position={pricePosition.status} title={pricePosition.description}>
+              {pricePosition.label}
+            </span>
+          ) : null}
         </div>
         {firstReason || primaryCheck ? (
           <div className="space-y-2 rounded-lg bg-mist p-3 text-xs font-bold leading-5 text-steel">

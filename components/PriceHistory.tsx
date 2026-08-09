@@ -1,6 +1,7 @@
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import { formatDate, formatPrice } from "@/lib/format";
-import { summarizePriceTrend, summarizeRecentPriceWindow } from "@/lib/priceTrend";
+import { getRecentPricePosition, summarizePriceTrend, summarizeRecentPriceWindow } from "@/lib/priceTrend";
+import type { SnapshotPriceSource } from "@/lib/priceTrend";
 import type { ProductSnapshot } from "@/lib/types";
 
 const changeLabels: Record<string, string> = {
@@ -21,16 +22,29 @@ const priceSourceLabels = {
   new_price: "새상품가"
 } as const;
 
-export default function PriceHistory({ snapshots }: { snapshots?: ProductSnapshot[] | null }) {
+export default function PriceHistory({
+  snapshots,
+  currentPrice,
+  currentSource,
+  currentIsFresh = false
+}: {
+  snapshots?: ProductSnapshot[] | null;
+  currentPrice?: number | null;
+  currentSource?: SnapshotPriceSource | null;
+  currentIsFresh?: boolean;
+}) {
   const items = [...(snapshots ?? [])].sort((a, b) => Date.parse(b.observed_at) - Date.parse(a.observed_at)).slice(0, 6);
   const trend = summarizePriceTrend(snapshots);
-  const recent = summarizeRecentPriceWindow(snapshots, 30);
+  const recent = summarizeRecentPriceWindow(snapshots, 30, new Date(), currentSource ?? undefined);
+  const pricePosition = getRecentPricePosition(snapshots, currentPrice, currentSource, 30);
   const chartMin = trend.points.length ? Math.min(...trend.points.map((point) => point.price)) : 0;
   const chartMax = trend.points.length ? Math.max(...trend.points.map((point) => point.price)) : 0;
   const chartRange = Math.max(1, chartMax - chartMin);
   const trendTone = trend.trend === "down" ? "text-pine" : trend.trend === "up" ? "text-coral" : "text-steel";
   const trendLabel = trend.trend === "down" ? "하락" : trend.trend === "up" ? "상승" : trend.trend === "steady" ? "보합" : "판단 대기";
   const TrendIcon = trend.trend === "down" ? ArrowDownRight : trend.trend === "up" ? ArrowUpRight : Minus;
+  const pricePositionPositive = pricePosition.status === "lowest" || pricePosition.status === "good";
+  const recentSummaryTitle = currentSource ? (recent.points.length > 1 ? "최근 30일 관찰 요약" : "최근 30일 관찰가") : "최근 30일 관찰 요약 · 기준 혼합 가능";
 
   return (
     <section className="space-y-3">
@@ -60,12 +74,24 @@ export default function PriceHistory({ snapshots }: { snapshots?: ProductSnapsho
             {recent.points.length ? (
               <div className="mt-3 rounded-md border border-pine/20 bg-pine/5 p-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <p className="text-xs font-black text-pine">{recent.points.length > 1 ? "최근 30일 최저 관찰가" : "최근 30일 관찰가"}</p>
+                  <p className="text-xs font-black text-pine">{recentSummaryTitle}</p>
                   <p className="text-lg font-black text-ink">{formatPrice(recent.lowestPrice)}</p>
                 </div>
+                {recent.averagePrice != null && recent.points.length > 1 ? (
+                  <p className="mt-2 text-xs font-bold text-steel">관찰 평균 {formatPrice(recent.averagePrice)} · {recent.points.length}회 기록</p>
+                ) : null}
                 <p className="mt-1 text-xs font-bold leading-5 text-steel">
-                  ReturnPick이 최근 {recent.points.length}회 기록한 가격 기준입니다. {recent.latestPrice === recent.lowestPrice ? "최근 확인가가 관찰 최저 수준입니다." : "시장 전체 최저가가 아닌 자체 관찰 기록이므로 구매 전 쿠팡에서 다시 확인하세요."}
+                  {currentSource ? `ReturnPick이 최근 ${recent.points.length}회 기록한 ${priceSourceLabels[currentSource]} 기준입니다. 시장 전체 최저가가 아닌 자체 관찰 기록이므로 구매 전 쿠팡에서 다시 확인하세요.` : "가격 기준이 섞였을 수 있는 자체 관찰 기록입니다. 서로 다른 가격 기준의 시점 비교로 사용하지 말고 구매 전 쿠팡에서 다시 확인하세요."}
                 </p>
+                {currentIsFresh && pricePosition.status !== "unknown" ? (
+                  <div className={`mt-3 rounded-md p-3 ${pricePositionPositive ? "border border-pine/20 bg-white/70" : "border border-lemon bg-lemon/15"}`} data-price-position={pricePosition.status}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className={`text-xs font-black ${pricePositionPositive ? "text-pine" : "text-ink"}`}>가격 시점 신호</p>
+                      <span className={`rounded-md px-2 py-1 text-xs font-black ${pricePositionPositive ? "bg-pine/10 text-pine" : "bg-white text-ink"}`}>{pricePosition.label}</span>
+                    </div>
+                    <p className="mt-1 text-xs font-bold leading-5 text-steel">{pricePosition.description}</p>
+                  </div>
+                ) : null}
               </div>
             ) : null}
             {trend.points.length > 1 ? (

@@ -5,6 +5,7 @@ import { getDealFreshness } from "@/lib/dealFreshness";
 import { getPriceReferenceInfo } from "@/lib/priceReference";
 import { getDealQuality } from "@/lib/quality";
 import { getLatestScore } from "@/lib/scoring";
+import { getProductPriceSource, getRecentPricePosition } from "@/lib/priceTrend";
 import type { ProductWithScore, RiskFlag } from "@/lib/types";
 
 const riskLabels: Record<RiskFlag, string> = {
@@ -43,6 +44,7 @@ export function getPurchaseDecision(product: ProductWithScore) {
   const hasVerifiedReturn = Boolean(product.return_price && !["확인필요", "알수없음"].includes(product.condition_grade));
   const hasAffiliate = isUsableAffiliateUrl(product.affiliate_url);
   const freshness = getDealFreshness(product);
+  const pricePosition = getRecentPricePosition(product.snapshots ?? product.product_snapshots, dealPrice, getProductPriceSource(product), 30);
 
   let confidence = Math.round(((score?.total_score ?? 55) * 0.62) + (quality.confidence * 0.38));
   if (discountRate != null && discountRate >= 0.2) confidence += 6;
@@ -53,6 +55,8 @@ export function getPurchaseDecision(product: ProductWithScore) {
   if (product.stock_count === 1) confidence -= 3;
   if (freshness.status === "stale") confidence -= 8;
   if (freshness.status === "unknown") confidence -= 5;
+  if (freshness.status === "fresh" && (pricePosition.status === "lowest" || pricePosition.status === "good")) confidence += 3;
+  if (freshness.status === "fresh" && pricePosition.status === "average_or_above") confidence -= 3;
   confidence = clamp(confidence);
 
   const verdict =
@@ -74,6 +78,8 @@ export function getPurchaseDecision(product: ProductWithScore) {
       : `${referenceInfo.label}로 보수 계산`,
     useCase ? `${useCase.label} 용도 적합도 ${useCase.score}점` : "",
     product.stock_count && product.stock_count > 1 ? `재고 ${product.stock_count}개 확인` : "",
+    freshness.status === "fresh" && pricePosition.status === "lowest" ? `최근 ${pricePosition.days}일 동일 가격 기준 관찰 최저 수준` : "",
+    freshness.status === "fresh" && pricePosition.status === "good" ? `최근 ${pricePosition.days}일 동일 가격 기준 관찰 평균보다 낮음` : "",
     score?.reasons?.[0] ?? ""
   ]).slice(0, 4);
 
@@ -83,6 +89,7 @@ export function getPurchaseDecision(product: ProductWithScore) {
     referenceInfo.naverTrust.status === "unverified" ? "저장된 네이버 가격은 동일 상품 검증 전이라 할인 계산에서 제외했습니다." : "",
     referenceInfo.naverTrust.status === "missing" ? "네이버 최저가 기준이 없어 가격 비교를 보수적으로 봐야 합니다." : "",
     product.stock_count === 1 ? "재고 1개 상품은 가격과 재고가 빠르게 바뀔 수 있습니다." : "",
+    freshness.status === "fresh" && pricePosition.status === "average_or_above" ? `최근 ${pricePosition.days}일 동일 가격 기준 관찰 평균 이상이라 가격을 더 비교할 수 있습니다.` : "",
     !hasAffiliate ? "구매 링크가 준비되지 않아 관리자 확인이 필요합니다." : "",
     freshness.status === "stale" ? `마지막 관찰 후 ${freshness.ageHours ?? 0}시간이 지나 최신 조건을 재확인해야 합니다.` : "",
     freshness.status === "unknown" ? "가격·재고 관찰 시각이 없어 쿠팡에서 최신 조건을 먼저 확인해야 합니다." : "",
@@ -107,6 +114,7 @@ export function getPurchaseDecision(product: ProductWithScore) {
     discountRate,
     primaryUseCase: useCase,
     hasAffiliate,
-    freshness
+    freshness,
+    pricePosition
   };
 }

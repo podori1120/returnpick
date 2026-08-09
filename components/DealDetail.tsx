@@ -24,6 +24,8 @@ import { formatPercent, formatPrice } from "@/lib/format";
 import { getDealPriceLabel, getReturnEvidenceLabel } from "@/lib/quality";
 import { getLatestScore } from "@/lib/scoring";
 import { isDemoProduct } from "@/lib/publicDeal";
+import { getDealFreshness } from "@/lib/dealFreshness";
+import { getProductPriceSource } from "@/lib/priceTrend";
 import type { ProductWithScore } from "@/lib/types";
 import { getSiteUrl } from "@/lib/siteUrl";
 import { getPriceReferenceInfo } from "@/lib/priceReference";
@@ -40,6 +42,7 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
   const discount = getDiscountRate(product);
   const priceReference = getPriceReferenceInfo(product);
   const dealPrice = product.return_price ?? product.source_price ?? product.new_price;
+  const freshness = getDealFreshness(product);
   const dealPriceLabel = getDealPriceLabel(product);
   const canonicalUrl = `${getSiteUrl()}/deals/${product.id}`;
 
@@ -190,7 +193,12 @@ export default function DealDetail({ product, relatedProducts = [] }: { product:
             <Checklist category={product.category} />
           </section>
 
-          <PriceHistory snapshots={product.snapshots ?? product.product_snapshots} />
+          <PriceHistory
+            snapshots={product.snapshots ?? product.product_snapshots}
+            currentPrice={dealPrice}
+            currentSource={getProductPriceSource(product)}
+            currentIsFresh={freshness.status === "fresh"}
+          />
           <RelatedDeals products={relatedProducts} />
         </section>
 

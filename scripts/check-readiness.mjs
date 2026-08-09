@@ -256,6 +256,7 @@ const requiredFiles = [
   "lib/naverProductMatch.ts",
   "lib/naverPriceTrust.ts",
   "lib/naverPriceBackfill.ts",
+  "lib/priceTrend.ts",
   "lib/productImageUrl.ts",
   "lib/providerProductMerge.ts",
   "lib/publicWebUrlSafety.ts",
@@ -303,6 +304,7 @@ const requiredFiles = [
   "scripts/verify-home-purpose-guides.mjs",
   "scripts/verify-recommendation-workflow.mjs",
   "scripts/verify-compare-decision.mjs",
+  "scripts/verify-price-trend.mjs",
   "scripts/sitemapContract.mjs",
   "scripts/verify-keyword-coverage-api.mjs",
   "scripts/verify-public-web-config.mjs",
@@ -1226,6 +1228,33 @@ if (
     "public deal cards expose the latest observation state before a visitor opens a deal, while the detail page keeps the full verification strip",
     "required"
   );
+  if (fileExists("lib/priceTrend.ts") && fileExists("scripts/verify-price-trend.mjs") && fileExists("components/PriceHistory.tsx") && fileExists("components/PurchaseDecisionPanel.tsx") && fileExists("package.json")) {
+    const priceTrend = readText("lib/priceTrend.ts");
+    const priceTrendCheck = readText("scripts/verify-price-trend.mjs");
+    const priceHistory = readText("components/PriceHistory.tsx");
+    const purchaseDecisionPanel = readText("components/PurchaseDecisionPanel.tsx");
+    const packageJson = readText("package.json");
+    check(
+      "public UX: conservative observed price timing",
+      priceTrend.includes("getRecentPricePosition") &&
+        priceTrend.includes("comparablePoints.length < 2") &&
+        priceTrend.includes("시장 전체 최저가는 아니며") &&
+        priceTrend.includes('status: "average_or_above"') &&
+        priceTrendCheck.includes("price trend rules: 28 passed") &&
+        packageJson.includes('"price-trend:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-price-trend.mjs"') &&
+        dealCard.includes("freshness.status === \"fresh\" && pricePosition.status !== \"unknown\"") &&
+        priceHistory.includes("averagePrice") &&
+        priceHistory.includes("currentIsFresh") &&
+        priceHistory.includes("기준 혼합 가능") &&
+        priceHistory.includes("pricePositionPositive") &&
+        purchaseDecisionPanel.includes("가격 시점 신호") &&
+        purchaseDecisionPanel.includes("decision.freshness.status === \"fresh\"") &&
+        purchaseDecisionPanel.includes("pricePositionPositive") &&
+        purchaseDecisionPanel.includes("data-price-position={decision.pricePosition.status}"),
+      "customer-facing price timing uses only two or more same-basis observations, is caveated as ReturnPick evidence, and stays hidden when the current observation is stale",
+      "required"
+    );
+  }
   check(
     "public UX: card affiliate CTA",
     dealCard.includes('import AffiliateButton from "@/components/AffiliateButton"') &&

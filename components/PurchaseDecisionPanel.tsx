@@ -19,6 +19,7 @@ export default function PurchaseDecisionPanel({ product }: { product: ProductWit
   const demoProduct = isDemoProduct(product);
   const outboundLink = getCoupangOutboundLink(product);
   const affiliateReady = !demoProduct && outboundLink.isAffiliate;
+  const pricePositionPositive = decision.pricePosition.status === "lowest" || decision.pricePosition.status === "good";
 
   return (
     <section className="rounded-lg border border-line bg-white p-5 shadow-soft">
@@ -54,6 +55,17 @@ export default function PurchaseDecisionPanel({ product }: { product: ProductWit
           </div>
 
           <PurchaseVerificationStrip freshness={decision.freshness} />
+
+          {decision.freshness.status === "fresh" && decision.pricePosition.status !== "unknown" ? (
+            <div className={`rounded-lg p-4 ${pricePositionPositive ? "border border-pine/20 bg-pine/5" : "border border-lemon bg-lemon/20"}`} data-price-position={decision.pricePosition.status}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className={`text-xs font-black ${pricePositionPositive ? "text-pine" : "text-ink"}`}>가격 시점 신호</p>
+                <span className={`rounded-md px-2.5 py-1 text-xs font-black ${pricePositionPositive ? "bg-white text-pine" : "bg-white text-ink"}`}>{decision.pricePosition.label}</span>
+              </div>
+              <p className="mt-2 text-sm font-bold leading-6 text-ink">{decision.pricePosition.description}</p>
+              <p className="mt-1 text-[11px] font-bold text-steel">동일 가격 기준 관찰 {decision.pricePosition.sampleCount}회 · 최근 {decision.pricePosition.days}일</p>
+            </div>
+          ) : null}
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs font-bold leading-5 text-steel">
