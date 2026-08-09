@@ -1,42 +1,54 @@
 "use client";
 
 import Link from "next/link";
+import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { categoryOptions } from "@/lib/category";
+import { priceBandOptions } from "@/lib/priceBand";
+import { getStoredJsonArray, setStoredJsonArray } from "@/lib/clientTracking";
+import { buildSavedFilterLabel, normalizeSavedFilters, savedFiltersChangeEvent, savedFiltersStorageKey, type SavedFilter } from "@/lib/savedFilters";
 import { useCaseOptions } from "@/lib/dealIntelligence";
 
-type SavedFilter = {
-  label: string;
-  href: string;
-  savedAt: string;
-};
-
-const storageKey = "returnpick_saved_filters";
+function readSavedFilters() {
+  return normalizeSavedFilters(getStoredJsonArray<SavedFilter>(savedFiltersStorageKey));
+}
 
 export default function SavedFilterBar() {
-  const [items, setItems] = useState<SavedFilter[]>([]);
+  const [items, setItems] = useState<SavedFilter[]>(() => readSavedFilters());
 
   useEffect(() => {
-    setItems(JSON.parse(window.localStorage.getItem(storageKey) || "[]") as SavedFilter[]);
+    function syncSavedFilters() {
+      setItems(readSavedFilters());
+    }
+
+    window.addEventListener("storage", syncSavedFilters);
+    window.addEventListener(savedFiltersChangeEvent, syncSavedFilters);
+    return () => {
+      window.removeEventListener("storage", syncSavedFilters);
+      window.removeEventListener(savedFiltersChangeEvent, syncSavedFilters);
+    };
   }, []);
+
+  function persist(next: SavedFilter[]) {
+    setStoredJsonArray(savedFiltersStorageKey, next);
+    window.dispatchEvent(new Event(savedFiltersChangeEvent));
+    setItems(next);
+  }
 
   function saveCurrentFilter() {
     const href = `${window.location.pathname}${window.location.search}`;
     const params = new URLSearchParams(window.location.search);
-    const useCaseLabel = useCaseOptions.find((option) => option.id === params.get("useCase"))?.label;
-    const categoryLabel = categoryOptions.find((option) => option.value === params.get("category"))?.label;
-    const label =
-      [useCaseLabel, categoryLabel, params.get("minScore") ? `${params.get("minScore")}점 이상` : null, params.get("minDiscount") ? `${params.get("minDiscount")} 할인 이상` : null]
-        .filter(Boolean)
-        .join(" · ") || "전체 딜";
-    const next = [{ label, href, savedAt: new Date().toISOString() }, ...items.filter((item) => item.href !== href)].slice(0, 8);
-    window.localStorage.setItem(storageKey, JSON.stringify(next));
-    setItems(next);
+    const label = buildSavedFilterLabel(params, { useCases: useCaseOptions, categories: categoryOptions, priceBands: priceBandOptions });
+    const next = normalizeSavedFilters([{ label, href, savedAt: new Date().toISOString() }, ...readSavedFilters().filter((item) => item.href !== href)]);
+    persist(next);
   }
 
   function clearSaved() {
-    window.localStorage.removeItem(storageKey);
-    setItems([]);
+    persist([]);
+  }
+
+  function removeSavedFilter(href: string) {
+    persist(readSavedFilters().filter((item) => item.href !== href));
   }
 
   return (
@@ -45,6 +57,7 @@ export default function SavedFilterBar() {
         <div>
           <p className="text-xs font-black text-pine">My Filters</p>
           <h2 className="text-lg font-black">관심 조건 저장</h2>
+          <p className="mt-1 text-xs font-semibold text-steel">검색·예산·품질·재고 조건을 저장해 다음 방문에 바로 비교하세요.</p>
         </div>
         <div className="flex gap-2">
           <button className="focus-ring rounded-lg bg-ink px-3 py-2 text-xs font-black text-white hover:bg-pine" onClick={saveCurrentFilter} type="button">
@@ -60,13 +73,24 @@ export default function SavedFilterBar() {
       {items.length ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {items.map((item) => (
-            <Link key={item.href} className="rounded-md bg-mist px-3 py-2 text-xs font-black text-steel hover:text-pine" href={item.href}>
-              {item.label}
-            </Link>
+            <div key={item.href} className="inline-flex max-w-full items-stretch rounded-md bg-mist text-xs font-black text-steel">
+              <Link className="focus-ring min-w-0 truncate px-3 py-2 hover:text-pine" href={item.href} title={item.label}>
+                {item.label}
+              </Link>
+              <button
+                aria-label={`저장 조건 삭제: ${item.label}`}
+                className="focus-ring shrink-0 border-l border-line px-2 text-steel hover:bg-white hover:text-ink"
+                onClick={() => removeSavedFilter(item.href)}
+                title="저장 조건 삭제"
+                type="button"
+              >
+                <X size={14} aria-hidden />
+              </button>
+            </div>
           ))}
         </div>
       ) : (
-        <p className="mt-3 text-sm font-semibold text-steel">자주 보는 점수, 할인율, 용도 조건을 저장해두면 다음 방문 때 바로 열 수 있습니다.</p>
+        <p className="mt-3 text-sm font-semibold text-steel">현재 필터 적용 후 저장하면 검색어와 예산까지 그대로 다시 열립니다.</p>
       )}
     </section>
   );
