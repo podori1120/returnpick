@@ -229,6 +229,7 @@ const requiredFiles = [
   "components/GuideEditorialLink.tsx",
   "components/SearchIntentRail.tsx",
   "components/SearchGuideEditorialBridge.tsx",
+  "components/MobileNav.tsx",
   "components/TelegramPreview.tsx",
   "lib/affiliateLinkBackfill.ts",
   "lib/affiliateIdentity.ts",
@@ -302,6 +303,7 @@ const requiredFiles = [
   "scripts/verify-search-intent-landings.mjs",
   "scripts/verify-home-purpose-selection.mjs",
   "scripts/verify-home-purpose-guides.mjs",
+  "scripts/verify-responsive-navigation.mjs",
   "scripts/verify-recommendation-workflow.mjs",
   "scripts/verify-compare-decision.mjs",
   "scripts/verify-price-trend.mjs",
@@ -328,6 +330,58 @@ const requiredFiles = [
 
 for (const file of requiredFiles) {
   check(`file: ${file}`, fileExists(file), file, "required");
+}
+
+if (
+  fileExists("components/MobileNav.tsx") &&
+  fileExists("scripts/verify-responsive-navigation.mjs") &&
+  fileExists("app/layout.tsx") &&
+  fileExists("package.json")
+) {
+  const mobileNav = readText("components/MobileNav.tsx");
+  const responsiveNavigationCheck = readText("scripts/verify-responsive-navigation.mjs");
+  const layout = readText("app/layout.tsx");
+  const packageJson = readText("package.json");
+  const routes = [
+    "/deals",
+    "/recommend",
+    "/picks",
+    "/compare",
+    "/saved",
+    "/watchlist",
+    "/guide/return-checklist",
+    "/guide/safe-categories",
+    "/disclosure",
+    "/admin"
+  ];
+  check(
+    "public UX: responsive navigation contract",
+    responsiveNavigationCheck.includes('from "node:assert/strict"') &&
+      responsiveNavigationCheck.includes('from "node:fs"') &&
+      packageJson.includes('"responsive-nav:check": "node scripts/verify-responsive-navigation.mjs"') &&
+      mobileNav.startsWith('"use client";') &&
+      mobileNav.includes('import { Menu, X } from "lucide-react";') &&
+      mobileNav.includes("useState") &&
+      mobileNav.includes("setOpen((value) => !value)") &&
+      mobileNav.includes("setOpen(false)") &&
+      mobileNav.includes('event.key === "Escape"') &&
+      mobileNav.includes("aria-expanded={open}") &&
+      mobileNav.includes('aria-controls="mobile-nav-panel"') &&
+      mobileNav.includes("focus-ring") &&
+      mobileNav.includes("document.body.style.overflow") &&
+      mobileNav.includes("previousOverflow") &&
+      mobileNav.includes("sm:hidden") &&
+      mobileNav.includes("onClick={closeMenu}") &&
+      !/\b(?:fixed|absolute)\b/.test(mobileNav) &&
+      layout.includes('import MobileNav from "@/components/MobileNav";') &&
+      layout.includes("<MobileNav />") &&
+      /<nav[^>]*className="[^"]*\bhidden\b[^"]*\bsm:flex\b/.test(layout) &&
+      layout.includes('import SearchSuggest from "@/components/SearchSuggest";') &&
+      layout.includes("<SearchSuggest />") &&
+      routes.every((route) => mobileNav.includes(route) && layout.includes(`href="${route}"`)),
+    "mobile navigation keeps all ten routes in a keyboard-accessible normal-flow panel while desktop nav remains sm+ and SearchSuggest stays mounted",
+    "required"
+  );
 }
 
 if (fileExists("package.json") && fileExists("eslint.config.mjs")) {

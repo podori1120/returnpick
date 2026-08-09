@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "git:check": "node scripts/verify-git-deploy-readiness.mjs",
     "check:readiness": "node scripts/check-readiness.mjs",
+    "responsive-nav:check": "node scripts/verify-responsive-navigation.mjs",
     "check:launch": "node scripts/check-readiness.mjs --launch",
     "check:production": "node scripts/verify-production-readiness.mjs",
     "check:production:launch": "node scripts/verify-production-readiness.mjs --launch",

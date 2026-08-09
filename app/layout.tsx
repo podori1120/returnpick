@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import CompareDock from "@/components/CompareDock";
+import MobileNav from "@/components/MobileNav";
 import SearchSuggest from "@/components/SearchSuggest";
 import { getSiteUrl } from "@/lib/siteUrl";
 import "./globals.css";
@@ -75,17 +76,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <header className="border-b border-line bg-white/90 backdrop-blur">
           <div className="mx-auto flex max-w-7xl flex-col items-stretch gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
-            <Link href="/" className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-pine text-lg font-black text-white">
-                R
-              </span>
-              <span>
-                <span className="block text-lg font-black tracking-tight">ReturnPick</span>
-                <span className="block text-xs font-semibold text-steel">리턴픽</span>
-              </span>
-            </Link>
+            <div className="flex flex-wrap items-center justify-between gap-3 sm:contents">
+              <Link href="/" className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-pine text-lg font-black text-white">
+                  R
+                </span>
+                <span>
+                  <span className="block text-lg font-black tracking-tight">ReturnPick</span>
+                  <span className="block text-xs font-semibold text-steel">리턴픽</span>
+                </span>
+              </Link>
+              <MobileNav />
+            </div>
             <SearchSuggest />
-            <nav aria-label="주요 메뉴" className="order-3 -mx-4 grid grid-cols-4 gap-1 px-4 pb-1 text-xs font-semibold text-steel sm:order-none sm:mx-0 sm:flex sm:flex-wrap sm:gap-2 sm:px-0 sm:pb-0 sm:text-sm">
+            <nav aria-label="주요 메뉴" className="hidden text-xs font-semibold text-steel sm:order-none sm:flex sm:flex-wrap sm:gap-2 sm:text-sm">
               <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/deals">
                 딜 보기
               </Link>
