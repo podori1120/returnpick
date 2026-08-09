@@ -2,14 +2,17 @@ import Link from "next/link";
 import { ArrowRight, CheckCircle2, Medal, ShieldCheck } from "lucide-react";
 import AffiliateButton from "@/components/AffiliateButton";
 import CompareButton from "@/components/CompareButton";
+import PriceTimingSignal from "@/components/PriceTimingSignal";
 import SavedDealButton from "@/components/SavedDealButton";
 import WebEvidenceBadge from "@/components/WebEvidenceBadge";
 import { getCategoryLabel } from "@/lib/category";
 import { getCoupangOutboundLink } from "@/lib/coupangLink";
 import { getDealPrice, getDiscountRate, getReferencePrice } from "@/lib/dealIntelligence";
+import { getDealFreshness } from "@/lib/dealFreshness";
 import { formatPercent, formatPrice } from "@/lib/format";
 import { getReturnEvidenceLabel } from "@/lib/quality";
 import { getLatestScore } from "@/lib/scoring";
+import { getProductPriceSource, getRecentPricePosition } from "@/lib/priceTrend";
 import type { ProductWithScore } from "@/lib/types";
 
 export default function DealRankingRail({ products }: { products: ProductWithScore[] }) {
@@ -38,6 +41,8 @@ export default function DealRankingRail({ products }: { products: ProductWithSco
             const dealPrice = getDealPrice(product);
             const referencePrice = getReferencePrice(product);
             const outboundLink = getCoupangOutboundLink(product);
+            const freshness = getDealFreshness(product);
+            const pricePosition = getRecentPricePosition(product.snapshots ?? product.product_snapshots, dealPrice, getProductPriceSource(product), 30);
 
             return (
               <li key={product.id} className="rounded-lg border border-line bg-mist p-3 sm:p-4">
@@ -69,6 +74,11 @@ export default function DealRankingRail({ products }: { products: ProductWithSco
                   <div><p className="font-bold text-steel">할인율</p><p className="mt-1 font-black text-pine">{formatPercent(getDiscountRate(product))}</p></div>
                   <div><p className="font-bold text-steel">기준가</p><p className="mt-1 font-black text-ink">{formatPrice(referencePrice)}</p></div>
                 </div>
+                {freshness.status === "fresh" && pricePosition.currentPrice != null ? (
+                  <div className="mt-3">
+                    <PriceTimingSignal freshness={freshness} pricePosition={pricePosition} />
+                  </div>
+                ) : null}
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <Link href={`/deals/${product.id}`} className="focus-ring inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-md bg-ink px-3 py-2 text-xs font-black text-white hover:bg-pine">

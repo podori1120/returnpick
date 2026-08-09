@@ -14,6 +14,7 @@ import { getProductPriceSource, getRecentPricePosition } from "@/lib/priceTrend"
 import type { ProductWithScore } from "@/lib/types";
 import CompareButton from "@/components/CompareButton";
 import SavedDealButton from "@/components/SavedDealButton";
+import PriceTimingSignal from "@/components/PriceTimingSignal";
 import ScoreBadge from "@/components/ScoreBadge";
 import VerdictBadge from "@/components/VerdictBadge";
 import WebEvidenceBadge from "@/components/WebEvidenceBadge";
@@ -33,7 +34,6 @@ export default function DealCard({ product }: { product: ProductWithScore }) {
   const riskCount = score?.risk_flags?.length ?? 0;
   const outboundLink = getCoupangOutboundLink(product);
   const pricePosition = getRecentPricePosition(product.snapshots ?? product.product_snapshots, deal, getProductPriceSource(product), 30);
-  const pricePositionTone = pricePosition.status === "lowest" || pricePosition.status === "good" ? "bg-pine/10 text-pine" : "bg-lemon/25 text-ink";
 
   return (
     <article className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">
@@ -76,11 +76,6 @@ export default function DealCard({ product }: { product: ProductWithScore }) {
           >
             {freshness.label}
           </span>
-          {freshness.status === "fresh" && pricePosition.status !== "unknown" ? (
-            <span className={`rounded-md px-2.5 py-1 text-xs font-bold ${pricePositionTone}`} data-price-position={pricePosition.status} title={pricePosition.description}>
-              {pricePosition.label}
-            </span>
-          ) : null}
         </div>
         {firstReason || primaryCheck ? (
           <div className="space-y-2 rounded-lg bg-mist p-3 text-xs font-bold leading-5 text-steel">
@@ -113,6 +108,7 @@ export default function DealCard({ product }: { product: ProductWithScore }) {
             <p className="mt-0.5 text-[10px] font-bold leading-4 text-steel">{referenceInfo.label}</p>
           </div>
         </div>
+        <PriceTimingSignal freshness={freshness} pricePosition={pricePosition} />
         <div className="rounded-lg border border-line bg-mist p-3">
           <div className="flex items-center justify-between gap-3">
             <div>
