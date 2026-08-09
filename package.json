@@ -56,6 +56,7 @@
     "coupang-provider:check": "node scripts/verify-coupang-provider.mjs",
     "provider-merge:check": "node scripts/verify-provider-product-merge.mjs",
     "public-web:check": "node scripts/verify-public-web-config.mjs",
+    "algumon-discovery:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-algumon-discovery.mjs",
     "public-web:intake:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-public-web-intake-enrichment.mjs",
     "admin-sourcing-gate:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-admin-sourcing-gate.mjs",
     "web-return:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-web-return-info.mjs",

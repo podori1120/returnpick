@@ -31,7 +31,12 @@ function isWithinKeywordPrice(product: ProviderProduct, keyword: SourcingKeyword
   return true;
 }
 
+function isAlgumonDiscoveryProduct(product: Pick<ProviderProduct, "source"> | Pick<SourcedProduct, "source">) {
+  return product.source === "algumon_discovery";
+}
+
 function classifyProduct(product: SourcedProduct, minDiscountRate: number | null): SourcingStatus {
+  if (isAlgumonDiscoveryProduct(product)) return "needs_review";
   const score = calculateDealScore(product);
   const reference = getPriceReferenceInfo(product).value;
   const deal = product.return_price ?? product.source_price ?? product.new_price;
@@ -261,10 +266,27 @@ async function enrichNaverLowestPrice(product: ProviderProduct, specJson: Record
 
 async function enrichAndSaveProduct(product: ProviderProduct, keyword: SourcingKeyword, options?: { allowAffiliateEnrichment?: boolean }) {
   const specJson = parseSpecsFromTitle(product.title, product.category);
+  const discoveryOnly = isAlgumonDiscoveryProduct(product);
   const allowAffiliateEnrichment = options?.allowAffiliateEnrichment ?? true;
   const [naverPrice, affiliate] = await Promise.all([
-    enrichNaverLowestPrice(product, specJson),
-    allowAffiliateEnrichment
+    discoveryOnly
+      ? Promise.resolve({
+          price: null,
+          priceLog: {
+            status: "ALGUMON_DISCOVERY_MANUAL_REVIEW",
+            source_url: product.source_url ?? null
+          }
+        } satisfies NaverPriceEnrichment)
+      : enrichNaverLowestPrice(product, specJson),
+    discoveryOnly
+      ? Promise.resolve({
+          affiliateUrl: null,
+          deeplinkLog: {
+            status: "ALGUMON_DISCOVERY_MANUAL_REVIEW",
+            source_url: product.source_url ?? null
+          }
+        } satisfies AffiliateEnrichment)
+      : allowAffiliateEnrichment
       ? enrichAffiliateUrl(product)
       : Promise.resolve({
           affiliateUrl: null,
@@ -274,7 +296,16 @@ async function enrichAndSaveProduct(product: ProviderProduct, keyword: SourcingK
           }
         } satisfies AffiliateEnrichment)
   ]);
-  const webReturnInfo = resolveStoredWebReturnInfo(product.title, product.raw_json?.web_return_info);
+  const webReturnInfo = discoveryOnly
+    ? {
+        isReturnCandidate: false,
+        condition_grade: null,
+        return_price: null,
+        stock_count: null,
+        evidence: [],
+        confidence: 0
+      }
+    : resolveStoredWebReturnInfo(product.title, product.raw_json?.web_return_info);
   const resolvedReturnInfo = resolveWebReturnEvidence(product, webReturnInfo);
 
   const { product: saved, inserted } = await upsertSourcedProduct({
@@ -282,9 +313,9 @@ async function enrichAndSaveProduct(product: ProviderProduct, keyword: SourcingK
     keyword: keyword.keyword,
     affiliate_url: affiliate.affiliateUrl,
     naver_lowest_price: naverPrice.price,
-    condition_grade: resolvedReturnInfo.condition_grade,
-    return_price: resolvedReturnInfo.return_price,
-    stock_count: resolvedReturnInfo.stock_count,
+    condition_grade: discoveryOnly ? "확인필요" : resolvedReturnInfo.condition_grade,
+    return_price: discoveryOnly ? null : resolvedReturnInfo.return_price,
+    stock_count: discoveryOnly ? null : resolvedReturnInfo.stock_count,
     spec_json: specJson,
     raw_json: {
       ...(product.raw_json ?? {}),
@@ -298,14 +329,23 @@ async function enrichAndSaveProduct(product: ProviderProduct, keyword: SourcingK
     is_rejected: false
   });
 
-  const status =
-    saved.sourcing_status === "published" || saved.sourcing_status === "approved"
+  const status = discoveryOnly
+    ? saved.sourcing_status === "rejected"
+      ? "rejected"
+      : "needs_review"
+    : saved.sourcing_status === "published" || saved.sourcing_status === "approved"
       ? saved.sourcing_status
       : classifyProduct(saved, keyword.min_discount_rate);
   const updated = await updateProduct(saved.id, {
     sourcing_status: status,
+    is_published: discoveryOnly ? false : saved.is_published,
     is_rejected: status === "rejected",
-    rejection_reason: status === "rejected" ? "네이버 최저가 대비 가격 매력이 낮습니다." : null
+    rejection_reason:
+      status === "rejected"
+        ? discoveryOnly
+          ? saved.rejection_reason ?? "알구몬 후보 수동 검토에서 제외되었습니다."
+          : "네이버 최저가 대비 가격 매력이 낮습니다."
+        : null
   });
 
   try {

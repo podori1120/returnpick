@@ -7,6 +7,7 @@ export type SavedFilter = {
 export const savedFiltersStorageKey = "returnpick_saved_filters";
 export const savedFiltersChangeEvent = "returnpick_saved_filters_changed";
 export const maxSavedFilters = 8;
+const internalOrigin = "https://returnpick.local";
 
 type LabelOption = {
   id?: string;
@@ -76,6 +77,23 @@ export function buildSavedFilterLabel(params: URLSearchParams, options: SavedFil
   return parts.filter((part): part is string => Boolean(part)).join(" · ") || "전체 딜";
 }
 
+export function buildSavedFilterHref(pathname: string, search: string) {
+  if (!pathname.startsWith("/") || pathname.startsWith("//")) return "/deals";
+  const url = new URL(`${pathname}${search}`, internalOrigin);
+  url.searchParams.delete("page");
+  const query = url.searchParams.toString();
+  return `${url.pathname}${query ? `?${query}` : ""}`;
+}
+
+function canonicalSavedFilterHref(rawHref: string) {
+  try {
+    const url = new URL(rawHref, internalOrigin);
+    return buildSavedFilterHref(url.pathname, url.search);
+  } catch {
+    return null;
+  }
+}
+
 export function normalizeSavedFilters(value: unknown): SavedFilter[] {
   if (!Array.isArray(value)) return [];
 
@@ -84,9 +102,11 @@ export function normalizeSavedFilters(value: unknown): SavedFilter[] {
     .flatMap((item): SavedFilter[] => {
       if (!item || typeof item !== "object") return [];
       const candidate = item as Partial<SavedFilter>;
-      const href = typeof candidate.href === "string" ? candidate.href.trim().slice(0, 1200) : "";
+      const rawHref = typeof candidate.href === "string" ? candidate.href.trim().slice(0, 1200) : "";
       const label = typeof candidate.label === "string" ? candidate.label.trim().slice(0, 160) : "";
-      if (!href || !href.startsWith("/") || href.startsWith("//") || !label || seen.has(href)) return [];
+      if (!rawHref || !rawHref.startsWith("/") || rawHref.startsWith("//") || !label) return [];
+      const href = canonicalSavedFilterHref(rawHref);
+      if (!href || seen.has(href)) return [];
       seen.add(href);
       return [
         {

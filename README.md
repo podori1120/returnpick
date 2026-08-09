@@ -187,6 +187,16 @@ PUBLIC_WEB_ALLOWED_HOSTS=example.com
 PUBLIC_WEB_SEARCH_TEMPLATES=https://example.com/search?q={keyword}
 ```
 
+알구몬처럼 검색 결과의 공개 목록을 제공하는 호스트를 참고 소스로 추가할 때도 같은 절차를 지킵니다. 현재 구현은 `www.algumon.com/n/deal?keyword=...` 검색 결과에서 **쿠팡으로 표시되고 광고가 아니며 종료되지 않은 후보**만 최대 8개까지 발견 후보로 읽습니다. 사이트의 `robots.txt`가 허용하는 경우에만 다음처럼 운영자가 명시적으로 allowlist와 템플릿을 등록합니다.
+
+```bash
+PUBLIC_WEB_CRAWL_ENABLED=true
+PUBLIC_WEB_ALLOWED_HOSTS=www.algumon.com
+PUBLIC_WEB_SEARCH_TEMPLATES=https://www.algumon.com/n/deal?keyword={keyword}
+```
+
+이 소스는 공개 목록의 상품명·출처·표시 문구만 후보 근거로 보관하며 이미지, 외부 목적지, 쿠팡 상품번호, 반품가, 재고, 제휴 링크를 복사하거나 추정하지 않습니다. 발견 후보는 항상 `needs_review`로 저장되고 상세 페이지 자동 방문도 건너뜁니다. 관리자는 후보의 원문 참고 주소를 확인한 뒤 실제 쿠팡 상품 URL과 **상품별** 파트너스 링크를 직접 입력하고, 가격·이미지·반품등급·재고를 확인해야 게시할 수 있습니다. 검색 서비스의 이용약관·robots.txt·요청 제한이 바뀌면 즉시 allowlist에서 제외하고, 공개 수집을 켜기 전 `npm run public-web:check`로 다시 확인하세요. 이 참고 수집은 쿠팡 페이지를 크롤링하거나 쿠팡 파트너스 API 권한을 대신하지 않습니다.
+
 공개 웹 참고 수집을 켜기 전에는 아래 명령으로 allowlist, 검색 템플릿, robots.txt, Crawl-delay를 먼저 확인하세요. `PUBLIC_WEB_CRAWL_ENABLED=false`이면 실제 공개 웹 요청을 하지 않고 비활성 상태만 보여줍니다.
 
 ```powershell

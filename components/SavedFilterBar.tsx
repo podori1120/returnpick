@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { categoryOptions } from "@/lib/category";
 import { priceBandOptions } from "@/lib/priceBand";
 import { getStoredJsonArray, setStoredJsonArray } from "@/lib/clientTracking";
-import { buildSavedFilterLabel, normalizeSavedFilters, savedFiltersChangeEvent, savedFiltersStorageKey, type SavedFilter } from "@/lib/savedFilters";
+import { buildSavedFilterHref, buildSavedFilterLabel, normalizeSavedFilters, savedFiltersChangeEvent, savedFiltersStorageKey, type SavedFilter } from "@/lib/savedFilters";
 import { useCaseOptions } from "@/lib/dealIntelligence";
 
 function readSavedFilters() {
@@ -36,7 +36,7 @@ export default function SavedFilterBar() {
   }
 
   function saveCurrentFilter() {
-    const href = `${window.location.pathname}${window.location.search}`;
+    const href = buildSavedFilterHref(window.location.pathname, window.location.search);
     const params = new URLSearchParams(window.location.search);
     const label = buildSavedFilterLabel(params, { useCases: useCaseOptions, categories: categoryOptions, priceBands: priceBandOptions });
     const next = normalizeSavedFilters([{ label, href, savedAt: new Date().toISOString() }, ...readSavedFilters().filter((item) => item.href !== href)]);

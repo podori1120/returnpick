@@ -264,6 +264,7 @@ const requiredFiles = [
   "lib/sourcing.ts",
   "lib/telegram.ts",
   "lib/providers/coupangPartnersProvider.ts",
+  "lib/providers/algumonDiscoveryParser.ts",
   "lib/providers/naverShoppingProvider.ts",
   "lib/providers/mockProvider.ts",
   "lib/validators.ts",
@@ -303,6 +304,7 @@ const requiredFiles = [
   "scripts/sitemapContract.mjs",
   "scripts/verify-keyword-coverage-api.mjs",
   "scripts/verify-public-web-config.mjs",
+  "scripts/verify-algumon-discovery.mjs",
   "scripts/verify-admin-sourcing-gate.mjs",
   "scripts/verify-web-return-info.mjs",
   "scripts/verify-public-web-url-safety.mjs",
@@ -2156,6 +2158,10 @@ if (fileExists("lib/providers/publicWebProvider.ts")) {
   const packageJson = fileExists("package.json") ? readText("package.json") : "";
   const publicWebConfigVerifier = fileExists("scripts/verify-public-web-config.mjs") ? readText("scripts/verify-public-web-config.mjs") : "";
   const publicWebUrlVerifier = fileExists("scripts/verify-public-web-url-safety.mjs") ? readText("scripts/verify-public-web-url-safety.mjs") : "";
+  const algumonParser = fileExists("lib/providers/algumonDiscoveryParser.ts") ? readText("lib/providers/algumonDiscoveryParser.ts") : "";
+  const algumonVerifier = fileExists("scripts/verify-algumon-discovery.mjs") ? readText("scripts/verify-algumon-discovery.mjs") : "";
+  const algumonQuality = fileExists("lib/quality.ts") ? readText("lib/quality.ts") : "";
+  const sourcing = fileExists("lib/sourcing.ts") ? readText("lib/sourcing.ts") : "";
   const webReturnInfo = fileExists("lib/webReturnInfo.ts") ? readText("lib/webReturnInfo.ts") : "";
   const webReturnInfoVerifier = fileExists("scripts/verify-web-return-info.mjs") ? readText("scripts/verify-web-return-info.mjs") : "";
   check(
@@ -2321,6 +2327,32 @@ if (fileExists("lib/providers/publicWebProvider.ts")) {
       !publicWebConfigVerifier.includes("process.env.NAVER") &&
       !publicWebConfigVerifier.includes("process.env.SUPABASE"),
     "public web config check validates allowlist, templates, robots, and Crawl-delay without reading unrelated secrets",
+    "required"
+  );
+  check(
+    "provider: Algumon Coupang discovery stays review-only",
+    packageJson.includes('"algumon-discovery:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-algumon-discovery.mjs"') &&
+      algumonParser.includes("MAX_ALGUMON_DISCOVERY_RESULTS = 8") &&
+      algumonParser.includes('storeName !== "쿠팡"') &&
+      algumonParser.includes("isAd !== false") &&
+      algumonParser.includes("ended !== false") &&
+      !algumonParser.includes("outboundUrl") &&
+      !algumonParser.includes("thumbnailUrl") &&
+      publicWebProvider.includes('url.pathname === "/n/deal"') &&
+      publicWebProvider.includes('url.protocol === "https:"') &&
+      publicWebProvider.includes('source: "algumon_discovery"') &&
+      publicWebProvider.includes("[알구몬 후보 #") &&
+      publicWebProvider.includes("source_title: record.title") &&
+      publicWebProvider.includes("outbound_not_fetched: true") &&
+      publicWebProvider.includes('if (product.source === "algumon_discovery")') &&
+      sourcing.includes("ALGUMON_DISCOVERY_MANUAL_REVIEW") &&
+      sourcing.includes('return "needs_review"') &&
+      sourcing.includes('saved.sourcing_status === "rejected"') &&
+      sourcing.includes("is_published: discoveryOnly ? false : saved.is_published") &&
+      algumonQuality.includes('product.source === "algumon_discovery"') &&
+      algumonQuality.includes("새 수동 상품으로 등록해야 합니다") &&
+      algumonVerifier.includes("no ads, duplicates, images, outbound paths, or automatic detail visits"),
+    "Algumon contributes only bounded Coupang-labelled internal candidates and never copies media, follows outbound links, enriches unverified facts, or publishes automatically",
     "required"
   );
 }

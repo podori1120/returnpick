@@ -1,5 +1,6 @@
 import type { Category, ConditionGrade, JsonValue } from "@/lib/types";
 import type { ProviderProduct, ProviderSearchResult } from "@/lib/providers/types";
+import { parseAlgumonCoupangDiscovery } from "@/lib/providers/algumonDiscoveryParser";
 import { cleanText, extractListedPriceCandidatesFromText, extractListedPriceFromText, extractReturnInfoFromText, toReturnInfoJson } from "@/lib/webReturnInfo";
 import { getSiteUrl } from "@/lib/siteUrl";
 import { isPublicWebHostname, safeAllowlistedPublicUrl } from "@/lib/publicWebUrlSafety";
@@ -871,9 +872,60 @@ function extractVisibleAnchorBlocks(html: string) {
   return blocks;
 }
 
+function isAlgumonHost(url: URL) {
+  return url.hostname === "www.algumon.com" || url.hostname === "algumon.com";
+}
+
+function isAlgumonDealSearchPage(url: URL) {
+  return url.protocol === "https:" && isAlgumonHost(url) && url.pathname === "/n/deal";
+}
+
+function extractAlgumonDiscoveryCards(html: string, category: Category, keyword: string, pageUrl: string): ProviderProduct[] {
+  const page = new URL(pageUrl);
+  const observedAt = new Date().toISOString();
+
+  return parseAlgumonCoupangDiscovery(html).map((record) => ({
+    source: "algumon_discovery",
+    source_product_id: `algumon:${record.dealId}`,
+    category,
+    keyword,
+    title: `[알구몬 후보 #${record.dealId}] ${record.title}`.slice(0, 140),
+    brand: null,
+    model_name: null,
+    image_url: null,
+    source_url: page.toString(),
+    coupang_url: null,
+    affiliate_url: null,
+    source_price: null,
+    return_price: null,
+    new_price: null,
+    condition_grade: "확인필요",
+    stock_count: null,
+    raw_json: {
+      provider: "algumon_discovery",
+      candidate_kind: "discovery_only",
+      source_title: record.title,
+      page_url: pageUrl,
+      source_deal_id: record.dealId,
+      source_site_name: record.siteName,
+      store_name: record.storeName,
+      displayed_price_text: record.displayedPriceText,
+      delivery_info_text: record.deliveryInfoText,
+      source_created_at: record.sourceCreatedAt,
+      observed_at: observedAt,
+      requires_manual_coupang_url: true,
+      outbound_not_fetched: true
+    }
+  }));
+}
+
 function extractCards(html: string, category: Category, keyword: string, pageUrl: string, allowedHosts: ReadonlySet<string>): ProviderProduct[] {
-  const anchorMatches = extractVisibleAnchorBlocks(html).filter((match) => match.inner.length <= 1500);
   const base = new URL(pageUrl);
+  if (isAlgumonHost(base)) {
+    if (!allowedHosts.has(base.hostname.toLowerCase())) return [];
+    return isAlgumonDealSearchPage(base) ? extractAlgumonDiscoveryCards(html, category, keyword, pageUrl) : [];
+  }
+  const anchorMatches = extractVisibleAnchorBlocks(html).filter((match) => match.inner.length <= 1500);
   const products: ProviderProduct[] = [];
   const seenProductKeys = new Set<string>();
 
@@ -1059,6 +1111,10 @@ async function enrichProductDetails(
 
   for (const [index, product] of enriched.entries()) {
     if (requestCount >= MAX_PUBLIC_WEB_DETAIL_PAGES) break;
+    if (product.source === "algumon_discovery") {
+      diagnostics.push({ stage: "detail", status: "DISCOVERY_ONLY_DETAIL_SKIPPED", url: product.source_url ?? undefined });
+      continue;
+    }
     if (!product.source_url) continue;
 
     let detailUrl: URL;

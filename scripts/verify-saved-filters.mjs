@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { buildSavedFilterLabel, normalizeSavedFilters } from "../lib/savedFilters.ts";
+import { buildSavedFilterHref, buildSavedFilterLabel, normalizeSavedFilters } from "../lib/savedFilters.ts";
 
 const options = {
   categories: [{ value: "laptop", label: "노트북" }],
@@ -23,9 +23,10 @@ assert.match(label, /20% 할인 이상/);
 assert.match(label, /최소 500,000원/);
 assert.match(label, /최대 900,000원/);
 assert.match(label, /할인율 순/);
+assert.equal(buildSavedFilterHref("/deals", "?search=%EA%B7%B8%EB%9E%A8&page=3"), "/deals?search=%EA%B7%B8%EB%9E%A8");
 
 const normalized = normalizeSavedFilters([
-  { label: "정상 조건", href: "/deals?search=그램", savedAt: "2026-08-09T00:00:00.000Z" },
+  { label: "정상 조건", href: "/deals?search=그램&page=3", savedAt: "2026-08-09T00:00:00.000Z" },
   { label: "중복 조건", href: "/deals?search=그램", savedAt: "" },
   { label: "외부 이동", href: "https://example.com", savedAt: "" },
   { label: "프로토콜 상대경로", href: "//example.com", savedAt: "" },
@@ -33,7 +34,7 @@ const normalized = normalizeSavedFilters([
   null
 ]);
 assert.equal(normalized.length, 1);
-assert.equal(normalized[0].href, "/deals?search=그램");
+assert.equal(normalized[0].href, "/deals?search=%EA%B7%B8%EB%9E%A8");
 assert.equal(normalizeSavedFilters("broken").length, 0);
 
-console.log("saved filter checks passed: 15 assertions");
+console.log("saved filter checks passed: 16 assertions");
