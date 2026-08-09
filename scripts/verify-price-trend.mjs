@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-const { summarizePriceTrend } = await import("../lib/priceTrend.ts");
+const { summarizePriceTrend, summarizeRecentPriceWindow } = await import("../lib/priceTrend.ts");
 
 function snapshot(id, observed_at, price) {
   return {
@@ -33,6 +33,19 @@ assert.equal(summary.delta, -50000);
 assert.equal(summary.trend, "down");
 assert.equal(summarizePriceTrend([]).trend, "unknown");
 
+const recent = summarizeRecentPriceWindow([
+  snapshot("too-old", "2025-12-31T00:00:00.000Z", 600000),
+  snapshot("window-start", "2026-01-01T00:00:00.000Z", 750000),
+  snapshot("window-low", "2026-01-10T00:00:00.000Z", 680000),
+  snapshot("window-latest", "2026-01-20T00:00:00.000Z", 700000),
+  snapshot("future", "2026-02-01T00:00:00.000Z", 500000)
+], 30, new Date("2026-01-31T00:00:00.000Z"));
+assert.deepEqual(recent.points.map((point) => point.id), ["window-start", "window-low", "window-latest"]);
+assert.equal(recent.lowestPrice, 680000);
+assert.equal(recent.latestPrice, 700000);
+assert.equal(recent.latestObservedAt, "2026-01-20T00:00:00.000Z");
+assert.equal(summarizeRecentPriceWindow([], 30, new Date("2026-01-31T00:00:00.000Z")).points.length, 0);
+
 const mixedSource = summarizePriceTrend([
   snapshot("source-price", "2026-01-01T00:00:00.000Z", 750000),
   Object.assign(snapshot("return-price", "2026-01-02T00:00:00.000Z", null), { return_price: 680000 })
@@ -40,4 +53,4 @@ const mixedSource = summarizePriceTrend([
 assert.equal(mixedSource.delta, null);
 assert.equal(mixedSource.trend, "unknown");
 
-console.log("price trend rules: 9 passed");
+console.log("price trend rules: 14 passed");

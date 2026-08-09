@@ -1,6 +1,6 @@
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import { formatDate, formatPrice } from "@/lib/format";
-import { summarizePriceTrend } from "@/lib/priceTrend";
+import { summarizePriceTrend, summarizeRecentPriceWindow } from "@/lib/priceTrend";
 import type { ProductSnapshot } from "@/lib/types";
 
 const changeLabels: Record<string, string> = {
@@ -22,8 +22,9 @@ const priceSourceLabels = {
 } as const;
 
 export default function PriceHistory({ snapshots }: { snapshots?: ProductSnapshot[] | null }) {
-  const items = (snapshots ?? []).slice(0, 6);
+  const items = [...(snapshots ?? [])].sort((a, b) => Date.parse(b.observed_at) - Date.parse(a.observed_at)).slice(0, 6);
   const trend = summarizePriceTrend(snapshots);
+  const recent = summarizeRecentPriceWindow(snapshots, 30);
   const chartMin = trend.points.length ? Math.min(...trend.points.map((point) => point.price)) : 0;
   const chartMax = trend.points.length ? Math.max(...trend.points.map((point) => point.price)) : 0;
   const chartRange = Math.max(1, chartMax - chartMin);
@@ -56,6 +57,17 @@ export default function PriceHistory({ snapshots }: { snapshots?: ProductSnapsho
                 <p className="mt-1 text-[11px] font-bold text-steel">첫 관찰가 대비 {trend.delta === null ? "비교 불가" : formatPrice(Math.abs(trend.delta))}</p>
               </div>
             </div>
+            {recent.points.length ? (
+              <div className="mt-3 rounded-md border border-pine/20 bg-pine/5 p-3">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="text-xs font-black text-pine">{recent.points.length > 1 ? "최근 30일 최저 관찰가" : "최근 30일 관찰가"}</p>
+                  <p className="text-lg font-black text-ink">{formatPrice(recent.lowestPrice)}</p>
+                </div>
+                <p className="mt-1 text-xs font-bold leading-5 text-steel">
+                  ReturnPick이 최근 {recent.points.length}회 기록한 가격 기준입니다. {recent.latestPrice === recent.lowestPrice ? "최근 확인가가 관찰 최저 수준입니다." : "시장 전체 최저가가 아닌 자체 관찰 기록이므로 구매 전 쿠팡에서 다시 확인하세요."}
+                </p>
+              </div>
+            ) : null}
             {trend.points.length > 1 ? (
               <div className="mt-4 rounded-md border border-line bg-mist px-3 pb-3 pt-4" role="img" aria-label="실제 관찰 가격 흐름">
                 <div className="flex h-24 items-end gap-1.5 sm:gap-2">

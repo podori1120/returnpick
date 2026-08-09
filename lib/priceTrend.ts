@@ -19,6 +19,14 @@ export type PriceTrendSummary = {
   trend: "down" | "up" | "steady" | "unknown";
 };
 
+export type RecentPriceWindowSummary = {
+  days: number;
+  points: PriceTrendPoint[];
+  lowestPrice: number | null;
+  latestPrice: number | null;
+  latestObservedAt: string | null;
+};
+
 function getSnapshotPrice(snapshot: ProductSnapshot): { price: number; source: SnapshotPriceSource } | null {
   const candidates: Array<[SnapshotPriceSource, number | null]> = [
     ["return_price", snapshot.return_price],
@@ -54,5 +62,29 @@ export function summarizePriceTrend(snapshots?: ProductSnapshot[] | null): Price
     latestObservedAt: latest?.observedAt ?? null,
     delta,
     trend
+  };
+}
+
+export function summarizeRecentPriceWindow(
+  snapshots?: ProductSnapshot[] | null,
+  days = 30,
+  now = new Date()
+): RecentPriceWindowSummary {
+  const windowDays = Number.isFinite(days) && days > 0 ? Math.floor(days) : 30;
+  const nowMs = now.getTime();
+  const endMs = Number.isFinite(nowMs) ? nowMs : Date.now();
+  const startMs = endMs - windowDays * 24 * 60 * 60 * 1000;
+  const points = summarizePriceTrend(snapshots).points.filter((point) => {
+    const observedMs = Date.parse(point.observedAt);
+    return observedMs >= startMs && observedMs <= endMs;
+  });
+  const latest = points.at(-1) ?? null;
+
+  return {
+    days: windowDays,
+    points,
+    lowestPrice: points.length ? Math.min(...points.map((point) => point.price)) : null,
+    latestPrice: latest?.price ?? null,
+    latestObservedAt: latest?.observedAt ?? null
   };
 }
