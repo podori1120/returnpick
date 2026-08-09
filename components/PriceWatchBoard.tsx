@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, CheckCircle2, Loader2, RefreshCw, Target, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, Bell, BellRing, CheckCircle2, Loader2, RefreshCw, Target, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import AffiliateButton from "@/components/AffiliateButton";
 import AffiliateInlineDisclosure from "@/components/AffiliateInlineDisclosure";
 import { getCoupangOutboundLink } from "@/lib/coupangLink";
 import { formatDate, formatPrice } from "@/lib/format";
-import { evaluatePriceWatch, getPriceWatchItems, getPriceWatchPriceDelta, maxPriceWatches, priceWatchChangeEvent, removePriceWatch, setPriceWatchItems, type PriceWatchItem } from "@/lib/priceWatch";
+import { evaluatePriceWatch, getPriceWatchItems, getPriceWatchNotificationKey, getPriceWatchPriceDelta, hasPriceWatchNotificationBeenSent, markPriceWatchNotificationSent, maxPriceWatches, priceWatchChangeEvent, removePriceWatch, setPriceWatchItems, type PriceWatchItem } from "@/lib/priceWatch";
 import type { PublicDeal } from "@/lib/publicDeal";
 
 type CompareResponse = {
@@ -15,6 +15,23 @@ type CompareResponse = {
   message?: string;
   error?: string;
 };
+
+type BrowserNotificationStatus = "checking" | "unsupported" | "insecure" | "default" | "granted" | "denied";
+
+function getBrowserNotificationStatus(): BrowserNotificationStatus {
+  if (typeof window === "undefined" || typeof window.Notification === "undefined") return "unsupported";
+  const localHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  if (!window.isSecureContext && !localHost) return "insecure";
+  return window.Notification.permission;
+}
+
+function getNotificationButtonLabel(status: BrowserNotificationStatus) {
+  if (status === "granted") return "브라우저 알림 사용 중";
+  if (status === "denied") return "브라우저 알림 차단됨";
+  if (status === "unsupported") return "브라우저 알림 미지원";
+  if (status === "insecure") return "HTTPS에서 알림 설정";
+  return "브라우저 알림 켜기";
+}
 
 function getWatchStatus(currentPrice: number | null, targetPrice: number) {
   const status = evaluatePriceWatch(currentPrice, targetPrice);
@@ -71,6 +88,14 @@ export default function PriceWatchBoard() {
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(null);
+  const [notificationStatus, setNotificationStatus] = useState<BrowserNotificationStatus>("checking");
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [requestingNotification, setRequestingNotification] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setNotificationStatus(getBrowserNotificationStatus()), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     function sync() {
@@ -133,6 +158,61 @@ export default function PriceWatchBoard() {
 
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
   const unavailableItems = items.filter((item) => !productMap.has(item.productId));
+  const reachedTargets = useMemo(
+    () => items
+      .map((item) => ({ item, product: productMap.get(item.productId) }))
+      .filter(({ item, product }) => product && evaluatePriceWatch(product.deal_price, item.targetPrice) === "hit") as Array<{ item: PriceWatchItem; product: PublicDeal }>,
+    [items, productMap]
+  );
+
+  useEffect(() => {
+    if (notificationStatus !== "granted" || !reachedTargets.length) return;
+
+    const pending = reachedTargets.filter(({ item, product }) => {
+      const key = getPriceWatchNotificationKey(item, product.deal_price);
+      return key !== null && !hasPriceWatchNotificationBeenSent(key);
+    });
+    if (!pending.length) return;
+
+    const first = pending[0];
+    const body = pending.length === 1
+      ? `${first.product.title} · 현재 ${formatPrice(first.product.deal_price)} · 목표 ${formatPrice(first.item.targetPrice)}`
+      : `${first.product.title} 외 ${pending.length - 1}개 상품이 목표가 이하입니다. 가격 기준함에서 확인하세요.`;
+
+    try {
+      const notification = new window.Notification(pending.length === 1 ? "ReturnPick 목표가 도달" : `ReturnPick 목표가 ${pending.length}개 도달`, {
+        body,
+        tag: "returnpick-price-targets"
+      });
+      pending.forEach(({ item, product }) => markPriceWatchNotificationSent(getPriceWatchNotificationKey(item, product.deal_price), item.productId));
+      notification.onclick = () => {
+        window.focus();
+        window.location.assign("/watchlist");
+        notification.close();
+      };
+    } catch {
+      // The in-page reached-target panel remains the reliable fallback.
+    }
+  }, [notificationStatus, reachedTargets]);
+
+  async function enableNotifications() {
+    if (notificationStatus === "unsupported" || notificationStatus === "insecure" || typeof window === "undefined" || typeof window.Notification === "undefined") {
+      setNotificationMessage("이 환경에서는 브라우저 알림을 사용할 수 없습니다. 가격 기준함을 열거나 다시 확인해 주세요.");
+      return;
+    }
+
+    setRequestingNotification(true);
+    setNotificationMessage("");
+    try {
+      const permission = await window.Notification.requestPermission();
+      setNotificationStatus(permission);
+      setNotificationMessage(permission === "granted" ? "허용되었습니다. 이 화면을 열어 확인한 목표가 도달 상품을 알려드립니다." : "알림이 허용되지 않았습니다. 화면 내 목표가 도달 안내는 계속 표시됩니다.");
+    } catch {
+      setNotificationMessage("브라우저 알림 설정을 완료하지 못했습니다. 화면 내 안내를 이용해 주세요.");
+    } finally {
+      setRequestingNotification(false);
+    }
+  }
 
   function clearAll() {
     setPriceWatchItems([]);
@@ -196,8 +276,25 @@ export default function PriceWatchBoard() {
             </button>
           </div>
         </div>
+        <div className="mt-4 flex flex-col gap-3 rounded-lg border border-pine/20 bg-pine/5 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-start gap-2">
+            {notificationStatus === "granted" ? <BellRing className="mt-0.5 shrink-0 text-pine" size={18} aria-hidden /> : <Bell className="mt-0.5 shrink-0 text-pine" size={18} aria-hidden />}
+            <div className="min-w-0">
+              <p className="text-sm font-black text-ink">목표가 도달 알림</p>
+              <p className="mt-1 text-xs font-semibold leading-5 text-steel">
+                {notificationStatus === "granted" ? "이 브라우저에서 허용됨 · 가격 기준함을 열어 확인한 결과만 알려드립니다." : "문자·이메일 없이, 직접 허용한 이 브라우저에서만 확인 결과를 알려드립니다."}
+              </p>
+            </div>
+          </div>
+          <button aria-label={getNotificationButtonLabel(notificationStatus)} className="focus-ring inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-pine/30 bg-white px-3 py-2 text-xs font-black text-pine hover:bg-pine/10 disabled:cursor-not-allowed disabled:opacity-60" disabled={requestingNotification || notificationStatus === "checking" || notificationStatus === "granted" || notificationStatus === "denied" || notificationStatus === "unsupported" || notificationStatus === "insecure"} onClick={() => void enableNotifications()} title={getNotificationButtonLabel(notificationStatus)} type="button">
+            {requestingNotification ? <Loader2 className="animate-spin" size={15} aria-hidden /> : notificationStatus === "granted" ? <BellRing size={15} aria-hidden /> : <Bell size={15} aria-hidden />}
+            {getNotificationButtonLabel(notificationStatus)}
+          </button>
+        </div>
+        {notificationMessage ? <p className="mt-3 rounded-lg border border-line bg-mist px-3 py-2 text-xs font-bold text-steel" role="status" aria-live="polite">{notificationMessage}</p> : null}
         <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold text-steel">
           <span className="rounded-md bg-mist px-2.5 py-1.5">최대 {maxPriceWatches}개 저장</span>
+          <span className="rounded-md bg-pine/10 px-2.5 py-1.5 text-pine">목표가 도달 {reachedTargets.length}개</span>
           <Link className="rounded-md bg-pine/10 px-2.5 py-1.5 text-pine hover:text-ink" href="/deals">새 딜 찾기</Link>
           {lastCheckedAt ? <span className="rounded-md bg-mist px-2.5 py-1.5">화면 확인 {formatDate(lastCheckedAt)}</span> : null}
         </div>
@@ -219,7 +316,22 @@ export default function PriceWatchBoard() {
         ) : null}
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2" aria-label="저장한 가격 기준 목록">
+      {reachedTargets.length ? (
+        <section className="rounded-lg border border-pine/30 bg-pine/5 p-4" aria-label="목표가 도달 안내" role="status">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="mt-0.5 shrink-0 text-pine" size={20} aria-hidden />
+            <div className="min-w-0">
+              <p className="text-sm font-black text-pine">목표가 도달한 상품 {reachedTargets.length}개</p>
+              <p className="mt-1 text-xs font-semibold leading-5 text-steel">현재 공개 상품에서 확인된 가격이 저장한 상한가 이하입니다. 가격·재고·반품등급은 구매 직전 쿠팡 상품 페이지에서 다시 확인하세요.</p>
+              <ul className="mt-3 grid gap-2 text-xs font-bold text-ink sm:grid-cols-2">
+                {reachedTargets.slice(0, 4).map(({ item, product }) => <li key={item.productId}><Link className="focus-ring inline-flex max-w-full items-center gap-1 truncate text-pine underline decoration-pine/30 underline-offset-4 hover:text-ink" href={product.detail_url}>{product.title} · {formatPrice(product.deal_price)}</Link></li>)}
+              </ul>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="grid gap-4 md:grid-cols-2" id="price-watch-items" aria-label="저장한 가격 기준 목록">
         {items.map((item) => {
           const product = productMap.get(item.productId);
           if (!product) return null;

@@ -97,7 +97,7 @@ export default function PriceWatchButton({ productId, title, currentPrice }: Pri
         </div>
       </div>
       <p className="mt-3 text-sm font-semibold leading-6 text-steel">
-        사고 싶은 상한가를 저장해 두면 다음에 이 상품을 다시 열 때 현재가와 비교합니다. 이 정보는 이 브라우저에만 저장되며 문자·푸시·이메일 알림은 보내지 않습니다.
+        사고 싶은 상한가를 저장해 두면 다음에 이 상품을 다시 열 때 현재가와 비교합니다. 이 정보는 이 브라우저에만 저장되며, 목표가 도달 브라우저 알림은 가격 기준함에서 직접 허용한 경우에만 표시됩니다.
       </p>
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
         <label className="block text-sm font-black" htmlFor={`price-target-${productId}`}>

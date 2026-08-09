@@ -1365,11 +1365,14 @@ check(
     publicPriceTimingBoard.includes("product.price_timing") &&
     publicPriceTimingBoard.includes("동일 기준 관찰") &&
     publicPriceTimingBoard.includes("formatPrice(product.price_timing.average_price)") &&
+    publicPriceTimingBoard.includes("getPriceWatchNotificationKey") &&
+    publicPriceTimingBoard.includes("브라우저 알림 켜기") &&
+    publicPriceTimingBoard.includes("목표가 도달한 상품") &&
     publicCompareBoard.includes("product.price_timing") &&
     publicCompareBoard.includes("[\"가격 시점\"") &&
     publicCompareBoard.includes("확인필요") &&
     publicPriceTimingPackage.includes('"public-price-timing:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-public-price-timing.mjs"'),
-  "watchlist and compare expose only fresh, same-basis ReturnPick timing evidence with neutral unknown and non-positive tones",
+  "watchlist and compare expose fresh price timing evidence and user-enabled target-price notification UX",
   "required"
 );
 
