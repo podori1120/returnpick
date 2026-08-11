@@ -108,6 +108,9 @@ export function getCustomerPublishReadiness(product: ProductWithScore): Customer
   if (product.source === "algumon_discovery") {
     blockers.add("알구몬 후보는 실제 쿠팡 상품과 상품별 파트너스 링크를 확인해 새 수동 상품으로 등록해야 합니다.");
   }
+  if (product.source === "hotdeals_discovery") {
+    blockers.add("HotDeals 후보는 실제 쿠팡 상품과 상품별 파트너스 링크를 확인해 새 수동 상품으로 등록해야 합니다.");
+  }
   if (!isUsableAffiliateUrl(product.affiliate_url)) {
     blockers.add(isApprovalSampleAffiliateUrl(product.affiliate_url) ? "승인용 샘플 링크 사용 중" : "상품별 파트너스 링크 필요");
   } else {
