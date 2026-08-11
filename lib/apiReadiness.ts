@@ -1445,6 +1445,8 @@ async function runPublicDataQualityCheck(
       ? `공개 상품 데이터 정리가 필요합니다. 고객공개 품질 블로커 ${publicQualityBlockedCount}건, 제휴 링크 누락 ${missingAffiliateCount}건, 비정상 파트너스 링크 ${badAffiliateCount}건, 승인용 링크 재사용 ${approvalLinkReuseCount}건, DB 제약 ${publicAffiliateConstraintOk ? "통과" : "미적용"}.`
       : `공개 상품 ${publishedCount}건의 구매 CTA와 고객공개 품질 기준, DB 제약이 통과했습니다.`,
     detail: {
+      mode,
+      write_smoke_skipped: !writeSmokesAllowed,
       published_count: publishedCount,
       published_public_ready_count: publicReadyCount,
       published_customer_hidden_count: publicQualityBlockedCount,

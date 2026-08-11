@@ -31,6 +31,7 @@ assert.ok(qualitySource.indexOf("if (writeSmokesAllowed)") < qualitySource.index
 assert.match(qualitySource, /if \(writeSmokesAllowed\)[\s\S]*\.from\("sourced_products"\)[\s\S]*\.delete\(/);
 assert.match(qualitySource, /rejected_bad_public_affiliate_url: writeSmokesAllowed \? publicAffiliateConstraintOk : null/);
 assert.match(qualitySource, /mode,\n        write_smoke_skipped: !writeSmokesAllowed,\n        public_affiliate_constraint/);
+assert.match(qualitySource, /detail: \{\n      mode,\n      write_smoke_skipped: !writeSmokesAllowed,/);
 
 assert.match(readinessRoute, /searchParams\.get\("mode"\) === "read_only"/);
 assert.match(readinessRoute, /runApiConnectionChecks\(mode\)/);
