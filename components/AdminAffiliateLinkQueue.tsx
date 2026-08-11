@@ -9,6 +9,7 @@ import { formatPrice } from "@/lib/format";
 import { getCustomerPublishReadiness } from "@/lib/quality";
 import { getNaverPriceTrust } from "@/lib/naverPriceTrust";
 import { scrollToAdminAnchor } from "@/lib/adminNavigation";
+import { isManualPromotionSource } from "@/lib/manualPromotion";
 import type { ProductWithScore } from "@/lib/types";
 
 function headers(password: string) {
@@ -103,6 +104,16 @@ type AffiliateLinkVerificationResponse = {
   error?: string;
   message?: string;
 };
+
+type ManualPromotionResponse = {
+  error?: string;
+  message?: string;
+  product?: ProductWithScore;
+};
+
+function hasPublicProductMarker(product: Pick<ProductWithScore, "is_published" | "sourcing_status">) {
+  return product.is_published === true || product.sourcing_status === "published";
+}
 
 const MAX_BULK_LINK_CHECKS = 8;
 const MAX_BULK_TEMPLATE_LINES = 80;
@@ -253,6 +264,7 @@ export default function AdminAffiliateLinkQueue({
   const [bulkImportResult, setBulkImportResult] = useState<BulkImportResult | null>(null);
   const [bulkVerificationRunning, setBulkVerificationRunning] = useState(false);
   const [checkingLinkId, setCheckingLinkId] = useState<string | null>(null);
+  const [manualPromotingId, setManualPromotingId] = useState<string | null>(null);
   const [linkVerifications, setLinkVerifications] = useState<Record<string, CheckedAffiliateLinkVerification>>({});
   const [notice, setNotice] = useState<{ type: "info" | "success" | "error"; message: string } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -316,6 +328,14 @@ export default function AdminAffiliateLinkQueue({
       product.sourcing_status === "published" &&
       getCustomerPublishReadiness(product).ready
   ).length;
+  const manualPromotionProducts = useMemo(
+    () =>
+      products
+        .filter((product) => !hasPublicProductMarker(product))
+        .filter((product) => isManualPromotionSource(product.source) && getAffiliateIdentityReadiness(product).ready)
+        .sort((a, b) => (b.latest_score?.total_score ?? 0) - (a.latest_score?.total_score ?? 0)),
+    [products]
+  );
   const hiddenPublishedCount = products.filter(
     (product) =>
       (product.is_published || product.sourcing_status === "published") &&
@@ -637,6 +657,49 @@ export default function AdminAffiliateLinkQueue({
     }
   }
 
+  async function promoteDiscoveryProduct(product: ProductWithScore) {
+    if (hasPublicProductMarker(product)) {
+      setNotice({ type: "error", message: "공개 표식이 있는 상품은 수동 검수 전환을 시작하지 않습니다." });
+      return;
+    }
+    if (!isManualPromotionSource(product.source) || !getAffiliateIdentityReadiness(product).ready) {
+      setNotice({ type: "error", message: "알구몬·HotDeals 후보의 상품번호 일치 확인을 먼저 완료하세요." });
+      return;
+    }
+    if (!window.confirm("이 발견 후보를 수동 검수 후보로 전환합니다. 원본 출처를 보존하며 공개 게시하지 않습니다. 계속할까요?")) return;
+
+    const latestProduct = products.find((candidate) => candidate.id === product.id) ?? product;
+    if (hasPublicProductMarker(latestProduct)) {
+      setNotice({ type: "error", message: "상품 상태가 공개로 바뀌어 수동 검수 전환을 중단했습니다." });
+      return;
+    }
+
+    setManualPromotingId(product.id);
+    setNotice({ type: "info", message: "발견 후보를 수동 검수 대기 상태로 전환하는 중입니다. 공개 게시하지 않습니다." });
+    try {
+      const response = await fetch(`/api/admin/products/${product.id}/manual-promote`, {
+        method: "POST",
+        headers: headers(password),
+        body: JSON.stringify({ manual_review_confirmed: true })
+      });
+      const data = (await response.json().catch(() => ({}))) as ManualPromotionResponse;
+      if (!response.ok) {
+        if (data.error === "MANUAL_PROMOTION_PUBLIC_CONFLICT") {
+          setProducts((current) => current.filter((item) => item.id !== product.id));
+        }
+        setNotice({ type: "error", message: data.message ?? data.error ?? "수동 검수 전환에 실패했습니다." });
+        return;
+      }
+      await loadProducts();
+      onCompleted();
+      setNotice({ type: "success", message: "수동 검수 후보로 전환했습니다. 현재 상품은 공개 게시되지 않았습니다." });
+    } catch {
+      setNotice({ type: "error", message: "네트워크 문제로 수동 검수 전환을 완료하지 못했습니다." });
+    } finally {
+      setManualPromotingId(null);
+    }
+  }
+
   const backfillManualItemCount = backfillManualItems(backfillResult).length;
 
   return (
@@ -688,6 +751,34 @@ export default function AdminAffiliateLinkQueue({
         <p className={`mt-4 rounded-lg border px-3 py-2 text-sm font-bold ${noticeClassName(notice.type)}`} role="status" aria-live="polite">
           {notice.message}
         </p>
+      ) : null}
+
+      {manualPromotionProducts.length ? (
+        <div className="mt-4 rounded-lg border border-pine/30 bg-pine/5 p-4">
+          <p className="text-sm font-black text-pine">발견 후보 수동 검수 전환</p>
+          <p className="mt-1 max-w-3xl text-xs font-bold leading-5 text-steel">
+            상품번호 일치 확인이 끝난 Algumon/HotDeals 후보만 표시합니다. 버튼을 누르면 원본 출처를 보존한 수동 검수 후보로 바꾸며, 이 작업만으로는 공개 게시하지 않습니다.
+          </p>
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            {manualPromotionProducts.slice(0, 12).map((product) => (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-white px-3 py-2" key={product.id}>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-black text-ink">{product.title}</p>
+                  <p className="mt-1 text-[11px] font-bold text-steel">{product.source} · 상품번호 일치 확인 완료</p>
+                </div>
+                <button
+                  className="focus-ring inline-flex shrink-0 items-center justify-center rounded-lg border border-pine/40 px-3 py-2 text-xs font-black text-pine hover:bg-pine/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={manualPromotingId !== null || bulkImportRunning || bulkVerificationRunning}
+                  onClick={() => void promoteDiscoveryProduct(product)}
+                  title="원본 출처를 보존하고 수동 검수로 전환합니다. 공개 게시하지 않습니다."
+                  type="button"
+                >
+                  {manualPromotingId === product.id ? "전환 중" : "수동 검수로 전환 · 미게시"}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
       ) : null}
 
       {backfillResult ? (

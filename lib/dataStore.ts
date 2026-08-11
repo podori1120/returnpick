@@ -17,6 +17,7 @@ import { planDistributionClaim, type DistributionClaimOperation } from "@/lib/di
 import type { DistributionCandidateCursor, DistributionCandidatePage } from "@/lib/distributionQueue";
 import { parseSpecsFromTitle } from "@/lib/specParser";
 import { normalizeKeywordKey } from "@/lib/keywordCoverage";
+import { isManualPromotionStateUnchanged, type ManualPromotionWriteState } from "@/lib/manualPromotion";
 import {
   matchesSourcedProductForUpsert,
   preserveSourcedProductReviewState,
@@ -809,6 +810,66 @@ export async function updateProduct(id: string, patch: Partial<SourcedProduct>, 
     category: (normalizedPatch.category ?? memoryProducts[index].category) as Category,
     condition_grade: (normalizedPatch.condition_grade ?? memoryProducts[index].condition_grade) as ConditionGrade,
     sourcing_status: (normalizedPatch.sourcing_status ?? memoryProducts[index].sourcing_status) as SourcingStatus
+  };
+  const changeFlags = getSnapshotChangeFlags(previous, memoryProducts[index]);
+  if (changeFlags.length > 0) memorySnapshots.unshift(makeSnapshot(memoryProducts[index], changeFlags, options?.snapshotOrigin ?? "admin"));
+  persistMemoryState();
+  return memoryProducts[index];
+}
+
+export async function updateProductIfUnchanged(
+  id: string,
+  expected: ManualPromotionWriteState,
+  patch: Partial<SourcedProduct>,
+  options?: { snapshotOrigin?: SnapshotOrigin }
+) {
+  const client = getSupabaseServiceClient();
+  const normalizedPatch = {
+    ...patch,
+    updated_at: now()
+  };
+
+  if (client) {
+    const { data: beforeData, error: beforeError } = await client
+      .from("sourced_products")
+      .select("*")
+      .eq("id", id)
+      .eq("updated_at", expected.updated_at)
+      .eq("is_published", false)
+      .neq("sourcing_status", "published")
+      .maybeSingle();
+    if (beforeError) throw beforeError;
+    if (!beforeData) return null;
+
+    const { data, error } = await client
+      .from("sourced_products")
+      .update(normalizedPatch)
+      .eq("id", id)
+      .eq("updated_at", expected.updated_at)
+      .eq("is_published", false)
+      .neq("sourcing_status", "published")
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+
+    const product = data as SourcedProduct;
+    await createProductSnapshotSafely(product, getSnapshotChangeFlags(beforeData as SourcedProduct, product), options?.snapshotOrigin ?? "admin");
+    return product;
+  }
+
+  const index = memoryProducts.findIndex((product) => compareProductIdsEqual(product.id, id));
+  if (index < 0) return null;
+  const previous = memoryProducts[index];
+  if (!isManualPromotionStateUnchanged(expected, previous)) return null;
+
+  memoryProducts[index] = {
+    ...previous,
+    ...normalizedPatch,
+    id,
+    category: (normalizedPatch.category ?? previous.category) as Category,
+    condition_grade: (normalizedPatch.condition_grade ?? previous.condition_grade) as ConditionGrade,
+    sourcing_status: (normalizedPatch.sourcing_status ?? previous.sourcing_status) as SourcingStatus
   };
   const changeFlags = getSnapshotChangeFlags(previous, memoryProducts[index]);
   if (changeFlags.length > 0) memorySnapshots.unshift(makeSnapshot(memoryProducts[index], changeFlags, options?.snapshotOrigin ?? "admin"));
