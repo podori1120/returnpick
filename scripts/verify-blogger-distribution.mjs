@@ -112,6 +112,8 @@ if (bloggerLogSection.includes("accessToken") || bloggerLogSection.includes("cli
 requireSignals("Admin Blogger route", adminRoute, [
   "export async function GET(request: Request)",
   "probeBloggerConnection()",
+  "isBloggerDistributionEnabled()",
+  "getBloggerPublishMode()",
   "Blogger OAuth 또는 지정 블로그 접근을 확인하지 못했습니다.",
   "requireAdmin(request)",
   "requirePersistentStorage()",

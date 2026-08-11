@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getProductById } from "@/lib/dataStore";
 import { buildProductDistributionKit, getProductDistributionReadiness } from "@/lib/productDistributionKit";
-import { probeBloggerConnection, sendBloggerForProduct, type BloggerPostMode } from "@/lib/blogger";
+import { getBloggerPublishMode, isBloggerDistributionEnabled, probeBloggerConnection, sendBloggerForProduct, type BloggerPostMode } from "@/lib/blogger";
 import { requireAdmin, requirePersistentStorage } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
@@ -11,11 +11,12 @@ export async function GET(request: Request) {
   if (unauthorized) return unauthorized;
 
   const result = await probeBloggerConnection();
-  if (result.status === "ok") return NextResponse.json(result);
+  const automation = { enabled: isBloggerDistributionEnabled(), publish_mode: getBloggerPublishMode() };
+  if (result.status === "ok") return NextResponse.json({ ...result, ...automation });
   if (result.status === "not_configured") {
-    return NextResponse.json({ ...result, message: "Blogger와 Google OAuth 환경변수가 준비되지 않았습니다." }, { status: 503 });
+    return NextResponse.json({ ...result, ...automation, message: "Blogger와 Google OAuth 환경변수가 준비되지 않았습니다." }, { status: 503 });
   }
-  return NextResponse.json({ ...result, message: "Blogger OAuth 또는 지정 블로그 접근을 확인하지 못했습니다." }, { status: 502 });
+  return NextResponse.json({ ...result, ...automation, message: "Blogger OAuth 또는 지정 블로그 접근을 확인하지 못했습니다." }, { status: 502 });
 }
 
 const knownErrors = new Set([
