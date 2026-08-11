@@ -891,9 +891,26 @@ export async function listSourcingRuns(limit = 10) {
 export async function listSourcingExecutionRuns(limit = 10) {
   const client = getSupabaseServiceClient();
   if (client) {
-    const { data, error } = await client.from("sourcing_runs").select("*").order("started_at", { ascending: false }).limit(Math.max(limit * 3, limit));
-    if (error) throw error;
-    return ((data ?? []) as SourcingRun[]).filter(isSourcingExecutionRun).slice(0, limit);
+    const pageSize = Math.max(limit * 3, limit);
+    const executionRuns: SourcingRun[] = [];
+    let pageStart = 0;
+
+    while (executionRuns.length < limit) {
+      const { data, error } = await client
+        .from("sourcing_runs")
+        .select("*")
+        .order("started_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(pageStart, pageStart + pageSize - 1);
+      if (error) throw error;
+
+      const page = (data ?? []) as SourcingRun[];
+      executionRuns.push(...page.filter(isSourcingExecutionRun));
+      if (page.length < pageSize) break;
+      pageStart += page.length;
+    }
+
+    return executionRuns.slice(0, limit);
   }
 
   return memoryRuns.filter(isSourcingExecutionRun).slice(0, limit);
