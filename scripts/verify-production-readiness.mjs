@@ -108,7 +108,8 @@ const adminUiRequiredText = [
   "확인 가격 저장",
   "/api/admin/prices/manual",
   "/api/admin/session",
-  "/api/admin/editorial-campaign",
+  // The legacy fixed campaign endpoint remains API-compatible but is intentionally
+  // not rendered; AdminProductDistributionKit is the single rendered distribution UI.
   "/api/admin/bootstrap-catalog",
   "/api/admin/bootstrap-catalog/manual",
   "Supabase 전 임시 입력",
