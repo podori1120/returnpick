@@ -129,6 +129,12 @@ assert.deepEqual(
       dealId: "5227901",
       title: "[쿠팡] 레고 게임보이 & 세트",
       sourceUrl: "https://www.hotdeals.kr/deals/DasajaHotDeal/5227901"
+    },
+    {
+      siteId: "DasajaHotDeal",
+      dealId: "5227902",
+      title: "[ 쿠팡 ] 무선 키보드",
+      sourceUrl: "https://www.hotdeals.kr/deals/DasajaHotDeal/5227902"
     }
   ]
 );
@@ -169,7 +175,7 @@ assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] LG 그램 파우치", "LG
 assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] LG", "L"), false);
 assert.deepEqual(
   parseHotDealsCoupangDiscovery(hotDealsFixture, hotDealsPageUrl, "무선 키보드").map((record) => record.dealId),
-  []
+  ["5227902"]
 );
 assert.deepEqual(parseHotDealsCoupangDiscovery(hotDealsFixture, hotDealsPageUrl, "갤럭시북"), []);
 assert.deepEqual(parseHotDealsCoupangDiscovery(hotDealsLiveFixture, "https://evil.example/deals/k/쿠팡", "LG 그램 16"), []);

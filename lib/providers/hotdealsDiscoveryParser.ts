@@ -420,7 +420,7 @@ export function parseHotDealsCoupangDiscovery(html: string, pageUrl: string, key
         const canonical = parseHotDealsDetailUrl(readOpeningAttribute(token, "href") ?? "", page);
         const title = extractVisibleH2Title(html.slice(tagEnd + 1, closingAnchor.start));
         const keywordMatches = keyword == null || matchesHotDealsDiscoveryKeyword(title ?? "", keyword);
-        if (canonical && title && keywordMatches && title.startsWith("[쿠팡]") && title.length <= MAX_HOTDEALS_TITLE_CHARS) {
+        if (canonical && title && keywordMatches && /^\[\s*쿠팡\s*\]/u.test(title) && title.length <= MAX_HOTDEALS_TITLE_CHARS) {
           const key = `${canonical.siteId}:${canonical.dealId}`;
           if (!seen.has(key)) {
             seen.add(key);
