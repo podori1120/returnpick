@@ -98,7 +98,10 @@ const steps = [
   ["Check Git deployment state", process.execPath, ["scripts/verify-git-deploy-readiness.mjs"]],
   ["Pull Vercel production env", npxCommand, ["vercel", "env", "pull", ".env.production", "--environment=production", "--yes"]],
   ["Check Vercel env names", process.execPath, ["scripts/verify-vercel-env-names.mjs", "production"]],
-  ["Check launch env values", process.execPath, ["scripts/verify-production-env.mjs", "--launch"]]
+  // `vercel env pull` masks sensitive values locally. The preceding env-name
+  // check plus the mandatory post-deploy live doctor are the safe evidence
+  // path; real blank/invalid values still fail in the checker.
+  ["Check launch env values", process.execPath, ["scripts/verify-production-env.mjs", "--launch", "--allow-vercel-masked"]]
 ];
 
 let stopped = false;

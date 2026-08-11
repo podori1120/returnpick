@@ -5,6 +5,7 @@ import { blankEnvSources, envRawEntries, envSource, envValue, loadEnvFiles } fro
 
 const args = process.argv.slice(2);
 const launchMode = args.includes("--launch");
+const allowVercelMasked = args.includes("--allow-vercel-masked");
 const loadedFiles = loadEnvFiles();
 const results = [];
 
@@ -32,6 +33,14 @@ function looksLikePlaceholderValue(value) {
 function isVercelMaskedValue(value) {
   const raw = String(value ?? "").trim().toUpperCase();
   return raw === "[SENSITIVE]" || raw === "[REDACTED]" || raw === "[ENCRYPTED]";
+}
+
+function isQuotedVercelMaskedValue(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length < 2) return false;
+  const quote = raw[0];
+  if (!['"', "'"].includes(quote) || raw.at(-1) !== quote) return false;
+  return isVercelMaskedValue(raw.slice(1, -1).trim());
 }
 
 function validatePublicHttpsUrl(value) {
@@ -668,6 +677,17 @@ function outerWhitespaceSource(name) {
   })?.source ?? "";
 }
 
+function vercelMaskedProductionSource(name) {
+  return envRawEntries(name).find((entry) => {
+    const source = String(entry.source ?? "").trim().toLowerCase();
+    return source.endsWith(" in .env.production") && isQuotedVercelMaskedValue(entry.value);
+  })?.source ?? "";
+}
+
+function canUseVercelMaskedValue(name) {
+  return launchMode && allowVercelMasked ? vercelMaskedProductionSource(name) : "";
+}
+
 function invalidValueStatus(check) {
   return launchMode && !check.required ? "WARN" : "FAIL";
 }
@@ -677,8 +697,13 @@ function checkEnvItem(check) {
   const blankSources = blankEnvSources(check.name);
   const source = envSource(check.name);
   const mustHave = launchMode && check.required;
+  const maskedProductionSource = canUseVercelMaskedValue(check.name);
 
   if (!value) {
+    if (maskedProductionSource) {
+      add("WARN", check.name, "Vercel env pull masked this value locally; Vercel env names were checked and the post-deploy live doctor remains required");
+      return;
+    }
     const detail = blankSources.length ? `blank in ${blankSources.join(", ")}` : "not set";
     if (mustHave) add("FAIL", check.name, `${detail}; expected ${check.hint}`);
     else add("WARN", check.name, `${detail}; expected ${check.hint}`);
@@ -686,6 +711,10 @@ function checkEnvItem(check) {
   }
 
   if (isVercelMaskedValue(value)) {
+    if (maskedProductionSource) {
+      add("WARN", check.name, "Vercel env pull masked this value locally; Vercel env names were checked and the post-deploy live doctor remains required");
+      return;
+    }
     add(
       launchMode && check.required ? "FAIL" : "WARN",
       check.name,
@@ -725,7 +754,12 @@ if (bootstrapCatalogInspection.status === "valid") {
 
 const anon = envValue("NEXT_PUBLIC_SUPABASE_ANON_KEY");
 const service = envValue("SUPABASE_SERVICE_ROLE_KEY");
-if (anon && service) {
+const maskedSupabaseSources = ["NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"]
+  .map(vercelMaskedProductionSource)
+  .filter(Boolean);
+if (launchMode && allowVercelMasked && maskedSupabaseSources.length) {
+  add("WARN", "SUPABASE_KEYS_DIFFER", "Supabase keys are masked by Vercel locally; the live readiness/doctor check must verify the actual runtime keys");
+} else if (anon && service) {
   if (isVercelMaskedValue(anon) || isVercelMaskedValue(service)) {
     add(
       launchMode ? "FAIL" : "WARN",
