@@ -474,8 +474,10 @@ create unique index if not exists sourced_products_source_product_key
   on sourced_products (source, source_product_id)
   where source_product_id is not null;
 
-create unique index if not exists sourced_products_title_category_key
-  on sourced_products (lower(title), category);
+drop index if exists sourced_products_title_category_key;
+create unique index sourced_products_title_category_key
+  on sourced_products (lower(title), category)
+  where source not in ('algumon_discovery', 'hotdeals_discovery');
 
 with ranked_sourcing_keywords as (
   select
@@ -676,6 +678,6 @@ grant execute on function list_distribution_candidate_ids(text, integer, integer
 -- Record the version only after every table, migration, policy, grant, and
 -- compatibility backfill above has completed successfully.
 insert into returnpick_schema_meta (key, value, updated_at)
-values ('schema_version', '2026-08-09-blogger-keyset-queue', now())
+values ('schema_version', '2026-08-11-hotdeals-identity-v1', now())
 on conflict (key)
 do update set value = excluded.value, updated_at = now();

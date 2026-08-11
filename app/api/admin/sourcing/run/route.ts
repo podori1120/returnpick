@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { listSourcingExecutionRuns } from "@/lib/dataStore";
 import { getApiReadinessSummary } from "@/lib/apiReadiness";
+import { getPublicWebRuntimeProfile, matchesRequiredPublicWebProfile } from "@/lib/providers/publicWebProfile";
 import { runSourcing } from "@/lib/sourcing";
 import { getNextSourcingKeywordOffset } from "@/lib/sourcingCursor";
 import { diagnoseSourcingRun } from "@/lib/sourcingDiagnostics";
@@ -73,6 +74,17 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const readiness = getApiReadinessSummary();
     const publicWebOnlyRequested = body.sourceMode === "public_web_only";
+    const publicWebProfile = getPublicWebRuntimeProfile();
+    if (publicWebOnlyRequested && !matchesRequiredPublicWebProfile(body.requiredPublicWebProfile, publicWebProfile)) {
+      return NextResponse.json(
+        {
+          error: "PUBLIC_WEB_PROFILE_MISMATCH",
+          message: "요청한 공개 웹 수집 프로필과 현재 운영 설정이 일치하지 않아 후보 저장을 시작하지 않았습니다.",
+          public_web_profile: publicWebProfile
+        },
+        { status: 409 }
+      );
+    }
     const publicWebReady = readiness.items.some((item) => item.id === "public_web" && item.state === "ready");
     const publicWebOnlyAllowed = publicWebOnlyRequested && publicWebReady && readiness.runtimeReady;
     if (process.env.NODE_ENV === "production" && !readiness.apiKeysReady && !publicWebOnlyAllowed) {

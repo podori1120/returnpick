@@ -13,6 +13,7 @@ import {
   upsertSourcedProduct
 } from "@/lib/dataStore";
 import { isCoupangUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
+import { resolveDiscoveryReviewState } from "@/lib/sourcedProductIdentity";
 import { createCoupangDeeplink, searchCoupangProducts } from "@/lib/providers/coupangPartnersProvider";
 import { searchMockProducts } from "@/lib/providers/mockProvider";
 import { searchNaverReturnCandidates } from "@/lib/providers/naverCandidateProvider";
@@ -31,12 +32,18 @@ function isWithinKeywordPrice(product: ProviderProduct, keyword: SourcingKeyword
   return true;
 }
 
-function isAlgumonDiscoveryProduct(product: Pick<ProviderProduct, "source"> | Pick<SourcedProduct, "source">) {
-  return product.source === "algumon_discovery";
+function isDiscoveryOnlyProduct(product: Pick<ProviderProduct, "source"> | Pick<SourcedProduct, "source">) {
+  if (product.source === "algumon_discovery") return true;
+  return product.source === "hotdeals_discovery";
+}
+
+function discoveryManualReviewStatus(product: Pick<ProviderProduct, "source">) {
+  if (product.source === "algumon_discovery") return "ALGUMON_DISCOVERY_MANUAL_REVIEW";
+  return "HOTDEALS_DISCOVERY_MANUAL_REVIEW";
 }
 
 function classifyProduct(product: SourcedProduct, minDiscountRate: number | null): SourcingStatus {
-  if (isAlgumonDiscoveryProduct(product)) return "needs_review";
+  if (isDiscoveryOnlyProduct(product)) return "needs_review";
   const score = calculateDealScore(product);
   const reference = getPriceReferenceInfo(product).value;
   const deal = product.return_price ?? product.source_price ?? product.new_price;
@@ -266,14 +273,14 @@ async function enrichNaverLowestPrice(product: ProviderProduct, specJson: Record
 
 async function enrichAndSaveProduct(product: ProviderProduct, keyword: SourcingKeyword, options?: { allowAffiliateEnrichment?: boolean }) {
   const specJson = parseSpecsFromTitle(product.title, product.category);
-  const discoveryOnly = isAlgumonDiscoveryProduct(product);
+  const discoveryOnly = isDiscoveryOnlyProduct(product);
   const allowAffiliateEnrichment = options?.allowAffiliateEnrichment ?? true;
   const [naverPrice, affiliate] = await Promise.all([
     discoveryOnly
       ? Promise.resolve({
           price: null,
           priceLog: {
-            status: "ALGUMON_DISCOVERY_MANUAL_REVIEW",
+            status: discoveryManualReviewStatus(product),
             source_url: product.source_url ?? null
           }
         } satisfies NaverPriceEnrichment)
@@ -282,7 +289,7 @@ async function enrichAndSaveProduct(product: ProviderProduct, keyword: SourcingK
       ? Promise.resolve({
           affiliateUrl: null,
           deeplinkLog: {
-            status: "ALGUMON_DISCOVERY_MANUAL_REVIEW",
+            status: discoveryManualReviewStatus(product),
             source_url: product.source_url ?? null
           }
         } satisfies AffiliateEnrichment)
@@ -308,43 +315,44 @@ async function enrichAndSaveProduct(product: ProviderProduct, keyword: SourcingK
     : resolveStoredWebReturnInfo(product.title, product.raw_json?.web_return_info);
   const resolvedReturnInfo = resolveWebReturnEvidence(product, webReturnInfo);
 
-  const { product: saved, inserted } = await upsertSourcedProduct({
-    ...product,
-    keyword: keyword.keyword,
-    affiliate_url: affiliate.affiliateUrl,
-    naver_lowest_price: naverPrice.price,
-    condition_grade: discoveryOnly ? "확인필요" : resolvedReturnInfo.condition_grade,
-    return_price: discoveryOnly ? null : resolvedReturnInfo.return_price,
-    stock_count: discoveryOnly ? null : resolvedReturnInfo.stock_count,
-    spec_json: specJson,
-    raw_json: {
-      ...(product.raw_json ?? {}),
-      web_return_info: mergeStoredWebReturnInfo(product.raw_json?.web_return_info, webReturnInfo),
+  const { product: saved, inserted } = await upsertSourcedProduct(
+    {
+      ...product,
+      keyword: keyword.keyword,
+      affiliate_url: affiliate.affiliateUrl,
       naver_lowest_price: naverPrice.price,
-      naver_price_lookup: naverPrice.priceLog,
-      coupang_deeplink: affiliate.deeplinkLog
+      condition_grade: discoveryOnly ? "확인필요" : resolvedReturnInfo.condition_grade,
+      return_price: discoveryOnly ? null : resolvedReturnInfo.return_price,
+      stock_count: discoveryOnly ? null : resolvedReturnInfo.stock_count,
+      spec_json: specJson,
+      raw_json: {
+        ...(product.raw_json ?? {}),
+        web_return_info: mergeStoredWebReturnInfo(product.raw_json?.web_return_info, webReturnInfo),
+        naver_lowest_price: naverPrice.price,
+        naver_price_lookup: naverPrice.priceLog,
+        coupang_deeplink: affiliate.deeplinkLog
+      },
+      sourcing_status: "candidate",
+      is_published: false,
+      is_rejected: false
     },
-    sourcing_status: "candidate",
-    is_published: false,
-    is_rejected: false
-  });
+    { matchMode: discoveryOnly ? "source_identity_only" : "source_or_title" }
+  );
 
+  const discoveryReviewState = discoveryOnly ? resolveDiscoveryReviewState(saved, inserted) : null;
   const status = discoveryOnly
-    ? saved.sourcing_status === "rejected"
-      ? "rejected"
-      : "needs_review"
+    ? discoveryReviewState!.sourcing_status
     : saved.sourcing_status === "published" || saved.sourcing_status === "approved"
       ? saved.sourcing_status
       : classifyProduct(saved, keyword.min_discount_rate);
   const updated = await updateProduct(saved.id, {
     sourcing_status: status,
-    is_published: discoveryOnly ? false : saved.is_published,
-    is_rejected: status === "rejected",
-    rejection_reason:
-      status === "rejected"
-        ? discoveryOnly
-          ? saved.rejection_reason ?? "알구몬 후보 수동 검토에서 제외되었습니다."
-          : "네이버 최저가 대비 가격 매력이 낮습니다."
+    is_published: discoveryOnly ? discoveryReviewState!.is_published : saved.is_published,
+    is_rejected: discoveryOnly ? discoveryReviewState!.is_rejected : status === "rejected",
+    rejection_reason: discoveryOnly
+      ? discoveryReviewState!.rejection_reason
+      : status === "rejected"
+        ? "네이버 최저가 대비 가격 매력이 낮습니다."
         : null
   });
 

@@ -1,6 +1,8 @@
 import type { Category, ConditionGrade, JsonValue } from "@/lib/types";
 import type { ProviderProduct, ProviderSearchResult } from "@/lib/providers/types";
 import { parseAlgumonCoupangDiscovery } from "@/lib/providers/algumonDiscoveryParser";
+import { parseHotDealsCoupangDiscovery } from "@/lib/providers/hotdealsDiscoveryParser";
+import { HOTDEALS_DISCOVERY_HOST } from "@/lib/providers/publicWebProfile";
 import { cleanText, extractListedPriceCandidatesFromText, extractListedPriceFromText, extractReturnInfoFromText, toReturnInfoJson } from "@/lib/webReturnInfo";
 import { getSiteUrl } from "@/lib/siteUrl";
 import { isPublicWebHostname, safeAllowlistedPublicUrl } from "@/lib/publicWebUrlSafety";
@@ -880,6 +882,23 @@ function isAlgumonDealSearchPage(url: URL) {
   return url.protocol === "https:" && isAlgumonHost(url) && url.pathname === "/n/deal";
 }
 
+function isHotDealsHost(url: URL) {
+  return url.hostname === HOTDEALS_DISCOVERY_HOST || url.hostname === "hotdeals.kr";
+}
+
+function isHotDealsKeywordSearchPage(url: URL) {
+  return url.protocol === "https:" && isHotDealsHost(url) && /^\/deals\/k\/[^/]+$/u.test(url.pathname);
+}
+
+function isAllowedHotDealsHost(url: URL, allowedHosts: ReadonlySet<string>) {
+  return allowedHosts.has(url.hostname.toLowerCase()) || (isHotDealsHost(url) && (allowedHosts.has(HOTDEALS_DISCOVERY_HOST) || allowedHosts.has("hotdeals.kr")));
+}
+
+function isDiscoveryOnlyProviderProduct(product: Pick<ProviderProduct, "source">) {
+  if (product.source === "algumon_discovery") return true;
+  return product.source === "hotdeals_discovery";
+}
+
 function extractAlgumonDiscoveryCards(html: string, category: Category, keyword: string, pageUrl: string): ProviderProduct[] {
   const page = new URL(pageUrl);
   const observedAt = new Date().toISOString();
@@ -919,11 +938,53 @@ function extractAlgumonDiscoveryCards(html: string, category: Category, keyword:
   }));
 }
 
+function extractHotDealsDiscoveryCards(html: string, category: Category, keyword: string, pageUrl: string): ProviderProduct[] {
+  const page = new URL(pageUrl);
+  const observedAt = new Date().toISOString();
+
+  return parseHotDealsCoupangDiscovery(html, pageUrl, keyword).map((record) => ({
+    source: "hotdeals_discovery",
+    source_product_id: `hotdeals:${record.siteId}:${record.dealId}`,
+    category,
+    keyword,
+    title: record.title.slice(0, 140),
+    brand: null,
+    model_name: null,
+    image_url: null,
+    source_url: record.sourceUrl,
+    coupang_url: null,
+    affiliate_url: null,
+    source_price: null,
+    return_price: null,
+    new_price: null,
+    condition_grade: "확인필요",
+    stock_count: null,
+    raw_json: {
+      provider: "hotdeals_discovery",
+      candidate_kind: "discovery_only",
+      discovery_only: true,
+      source_title: record.title,
+      source_site: record.siteId,
+      source_site_id: record.siteId,
+      source_deal_id: record.dealId,
+      source_url: record.sourceUrl,
+      page_url: page.toString(),
+      observed_at: observedAt,
+      requires_manual_coupang_url: true,
+      outbound_not_fetched: true
+    }
+  }));
+}
+
 function extractCards(html: string, category: Category, keyword: string, pageUrl: string, allowedHosts: ReadonlySet<string>): ProviderProduct[] {
   const base = new URL(pageUrl);
   if (isAlgumonHost(base)) {
     if (!allowedHosts.has(base.hostname.toLowerCase())) return [];
     return isAlgumonDealSearchPage(base) ? extractAlgumonDiscoveryCards(html, category, keyword, pageUrl) : [];
+  }
+  if (isHotDealsHost(base)) {
+    if (!isAllowedHotDealsHost(base, allowedHosts)) return [];
+    return isHotDealsKeywordSearchPage(base) ? extractHotDealsDiscoveryCards(html, category, keyword, pageUrl) : [];
   }
   const anchorMatches = extractVisibleAnchorBlocks(html).filter((match) => match.inner.length <= 1500);
   const products: ProviderProduct[] = [];
@@ -1111,7 +1172,7 @@ async function enrichProductDetails(
 
   for (const [index, product] of enriched.entries()) {
     if (requestCount >= MAX_PUBLIC_WEB_DETAIL_PAGES) break;
-    if (product.source === "algumon_discovery") {
+    if (isDiscoveryOnlyProviderProduct(product)) {
       diagnostics.push({ stage: "detail", status: "DISCOVERY_ONLY_DETAIL_SKIPPED", url: product.source_url ?? undefined });
       continue;
     }

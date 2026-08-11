@@ -1905,7 +1905,7 @@ if (fileExists("scripts/verify-scheduled-affiliate-backfill.mjs")) {
 
 if (fileExists("sql/schema.sql")) {
   const schema = readText("sql/schema.sql");
-  const schemaVersion = "2026-08-09-blogger-keyset-queue";
+  const schemaVersion = "2026-08-11-hotdeals-identity-v1";
   const apiReadinessSource = fileExists("lib/apiReadiness.ts") ? readText("lib/apiReadiness.ts") : "";
   const distributionQueueSource = fileExists("lib/distributionQueue.ts") ? readText("lib/distributionQueue.ts") : "";
   check(
@@ -2523,8 +2523,8 @@ if (fileExists("lib/providers/publicWebProvider.ts")) {
       publicWebProvider.includes('if (product.source === "algumon_discovery")') &&
       sourcing.includes("ALGUMON_DISCOVERY_MANUAL_REVIEW") &&
       sourcing.includes('return "needs_review"') &&
-      sourcing.includes('saved.sourcing_status === "rejected"') &&
-      sourcing.includes("is_published: discoveryOnly ? false : saved.is_published") &&
+      sourcing.includes("resolveDiscoveryReviewState(saved, inserted)") &&
+      sourcing.includes("is_published: discoveryOnly ? discoveryReviewState!.is_published : saved.is_published") &&
       algumonQuality.includes('product.source === "algumon_discovery"') &&
       algumonQuality.includes("새 수동 상품으로 등록해야 합니다") &&
       algumonVerifier.includes("no ads, duplicates, images, outbound paths, or automatic detail visits"),
@@ -3551,7 +3551,7 @@ if (fileExists("lib/apiReadiness.ts")) {
   check(
     "readiness: supabase schema version marker",
     readiness.includes("EXPECTED_SCHEMA_VERSION") &&
-      readiness.includes("2026-08-09-blogger-keyset-queue") &&
+      readiness.includes("2026-08-11-hotdeals-identity-v1") &&
       readiness.includes("returnpick_schema_meta") &&
       readiness.includes("schema_version"),
     "admin readiness verifies the deployed DB has the latest schema.sql marker",

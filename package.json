@@ -72,6 +72,8 @@
     "schema:setup": "node scripts/print-supabase-setup-runbook.mjs",
     "schema:production": "node scripts/verify-supabase-schema.mjs",
     "sourcing:diagnose": "node scripts/diagnose-sourcing-recovery.mjs",
+    "sourcing:public-web:daily": "npm run algumon-discovery:check && node scripts/run-production-public-web-intake.mjs",
+    "sourcing:public-web:daily:check": "node scripts/verify-production-public-web-intake.mjs",
     "sourcing:throughput:check": "node scripts/verify-sourcing-throughput.mjs",
     "sourcing:keywords:check": "node scripts/verify-sourcing-keyword-coverage.mjs",
     "keyword-coverage:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-keyword-coverage-api.mjs",

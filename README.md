@@ -132,7 +132,7 @@ npm run schema:setup
 
 `schema.sql`은 새로 공개되는 상품이 `https://link.coupang.com/a/짧은코드` 형태의 엄격한 쿠팡 파트너스 단축 링크 없이 `published` 상태가 되는 것을 DB 레벨에서도 막습니다. 테스트·샘플처럼 보이는 단축 코드는 서버와 DB 양쪽에서 거부합니다. 이 제약은 `not valid`로 추가되어 기존 레거시 데이터 때문에 SQL 적용이 중단되지는 않지만, 이후 새로 저장하거나 수정하는 공개 상품에는 바로 적용됩니다. 기존 문제 데이터는 `/admin` 실제 연결 테스트의 `공개 데이터 품질` 항목에서 찾아 정리하세요.
 
-`schema.sql`은 `returnpick_schema_meta` 테이블에 `schema_version=2026-08-09-blogger-keyset-queue` 표식도 기록합니다. `/admin`의 실제 연결 테스트는 이 값을 확인하므로, Supabase 테이블은 있어도 최신 SQL을 다시 적용하지 않은 경우 `Supabase 운영 DB` 카드에서 바로 드러납니다. `last_observed_at`은 자동 소싱이 상품을 다시 찾은 시각만 기록하며, 관리자 수정 시각과 섞이지 않습니다. 관리자 수동 후보는 자동 관측 시각을 부여하지 않으므로, 수동 입력만으로 `24시간 내 수집` 상태가 되지 않고 구매 전 쿠팡 페이지 재확인이 계속 표시됩니다. 다만 관리자가 상품별 링크·이미지·가격을 확인해 명시적으로 게시하면 `manual_catalog_review` 증거를 남기고, 승인 대기용 임시 카탈로그에는 그 수동 검토 시각을 사용합니다. 수동 검토 증거는 7일 뒤 만료되어 다시 게시 검토와 카탈로그 내보내기가 필요합니다.
+`schema.sql`은 `returnpick_schema_meta` 테이블에 `schema_version=2026-08-11-hotdeals-identity-v1` 표식도 기록합니다. `/admin`의 실제 연결 테스트는 이 값을 확인하므로, Supabase 테이블은 있어도 최신 SQL을 다시 적용하지 않은 경우 `Supabase 운영 DB` 카드에서 바로 드러납니다. `last_observed_at`은 자동 소싱이 상품을 다시 찾은 시각만 기록하며, 관리자 수정 시각과 섞이지 않습니다. 관리자 수동 후보는 자동 관측 시각을 부여하지 않으므로, 수동 입력만으로 `24시간 내 수집` 상태가 되지 않고 구매 전 쿠팡 페이지 재확인이 계속 표시됩니다. 다만 관리자가 상품별 링크·이미지·가격을 확인해 명시적으로 게시하면 `manual_catalog_review` 증거를 남기고, 승인 대기용 임시 카탈로그에는 그 수동 검토 시각을 사용합니다. 수동 검토 증거는 7일 뒤 만료되어 다시 게시 검토와 카탈로그 내보내기가 필요합니다.
 
 또한 실제 연결 테스트는 Supabase RPC로 `is_strict_coupang_partners_url` 함수를 직접 호출해 정상 파트너스 단축 링크는 허용하고, 테스트 코드처럼 보이는 링크와 일반 쿠팡 상품 URL은 거부하는지 확인합니다. 버전 표식만 맞고 DB 함수가 빠졌거나 다르게 적용된 상태도 이 단계에서 막힙니다.
 
@@ -208,7 +208,15 @@ PUBLIC_WEB_ALLOWED_HOSTS=www.algumon.com
 PUBLIC_WEB_SEARCH_TEMPLATES=https://www.algumon.com/n/deal?keyword={keyword}
 ```
 
-이 소스는 공개 목록의 상품명·출처·표시 문구만 후보 근거로 보관하며 이미지, 외부 목적지, 쿠팡 상품번호, 반품가, 재고, 제휴 링크를 복사하거나 추정하지 않습니다. 발견 후보는 항상 `needs_review`로 저장되고 상세 페이지 자동 방문도 건너뜁니다. 관리자는 후보의 원문 참고 주소를 확인한 뒤 실제 쿠팡 상품 URL과 **상품별** 파트너스 링크를 직접 입력하고, 가격·이미지·반품등급·재고를 확인해야 게시할 수 있습니다. 검색 서비스의 이용약관·robots.txt·요청 제한이 바뀌면 즉시 allowlist에서 제외하고, 공개 수집을 켜기 전 `npm run public-web:check`로 다시 확인하세요. 이 참고 수집은 쿠팡 페이지를 크롤링하거나 쿠팡 파트너스 API 권한을 대신하지 않습니다.
+알구몬과 HotDeals를 한 번에 사용하는 고정 프로필은 아래 설정을 **알구몬, HotDeals 순서 그대로** 입력하고 `/api/admin/sourcing/run` 요청의 `requiredPublicWebProfile`에 `algumon_hotdeals_discovery_v1`을 지정합니다. 순서를 바꾸거나 호스트·템플릿을 추가·중복·누락하면 `custom`으로 처리되어 공개웹 전용 실행이 차단됩니다.
+
+```bash
+PUBLIC_WEB_CRAWL_ENABLED=true
+PUBLIC_WEB_ALLOWED_HOSTS=www.algumon.com,www.hotdeals.kr
+PUBLIC_WEB_SEARCH_TEMPLATES=https://www.algumon.com/n/deal?keyword={keyword},https://www.hotdeals.kr/deals/k/%EC%BF%A0%ED%8C%A1?keyword={keyword}
+```
+
+이 소스는 공개 목록의 상품명·출처·표시 문구만 후보 근거로 보관하며 이미지, 외부 목적지, 쿠팡 상품번호, 반품가, 재고, 제휴 링크를 복사하거나 추정하지 않습니다. 신규 발견 후보만 `needs_review`로 저장되고, 동일한 소스 ID가 다시 관측되면 기존 승인·게시·거절 상태를 보존하며 상세 페이지 자동 방문도 건너뜁니다. 관리자는 후보의 원문 참고 주소를 확인한 뒤 실제 쿠팡 상품 URL과 **상품별** 파트너스 링크를 직접 입력하고, 가격·이미지·반품등급·재고를 확인해야 게시할 수 있습니다. 검색 서비스의 이용약관·robots.txt·요청 제한이 바뀌면 즉시 allowlist에서 제외하고, 공개 수집을 켜기 전 `npm run public-web:check`로 다시 확인하세요. 이 참고 수집은 쿠팡 페이지를 크롤링하거나 쿠팡 파트너스 API 권한을 대신하지 않습니다.
 
 공개 웹 참고 수집을 켜기 전에는 아래 명령으로 allowlist, 검색 템플릿, robots.txt, Crawl-delay를 먼저 확인하세요. `PUBLIC_WEB_CRAWL_ENABLED=false`이면 실제 공개 웹 요청을 하지 않고 비활성 상태만 보여줍니다.
 
@@ -313,8 +321,17 @@ curl -X POST http://localhost:3000/api/admin/sourcing/run \
 curl -X POST http://localhost:3000/api/admin/sourcing/run \
   -H "Content-Type: application/json" \
   -H "x-admin-password: YOUR_ADMIN_PASSWORD" \
-  -d "{\"sourceMode\":\"public_web_only\",\"useMockFallback\":false,\"keywordLimit\":6}"
+  -d "{\"sourceMode\":\"public_web_only\",\"requiredPublicWebProfile\":\"hotdeals_discovery_v2\",\"useMockFallback\":false,\"keywordLimit\":6}"
 ```
+
+매일 운영 수집은 아래 전용 실행기를 사용합니다. 이 실행기는 `.env.production`, `.env.local`, `.env`에서 관리자 인증을 읽되 값을 출력하지 않고, 운영 readiness의 정확한 알구몬·HotDeals 프로필과 필수 연결 검사를 먼저 확인합니다. 최근 15분 내 실제 수집이 있으면 쓰지 않고 멈추며, 한 번에 활성 키워드 8개만 처리합니다. 첫 구간이 오류·후보·저장·갱신 없이 완주되고 `FETCHED_HTML` 진단만 있을 때에만 키워드 스냅샷과 최신 실행 ID를 다시 확인한 뒤 다음 구간을 한 번 실행합니다. 결과는 `COMPLETED_REVIEW_ONLY`, `PARTIAL`, `BLOCKED_AUTH`, `BLOCKED_NOOP` 중 하나의 JSON으로만 보고하며 자동 게시나 외부 발송은 하지 않습니다.
+
+```powershell
+npm.cmd run sourcing:public-web:daily:check
+npm.cmd run sourcing:public-web:daily
+```
+
+쓰기 요청은 네트워크 오류 때 자동 재시도하지 않습니다. 응답을 받지 못해 실제 저장 여부가 불명확하면 `PARTIAL`로 끝내고 다음 실행의 15분 중복 가드가 운영 DB를 다시 확인하도록 합니다.
 
 활성화된 `sourcing_keywords`를 읽고, 쿠팡 파트너스 API, 네이버 쇼핑 반품 후보, 공개 웹 참고 수집, mock provider 순서로 후보를 수집한 뒤 스펙 파싱, 네이버 최저가 보완, 점수화를 수행합니다.
 

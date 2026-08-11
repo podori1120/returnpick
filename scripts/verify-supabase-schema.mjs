@@ -6,7 +6,7 @@ import { envValue, loadEnvFiles } from "./load-env-files.mjs";
 
 loadEnvFiles();
 
-const EXPECTED_SCHEMA_VERSION = "2026-08-09-blogger-keyset-queue";
+const EXPECTED_SCHEMA_VERSION = "2026-08-11-hotdeals-identity-v1";
 const requiredTables = [
   "returnpick_schema_meta",
   "sourcing_keywords",
@@ -124,6 +124,146 @@ async function writeSmokeCheck(client) {
   if (cleanupErrors.length) return result(false, "write:cleanup", cleanupErrors.join(" | "));
 
   return result(true, "write:smoke", "sourcing_runs and affiliate_events insert/delete ok");
+}
+
+async function discoveryIdentityPersistenceCheck(client) {
+  const token = randomUUID();
+  const title = `ReturnPick discovery identity ${token}`;
+  const manualId = randomUUID();
+  const hotAId = randomUUID();
+  const hotBId = randomUUID();
+  const duplicateIdentityId = randomUUID();
+  const duplicateManualId = randomUUID();
+  const cleanupIds = [manualId, hotAId, hotBId, duplicateIdentityId, duplicateManualId];
+  const hotAIdentity = `hotdeals:schema-regression:${token}:100`;
+  const hotBIdentity = `hotdeals:schema-regression:${token}:200`;
+  const rejectionReason = "schema verifier preserved rejection";
+  const failures = [];
+
+  try {
+    const inserted = await client
+      .from("sourced_products")
+      .insert([
+        {
+          id: manualId,
+          source: "manual_admin",
+          source_product_id: `manual-schema-regression-${token}`,
+          category: "laptop",
+          title,
+          sourcing_status: "approved",
+          is_published: false,
+          raw_json: { verifier: true, smoke_test: "discovery_identity_manual" }
+        },
+        {
+          id: hotAId,
+          source: "hotdeals_discovery",
+          source_product_id: hotAIdentity,
+          category: "laptop",
+          title,
+          sourcing_status: "rejected",
+          is_published: false,
+          is_rejected: true,
+          rejection_reason: rejectionReason,
+          raw_json: { verifier: true, smoke_test: "discovery_identity_a" }
+        },
+        {
+          id: hotBId,
+          source: "hotdeals_discovery",
+          source_product_id: hotBIdentity,
+          category: "laptop",
+          title,
+          sourcing_status: "needs_review",
+          is_published: false,
+          is_rejected: false,
+          raw_json: { verifier: true, smoke_test: "discovery_identity_b" }
+        }
+      ])
+      .select("id,source,source_product_id,sourcing_status,is_published,is_rejected,rejection_reason");
+
+    if (inserted.error) {
+      failures.push(`coexistence insert: ${inserted.error.message}`);
+    } else {
+      const insertedIds = new Set((inserted.data ?? []).map((row) => row.id));
+      if (insertedIds.size !== 3 || ![manualId, hotAId, hotBId].every((id) => insertedIds.has(id))) {
+        failures.push("coexistence insert did not return all three exact rows");
+      }
+
+      const reprocessed = await client
+        .from("sourced_products")
+        .update({ raw_json: { verifier: true, smoke_test: "discovery_identity_reprocessed" } })
+        .eq("source", "hotdeals_discovery")
+        .eq("source_product_id", hotAIdentity)
+        .select("id,sourcing_status,is_published,is_rejected,rejection_reason")
+        .maybeSingle();
+      if (reprocessed.error) {
+        failures.push(`exact identity reprocess: ${reprocessed.error.message}`);
+      } else if (
+        reprocessed.data?.id !== hotAId ||
+        reprocessed.data?.sourcing_status !== "rejected" ||
+        reprocessed.data?.is_published !== false ||
+        reprocessed.data?.is_rejected !== true ||
+        reprocessed.data?.rejection_reason !== rejectionReason
+      ) {
+        failures.push("exact identity reprocess changed the rejected review state");
+      }
+
+      const duplicateIdentity = await client.from("sourced_products").insert({
+        id: duplicateIdentityId,
+        source: "hotdeals_discovery",
+        source_product_id: hotAIdentity,
+        category: "monitor",
+        title: `${title} duplicate identity`,
+        sourcing_status: "needs_review",
+        is_published: false,
+        raw_json: { verifier: true, smoke_test: "discovery_identity_duplicate" }
+      });
+      if (duplicateIdentity.error?.code !== "23505") {
+        failures.push(
+          duplicateIdentity.error
+            ? `duplicate source identity returned ${duplicateIdentity.error.code ?? "unknown"}: ${duplicateIdentity.error.message}`
+            : "duplicate source identity was accepted"
+        );
+      }
+
+      const duplicateManual = await client.from("sourced_products").insert({
+        id: duplicateManualId,
+        source: "schema_verifier_duplicate",
+        source_product_id: `manual-schema-regression-duplicate-${token}`,
+        category: "laptop",
+        title,
+        sourcing_status: "candidate",
+        is_published: false,
+        raw_json: { verifier: true, smoke_test: "manual_title_duplicate" }
+      });
+      if (duplicateManual.error?.code !== "23505") {
+        failures.push(
+          duplicateManual.error
+            ? `duplicate non-discovery title returned ${duplicateManual.error.code ?? "unknown"}: ${duplicateManual.error.message}`
+            : "duplicate non-discovery title/category was accepted"
+        );
+      }
+    }
+  } catch (error) {
+    failures.push(`unexpected verifier error: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    const cleanup = await client.from("sourced_products").delete().in("id", cleanupIds);
+    if (cleanup.error) failures.push(`cleanup delete: ${cleanup.error.message}`);
+
+    const remaining = await client.from("sourced_products").select("id").in("id", cleanupIds);
+    if (remaining.error) {
+      failures.push(`cleanup verification: ${remaining.error.message}`);
+    } else if ((remaining.data ?? []).length) {
+      failures.push(`cleanup verification found ${(remaining.data ?? []).length} remaining row(s)`);
+    }
+  }
+
+  return result(
+    !failures.length,
+    "write:discovery_identity",
+    failures.length
+      ? failures.join(" | ")
+      : "manual review row and same-title discovery identities coexist; exact rejection state, identity uniqueness, legacy title uniqueness, and cleanup passed"
+  );
 }
 
 async function distributionDeliverySmokeCheck(client) {
@@ -429,6 +569,7 @@ async function main() {
   for (const check of requiredSchemaChecks) checks.push(await columnCheck(client, check));
   checks.push(await schemaVersionCheck(client));
   checks.push(await strictAffiliateFunctionCheck(client));
+  checks.push(await discoveryIdentityPersistenceCheck(client));
   checks.push(await distributionDeliverySmokeCheck(client));
   checks.push(await writeSmokeCheck(client));
   checks.push(await publicColumnBoundaryCheck(url, client, anonKey));

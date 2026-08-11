@@ -17,6 +17,11 @@ import { planDistributionClaim, type DistributionClaimOperation } from "@/lib/di
 import type { DistributionCandidateCursor, DistributionCandidatePage } from "@/lib/distributionQueue";
 import { parseSpecsFromTitle } from "@/lib/specParser";
 import { normalizeKeywordKey } from "@/lib/keywordCoverage";
+import {
+  matchesSourcedProductForUpsert,
+  preserveSourcedProductReviewState,
+  type SourcedProductMatchMode
+} from "@/lib/sourcedProductIdentity";
 import type {
   AffiliateEvent,
   AffiliateEventType,
@@ -694,10 +699,11 @@ export async function insertSourcedProduct(input: ProductInput) {
   return { product: payload, inserted: true as const };
 }
 
-export async function upsertSourcedProduct(input: ProductInput) {
+export async function upsertSourcedProduct(input: ProductInput, options?: { matchMode?: SourcedProductMatchMode }) {
   const client = getSupabaseServiceClient();
   const payload = makeProduct(input);
   const insertPayload = { ...payload, id: input.id ?? undefined };
+  const matchMode = options?.matchMode ?? "source_or_title";
 
   if (client) {
     let existing: SourcedProduct | null = null;
@@ -711,7 +717,7 @@ export async function upsertSourcedProduct(input: ProductInput) {
       if (error) throw error;
       existing = data as SourcedProduct | null;
     }
-    if (!existing) {
+    if (!existing && matchMode !== "source_identity_only") {
       const { data, error } = await client
         .from("sourced_products")
         .select("*")
@@ -727,10 +733,7 @@ export async function upsertSourcedProduct(input: ProductInput) {
         ...insertPayload,
         id: undefined,
         created_at: undefined,
-        sourcing_status: existing.sourcing_status,
-        is_published: existing.is_published,
-        is_rejected: existing.is_rejected,
-        rejection_reason: existing.rejection_reason,
+        ...preserveSourcedProductReviewState(existing),
         ...preserveExistingReviewFields(existing, payload)
       };
       const { data, error } = await client
@@ -752,12 +755,7 @@ export async function upsertSourcedProduct(input: ProductInput) {
     return { product, inserted: true };
   }
 
-  const existingIndex = memoryProducts.findIndex((product) => {
-    const sameSourceId =
-      payload.source_product_id && product.source === payload.source && product.source_product_id === payload.source_product_id;
-    const sameTitle = product.category === payload.category && product.title.toLowerCase() === payload.title.toLowerCase();
-    return sameSourceId || sameTitle;
-  });
+  const existingIndex = memoryProducts.findIndex((product) => matchesSourcedProductForUpsert(product, payload, matchMode));
 
   if (existingIndex >= 0) {
     const previous = memoryProducts[existingIndex];
@@ -767,10 +765,7 @@ export async function upsertSourcedProduct(input: ProductInput) {
       ...preserveExistingReviewFields(memoryProducts[existingIndex], payload),
       id: memoryProducts[existingIndex].id,
       created_at: memoryProducts[existingIndex].created_at,
-      sourcing_status: memoryProducts[existingIndex].sourcing_status,
-      is_published: memoryProducts[existingIndex].is_published,
-      is_rejected: memoryProducts[existingIndex].is_rejected,
-      rejection_reason: memoryProducts[existingIndex].rejection_reason,
+      ...preserveSourcedProductReviewState(memoryProducts[existingIndex]),
       updated_at: now()
     };
     memorySnapshots.unshift(makeSnapshot(memoryProducts[existingIndex], getSnapshotChangeFlags(previous, memoryProducts[existingIndex]), "sourcing"));

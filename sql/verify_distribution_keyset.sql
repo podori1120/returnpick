@@ -215,7 +215,7 @@ begin
   ) then
     raise exception 'authenticated can execute private keyset candidate RPC';
   end if;
-  if applied_version <> '2026-08-09-blogger-keyset-queue' then
+  if applied_version <> '2026-08-11-hotdeals-identity-v1' then
     raise exception 'schema version mismatch: %', applied_version;
   end if;
 end;

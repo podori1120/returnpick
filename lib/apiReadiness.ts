@@ -29,7 +29,7 @@ import { isStrongAdminPassword } from "@/lib/validators";
 type ReadinessState = "ready" | "missing" | "partial" | "disabled";
 type ReadinessMode = "pre_approval" | "manual_launch_ready" | "api_ready" | "launch_ready";
 
-const EXPECTED_SCHEMA_VERSION = "2026-08-09-blogger-keyset-queue";
+const EXPECTED_SCHEMA_VERSION = "2026-08-11-hotdeals-identity-v1";
 
 export type ApiReadinessItem = {
   id: string;
