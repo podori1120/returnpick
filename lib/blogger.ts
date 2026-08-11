@@ -24,6 +24,12 @@ type BloggerApiPost = {
   url?: unknown;
 };
 
+type BloggerApiBlog = {
+  id?: unknown;
+  name?: unknown;
+  url?: unknown;
+};
+
 type BloggerDeliveryStatus = "failed" | "ambiguous";
 
 class BloggerProviderError extends Error {
@@ -184,6 +190,44 @@ function safeBloggerError(error: unknown) {
   const message = error instanceof Error ? error.message : "";
   if (/^(BLOGGER|GOOGLE_OAUTH)_/.test(message)) return message.slice(0, 120);
   return "BLOGGER_PROVIDER_FAILED";
+}
+
+export async function probeBloggerConnection() {
+  const config = getBloggerConfig();
+  if (!config) return { status: "not_configured" as const, blog_url: null };
+
+  let accessToken: string;
+  try {
+    accessToken = await refreshGoogleAccessToken(config);
+  } catch (error) {
+    return { status: "error" as const, blog_url: config.blogUrl, error: safeBloggerError(error) };
+  }
+
+  const endpoint = `https://www.googleapis.com/blogger/v3/blogs/${encodeURIComponent(config.blogId)}`;
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(endpoint, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" }
+    });
+  } catch (error) {
+    return { status: "error" as const, blog_url: config.blogUrl, error: safeBloggerError(error) };
+  }
+
+  if (!response.ok) return { status: "error" as const, blog_url: config.blogUrl, error: `BLOGGER_HTTP_${response.status}` };
+
+  const payload = (await response.json().catch(() => ({}))) as BloggerApiBlog;
+  if (payload.id !== config.blogId) {
+    return { status: "error" as const, blog_url: config.blogUrl, error: "BLOGGER_BLOG_ID_MISMATCH" };
+  }
+
+  return {
+    status: "ok" as const,
+    blog_id: config.blogId,
+    blog_url: config.blogUrl,
+    provider_url: typeof payload.url === "string" && payload.url.trim() ? payload.url : null,
+    blog_name: typeof payload.name === "string" && payload.name.trim() ? payload.name.slice(0, 160) : null
+  };
 }
 
 function safeDistributionLedgerError(error: unknown) {

@@ -1,10 +1,22 @@
 import { NextResponse } from "next/server";
 import { getProductById } from "@/lib/dataStore";
 import { buildProductDistributionKit, getProductDistributionReadiness } from "@/lib/productDistributionKit";
-import { sendBloggerForProduct, type BloggerPostMode } from "@/lib/blogger";
+import { probeBloggerConnection, sendBloggerForProduct, type BloggerPostMode } from "@/lib/blogger";
 import { requireAdmin, requirePersistentStorage } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
+  const unauthorized = requireAdmin(request);
+  if (unauthorized) return unauthorized;
+
+  const result = await probeBloggerConnection();
+  if (result.status === "ok") return NextResponse.json(result);
+  if (result.status === "not_configured") {
+    return NextResponse.json({ ...result, message: "Blogger와 Google OAuth 환경변수가 준비되지 않았습니다." }, { status: 503 });
+  }
+  return NextResponse.json({ ...result, message: "Blogger OAuth 또는 지정 블로그 접근을 확인하지 못했습니다." }, { status: 502 });
+}
 
 const knownErrors = new Set([
   "PRODUCT_NOT_FOUND",

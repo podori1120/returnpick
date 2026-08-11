@@ -98,12 +98,21 @@ requireSignals("Blogger provider", blogger, [
   "ambiguous",
   "BLOGGER_DISTRIBUTION_DISABLED"
 ]);
+requireSignals("Blogger connection probe", blogger, [
+  "probeBloggerConnection",
+  "BLOGGER_BLOG_ID_MISMATCH",
+  "method: \"GET\"",
+  "BLOGGER_HTTP_"
+]);
 const bloggerLogSection = blogger.slice(blogger.indexOf("async function recordBloggerLog"), blogger.indexOf("export async function sendBloggerForProduct"));
 if (bloggerLogSection.includes("accessToken") || bloggerLogSection.includes("clientSecret") || bloggerLogSection.includes("refreshToken")) {
   throw new Error("Blogger logs must not include OAuth access tokens");
 }
 
 requireSignals("Admin Blogger route", adminRoute, [
+  "export async function GET(request: Request)",
+  "probeBloggerConnection()",
+  "Blogger OAuth 또는 지정 블로그 접근을 확인하지 못했습니다.",
   "requireAdmin(request)",
   "requirePersistentStorage()",
   "mode !== \"preview\" && mode !== \"draft\" && mode !== \"publish\"",
