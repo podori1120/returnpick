@@ -990,7 +990,7 @@ async function main() {
     }
 
     try {
-      const liveChecks = await readJson("/api/admin/api-readiness", {
+      const liveChecks = await readJson("/api/admin/api-readiness?mode=read_only", {
         method: "POST",
         headers: adminHeaders()
       });
@@ -999,7 +999,11 @@ async function main() {
         fail("connection checks", `POST returned ${liveChecks.response.status}`);
       } else {
         readiness = liveChecks.json?.readiness ?? readiness;
-        checkConnectionCards(readiness, liveChecks.json?.checks);
+        if (liveChecks.json?.mode !== "read_only") {
+          fail("connection checks", "readiness POST did not confirm read_only mode");
+        } else {
+          checkConnectionCards(readiness, liveChecks.json?.checks);
+        }
       }
     } catch (error) {
       fail("connection checks", error instanceof Error ? error.message : "POST failed");

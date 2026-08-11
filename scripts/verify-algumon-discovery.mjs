@@ -487,7 +487,8 @@ assert.match(
 assert.match(qualitySource, /product\.source === "hotdeals_discovery"/);
 assert.match(qualitySource, /HotDeals 후보는 실제 쿠팡 상품과 상품별 파트너스 링크/);
 assert.match(readinessRouteSource, /publicWebProfile = getPublicWebRuntimeProfile\(\)/);
-assert.match(readinessRouteSource, /NextResponse\.json\(\{ readiness, storage, checks, publicWebProfile \}\)/);
+assert.match(readinessRouteSource, /NextResponse\.json\(\{ readiness, storage, checks, publicWebProfile(?:, mode)? \}\)/);
+assert.match(readinessRouteSource, /runApiConnectionChecks\(mode\)/);
 assert.match(sourcingRouteSource, /matchesRequiredPublicWebProfile\(body\.requiredPublicWebProfile, publicWebProfile\)/);
 assert.match(sourcingRouteSource, /PUBLIC_WEB_PROFILE_MISMATCH/);
 assert.ok(

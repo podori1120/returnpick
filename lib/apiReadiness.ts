@@ -28,6 +28,7 @@ import { isStrongAdminPassword } from "@/lib/validators";
 
 type ReadinessState = "ready" | "missing" | "partial" | "disabled";
 type ReadinessMode = "pre_approval" | "manual_launch_ready" | "api_ready" | "launch_ready";
+export type ApiReadinessCheckMode = "full" | "read_only";
 
 const EXPECTED_SCHEMA_VERSION = "2026-08-11-hotdeals-identity-v1";
 
@@ -214,8 +215,23 @@ function connectionCheckFailure(id: string, label: string, error: unknown): ApiC
   };
 }
 
-function dataQualityDependencyCheck(message: string, supabaseStatus: string): ApiConnectionCheck {
+function withReadinessMode(check: ApiConnectionCheck, mode: ApiReadinessCheckMode): ApiConnectionCheck {
   return {
+    ...check,
+    detail: {
+      ...(check.detail ?? {}),
+      mode,
+      write_smoke_skipped: mode === "read_only"
+    }
+  };
+}
+
+function dataQualityDependencyCheck(
+  message: string,
+  supabaseStatus: string,
+  mode: ApiReadinessCheckMode = "full"
+): ApiConnectionCheck {
+  return withReadinessMode({
     id: "data_quality",
     label: "공개 데이터 품질",
     status: "skipped",
@@ -225,7 +241,7 @@ function dataQualityDependencyCheck(message: string, supabaseStatus: string): Ap
       supabase_status: supabaseStatus,
       operator_next_action: "Supabase 운영 DB 설정과 스키마 검사를 먼저 통과시킨 뒤 공개 데이터 품질 검사를 다시 실행하세요."
     }
-  };
+  }, mode);
 }
 
 function describeCoupangApiIssue(...values: Array<string | null | undefined>) {
@@ -507,14 +523,27 @@ function describeSupabaseIssue(detail: Record<string, JsonValue>, fallbackMessag
 
 function readableSupabaseConnectionCheck(check: ApiConnectionCheck): ApiConnectionCheck {
   if (check.id !== "supabase") return check;
+  const readOnlyMode = check.detail?.mode === "read_only";
+
+  if (readOnlyMode && check.status === "ok") {
+    return {
+      ...check,
+      label: "Supabase 운영 DB",
+      message: "Read-only Supabase schema/RPC checks passed; write and anon RLS smoke checks were skipped."
+    };
+  }
 
   if (check.status === "skipped") {
     return {
       ...check,
       label: "Supabase 운영 DB",
-      message: "Supabase 환경변수가 없어 운영 DB 연결 테스트를 건너뜁니다. 승인 전 화면 확인은 가능하지만 실제 반복 운영에는 Supabase 연결이 필요합니다.",
+      message: readOnlyMode
+        ? "Read-only Supabase checks skipped because environment is not configured; write and anon RLS smoke checks were skipped."
+        : "Supabase 환경변수가 없어 운영 DB 연결 테스트를 건너뜁니다. 승인 전 화면 확인은 가능하지만 실제 반복 운영에는 Supabase 연결이 필요합니다.",
       detail: {
         ...(check.detail ?? {}),
+        mode: check.detail?.mode ?? "full",
+        write_smoke_skipped: readOnlyMode,
         operator_next_action: "Supabase 프로젝트를 만들고 sql/schema.sql을 적용한 뒤 URL, anon key, service role key를 Vercel에 등록하세요."
       }
     };
@@ -532,9 +561,13 @@ function readableSupabaseConnectionCheck(check: ApiConnectionCheck): ApiConnecti
   return {
     ...check,
     label: "Supabase 운영 DB",
-    message: issue.message,
+    message: readOnlyMode
+      ? `Read-only Supabase schema/RPC checks failed; write and anon RLS smoke checks were skipped. ${issue.message}`
+      : issue.message,
     detail: {
       ...(check.detail ?? {}),
+      mode: check.detail?.mode ?? "full",
+      write_smoke_skipped: readOnlyMode,
       supabase_issue_code: issue.code,
       operator_next_action: issue.nextAction,
       raw_provider_message: check.message
@@ -1294,32 +1327,45 @@ async function runStrictAffiliateSqlFunctionSmokeCheck(client: NonNullable<Retur
   };
 }
 
-async function runPublicDataQualityCheck(client: NonNullable<ReturnType<typeof getSupabaseServiceClient>>): Promise<ApiConnectionCheck> {
+async function runPublicDataQualityCheck(
+  client: NonNullable<ReturnType<typeof getSupabaseServiceClient>>,
+  mode: ApiReadinessCheckMode = "full"
+): Promise<ApiConnectionCheck> {
   const approvalUrl = process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL?.trim() ?? "";
-  const invalidPublicId = randomUUID();
-  const invalidPublicInsert = await client
-    .from("sourced_products")
-    .insert({
-      id: invalidPublicId,
-      source: "readiness_check",
-      source_product_id: `invalid-public-affiliate-${invalidPublicId}`,
-      category: "laptop",
-      title: `ReturnPick invalid public affiliate smoke ${invalidPublicId}`,
-      affiliate_url: "https://link.coupang.com/a/readiness",
-      sourcing_status: "published",
-      is_published: true,
-      raw_json: { source: "api_readiness", should_be_rejected: true }
-    })
-    .select("id")
-    .single();
-  const invalidPublicCleanup = invalidPublicInsert.error ? null : await client.from("sourced_products").delete().eq("id", invalidPublicId);
-  const invalidPublicRejectedByConstraint =
-    invalidPublicInsert.error?.code === "23514" ||
-    invalidPublicInsert.error?.message?.includes("sourced_products_public_affiliate_url_check") ||
-    invalidPublicInsert.error?.details?.includes("sourced_products_public_affiliate_url_check") ||
-    false;
-  const invalidPublicUnexpectedError = invalidPublicInsert.error && !invalidPublicRejectedByConstraint ? invalidPublicInsert.error : null;
-  const publicAffiliateConstraintOk = invalidPublicRejectedByConstraint;
+  const writeSmokesAllowed = mode === "full";
+  let invalidPublicInsert: { error: { code?: string; message?: string; details?: string } | null } | null = null;
+  let invalidPublicCleanup: { error: { message?: string } | null } | null = null;
+  let invalidPublicRejectedByConstraint: boolean | null = null;
+  let invalidPublicUnexpectedError: { message?: string } | null = null;
+
+  if (writeSmokesAllowed) {
+    const invalidPublicId = randomUUID();
+    const insertResult = await client
+      .from("sourced_products")
+      .insert({
+        id: invalidPublicId,
+        source: "readiness_check",
+        source_product_id: `invalid-public-affiliate-${invalidPublicId}`,
+        category: "laptop",
+        title: `ReturnPick invalid public affiliate smoke ${invalidPublicId}`,
+        affiliate_url: "https://link.coupang.com/a/readiness",
+        sourcing_status: "published",
+        is_published: true,
+        raw_json: { source: "api_readiness", should_be_rejected: true }
+      })
+      .select("id")
+      .single();
+    invalidPublicInsert = { error: insertResult.error };
+    const cleanupResult = insertResult.error ? null : await client.from("sourced_products").delete().eq("id", invalidPublicId);
+    invalidPublicCleanup = cleanupResult ? { error: cleanupResult.error } : null;
+    invalidPublicRejectedByConstraint =
+      insertResult.error?.code === "23514" ||
+      insertResult.error?.message?.includes("sourced_products_public_affiliate_url_check") ||
+      insertResult.error?.details?.includes("sourced_products_public_affiliate_url_check") ||
+      false;
+    invalidPublicUnexpectedError = insertResult.error && !invalidPublicRejectedByConstraint ? insertResult.error : null;
+  }
+  const publicAffiliateConstraintOk = writeSmokesAllowed ? invalidPublicRejectedByConstraint === true : false;
   const publicBaseQuery = () => client.from("sourced_products").select("id", { count: "exact", head: true }).eq("is_published", true).eq("sourcing_status", "published");
 
   const published = await publicBaseQuery();
@@ -1359,6 +1405,13 @@ async function runPublicDataQualityCheck(client: NonNullable<ReturnType<typeof g
       status: "error",
       message: `공개 데이터 품질 검사 ${queryErrors.length}건에 실패했습니다. sourced_products 권한과 컬럼을 확인하세요.`,
       detail: {
+        mode,
+        write_smoke_skipped: !writeSmokesAllowed,
+        public_affiliate_constraint: {
+          mode,
+          write_smoke_skipped: !writeSmokesAllowed,
+          rejected_bad_public_affiliate_url: writeSmokesAllowed ? publicAffiliateConstraintOk : null
+        },
         errors: queryErrors.map((error) => error?.message ?? "UNKNOWN_DATA_QUALITY_ERROR")
       }
     };
@@ -1372,14 +1425,23 @@ async function runPublicDataQualityCheck(client: NonNullable<ReturnType<typeof g
   const publicQualityBlockerSummary = summarizePublicQualityBlockers(publicQualityBlockedProducts);
   const statusMismatchCount = statusMismatch.count ?? 0;
   const approvalLinkReuseCount = approvalLinkReuse?.count ?? 0;
-  const blockingCount = publicQualityBlockedCount + approvalLinkReuseCount + (publicAffiliateConstraintOk ? 0 : 1);
-  const operatorNextAction = publicQualityNextAction(publicQualityBlockerSummary, approvalLinkReuseCount, publicAffiliateConstraintOk);
+  const constraintBlocker = writeSmokesAllowed && !publicAffiliateConstraintOk;
+  const blockingCount = publicQualityBlockedCount + approvalLinkReuseCount + (constraintBlocker ? 1 : 0);
+  const operatorNextAction = publicQualityNextAction(
+    publicQualityBlockerSummary,
+    approvalLinkReuseCount,
+    mode === "read_only" ? true : publicAffiliateConstraintOk
+  );
 
   return {
     id: "data_quality",
     label: "공개 데이터 품질",
     status: blockingCount ? "error" : "ok",
-    message: blockingCount
+    message: mode === "read_only" && blockingCount
+      ? "Read-only data-quality queries found blockers; write-only smoke checks and the affiliate constraint probe were skipped."
+      : mode === "read_only"
+        ? "Read-only data-quality queries passed; write-only smoke checks were skipped."
+        : blockingCount
       ? `공개 상품 데이터 정리가 필요합니다. 고객공개 품질 블로커 ${publicQualityBlockedCount}건, 제휴 링크 누락 ${missingAffiliateCount}건, 비정상 파트너스 링크 ${badAffiliateCount}건, 승인용 링크 재사용 ${approvalLinkReuseCount}건, DB 제약 ${publicAffiliateConstraintOk ? "통과" : "미적용"}.`
       : `공개 상품 ${publishedCount}건의 구매 CTA와 고객공개 품질 기준, DB 제약이 통과했습니다.`,
     detail: {
@@ -1395,9 +1457,11 @@ async function runPublicDataQualityCheck(client: NonNullable<ReturnType<typeof g
       public_quality_blocker_summary: publicQualityBlockerSummary,
       operator_next_action: operatorNextAction,
       public_affiliate_constraint: {
-        rejected_bad_public_affiliate_url: publicAffiliateConstraintOk,
-        rejection_code: invalidPublicInsert.error?.code ?? null,
-        rejection_message: invalidPublicInsert.error?.message ?? null,
+        mode,
+        write_smoke_skipped: !writeSmokesAllowed,
+        rejected_bad_public_affiliate_url: writeSmokesAllowed ? publicAffiliateConstraintOk : null,
+        rejection_code: invalidPublicInsert?.error?.code ?? null,
+        rejection_message: invalidPublicInsert?.error?.message ?? null,
         cleanup_error: invalidPublicCleanup?.error?.message ?? null
       },
       sample_bad_affiliate_products: badAffiliateProducts.slice(0, 5).map((product) => ({
@@ -1895,7 +1959,7 @@ export async function getSupabaseStorageReadiness(): Promise<SupabaseStorageRead
   }
 }
 
-export async function runApiConnectionChecks(): Promise<ApiConnectionCheck[]> {
+export async function runApiConnectionChecks(mode: ApiReadinessCheckMode = "full"): Promise<ApiConnectionCheck[]> {
   const summary = getApiReadinessSummary();
   const itemById = new Map(summary.items.map((item) => [item.id, item]));
   const checks: ApiConnectionCheck[] = [];
@@ -2087,20 +2151,49 @@ export async function runApiConnectionChecks(): Promise<ApiConnectionCheck[]> {
   try {
   const supabase = itemById.get("supabase");
   if (!hasSupabaseConfig()) {
-    checks.push({ id: "supabase", label: "Supabase 운영 DB", status: "skipped", message: "Supabase 값이 없어 로컬 저장소 모드입니다." });
-    dataQualityCheck = dataQualityDependencyCheck("Supabase 값이 없어 공개 데이터 품질 검사를 건너뜁니다.", "not_configured");
+    checks.push({
+      id: "supabase",
+      label: "Supabase 운영 DB",
+      status: "skipped",
+      message:
+        mode === "read_only"
+          ? "Read-only Supabase checks skipped because environment is not configured; write and anon RLS smoke checks were skipped."
+          : "Supabase 값이 없어 로컬 저장소 모드입니다.",
+      detail: {
+        mode,
+        write_smoke_skipped: mode === "read_only"
+      }
+    });
+    dataQualityCheck = dataQualityDependencyCheck(
+      mode === "read_only"
+        ? "Read-only Supabase checks skipped because environment is not configured; data-quality queries and write-only smoke checks were skipped."
+        : "Supabase 값이 없어 공개 데이터 품질 검사를 건너뜁니다.",
+      "not_configured",
+      mode
+    );
   } else if (supabase?.state !== "ready") {
     checks.push({
       id: "supabase",
       label: "Supabase 운영 DB",
       status: "error",
-      message: supabase?.message ?? "Supabase 환경변수 형식을 확인하세요.",
+      message:
+        mode === "read_only"
+          ? `Read-only Supabase checks failed because the environment is not ready; write and anon RLS smoke checks were skipped. ${supabase?.message ?? "Supabase 환경변수 형식을 확인하세요."}`
+          : supabase?.message ?? "Supabase 환경변수 형식을 확인하세요.",
       detail: {
+        mode,
+        write_smoke_skipped: mode === "read_only",
         missing_or_invalid_env: supabase?.missingEnv ?? [],
         next_action: supabase?.nextAction ?? "Supabase URL과 key를 다시 확인하세요."
       }
     });
-    dataQualityCheck = dataQualityDependencyCheck("Supabase 환경변수가 준비되지 않아 공개 데이터 품질 검사를 건너뜁니다.", "invalid_configuration");
+    dataQualityCheck = dataQualityDependencyCheck(
+      mode === "read_only"
+        ? "Read-only Supabase checks did not pass because the environment is not ready; data-quality queries and write-only smoke checks were skipped."
+        : "Supabase 환경변수가 준비되지 않아 공개 데이터 품질 검사를 건너뜁니다.",
+      "invalid_configuration",
+      mode
+    );
   } else {
     const client = getSupabaseServiceClient();
     const requiredTables = [
@@ -2161,11 +2254,15 @@ export async function runApiConnectionChecks(): Promise<ApiConnectionCheck[]> {
     const strictAffiliateFunction =
       client && !failedTables.length && !failedSchema.length ? await runStrictAffiliateSqlFunctionSmokeCheck(client) : null;
     const distributionLedgerSmoke =
-      client && !failedTables.length && !failedSchema.length ? await runDistributionDeliveryLedgerSmokeCheck(client) : null;
+      mode === "full" && client && !failedTables.length && !failedSchema.length
+        ? await runDistributionDeliveryLedgerSmokeCheck(client)
+        : null;
     const writeSmoke =
-      client && !failedTables.length && !failedSchema.length && strictAffiliateFunction?.ok ? await runSupabaseWriteSmokeCheck(client) : null;
+      mode === "full" && client && !failedTables.length && !failedSchema.length && strictAffiliateFunction?.ok
+        ? await runSupabaseWriteSmokeCheck(client)
+        : null;
     const anonRlsSmoke =
-      client && !failedTables.length && !failedSchema.length && strictAffiliateFunction?.ok && writeSmoke?.ok
+      mode === "full" && client && !failedTables.length && !failedSchema.length && strictAffiliateFunction?.ok && writeSmoke?.ok
         ? await runAnonPublicRlsSmokeCheck(client)
         : null;
     const failedStrictAffiliateFunctionSteps = strictAffiliateFunction?.steps.filter((step) => !step.ok) ?? [];
@@ -2184,10 +2281,16 @@ export async function runApiConnectionChecks(): Promise<ApiConnectionCheck[]> {
       id: "supabase",
       label: "Supabase 운영 DB",
       status: failedCount ? "error" : "ok",
-      message: failedCount
+      message: mode === "read_only"
+        ? failedCount
+          ? "Read-only Supabase schema/RPC checks failed; write and anon RLS smoke checks were skipped."
+          : "Read-only Supabase schema/RPC checks passed; write and anon RLS smoke checks were skipped."
+        : failedCount
         ? `테이블/스키마/쓰기/RLS 확인 ${failedCount}건에 실패했습니다. schema.sql과 Supabase key를 다시 확인하세요.`
         : "필수 운영 테이블, 최신 컬럼, 실행 로그/클릭 이벤트 쓰기, anon 공개 RLS 경로가 모두 확인되었습니다.",
       detail: {
+        mode,
+        write_smoke_skipped: mode === "read_only",
         tables: tableChecks,
         schema: schemaChecks,
         schema_version: {
@@ -2208,20 +2311,39 @@ export async function runApiConnectionChecks(): Promise<ApiConnectionCheck[]> {
     });
     dataQualityCheck =
       !failedCount && client
-        ? await runPublicDataQualityCheck(client)
-        : dataQualityDependencyCheck("Supabase 스키마 또는 쓰기 검사가 통과하지 않아 공개 데이터 품질 검사를 건너뜁니다.", "schema_check_failed");
+        ? await runPublicDataQualityCheck(client, mode)
+        : dataQualityDependencyCheck(
+            mode === "read_only"
+              ? "Read-only Supabase schema/RPC checks did not pass; data-quality queries and write-only smoke checks were skipped."
+              : "Supabase 스키마 또는 쓰기 검사가 통과하지 않아 공개 데이터 품질 검사를 건너뜁니다.",
+            "schema_check_failed",
+            mode
+          );
   }
 
   } catch (error) {
-    const failure = connectionCheckFailure("supabase", "Supabase 운영 DB", error);
+    const failure = withReadinessMode(connectionCheckFailure("supabase", "Supabase 운영 DB", error), mode);
     const existingSupabaseIndex = checks.findIndex((check) => check.id === "supabase");
     if (existingSupabaseIndex >= 0) checks[existingSupabaseIndex] = failure;
     else checks.push(failure);
-    dataQualityCheck = dataQualityDependencyCheck("Supabase 연결 테스트 중 예외가 발생해 공개 데이터 품질 검사를 건너뜁니다.", "connection_error");
+    dataQualityCheck = dataQualityDependencyCheck(
+      mode === "read_only"
+        ? "Read-only Supabase connection checks raised an exception; data-quality queries and write-only smoke checks were skipped."
+        : "Supabase 연결 테스트 중 예외가 발생해 공개 데이터 품질 검사를 건너뜁니다.",
+      "connection_error",
+      mode
+    );
   }
 
   checks.push(
-    dataQualityCheck ?? dataQualityDependencyCheck("Supabase 검사 결과를 확인할 수 없어 공개 데이터 품질 검사를 건너뜁니다.", "unknown")
+    dataQualityCheck ??
+      dataQualityDependencyCheck(
+        mode === "read_only"
+          ? "Read-only Supabase checks returned no result; data-quality queries and write-only smoke checks were skipped."
+          : "Supabase 검사 결과를 확인할 수 없어 공개 데이터 품질 검사를 건너뜁니다.",
+        "unknown",
+        mode
+      )
   );
 
   try {
