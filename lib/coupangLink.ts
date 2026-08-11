@@ -28,6 +28,9 @@ export function cleanCoupangSearchQuery(product: Pick<CoupangLinkProduct, "title
     raw = `${product.brand} ${raw}`;
   }
   return raw
+    .replace(/^\s*(?:\[\s*쿠팡\s*\]|\(\s*쿠팡(?:\s*WOW)?\s*\))\s*/iu, " ")
+    .replace(/\s*\((?=[^()]*\d[\d,]*\s*원)(?:[^()]|\([^()]*\))*\)\s*$/iu, " ")
+    .replace(/\s*\((?:무료배송|무료\s*배송|와우\s*무료|와우\s*무배|무배)\)\s*$/iu, " ")
     .replace(/반품\s*[-–]?\s*(미개봉|최상|상|중|확인필요|알수없음)?/gi, " ")
     .replace(/\b(return|returned|renewed|refurbished|open\s*box)\b/gi, " ")
     .replace(/\s+/g, " ")
