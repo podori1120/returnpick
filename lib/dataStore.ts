@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import path from "path";
 import { readBootstrapCatalog } from "@/lib/bootstrapCatalog";
-import { isGenericCoupangLandingUrl, isUsableAffiliateUrl } from "@/lib/coupangLink";
+import { isGenericCoupangLandingUrl, isUsableAffiliateUrl, isUsableCoupangProductUrl } from "@/lib/coupangLink";
 import { demoCatalog } from "@/lib/demoCatalog";
 import { stableDemoProductId } from "@/lib/demoIdentity";
 import { getCustomerPublishReadiness, getDealQuality } from "@/lib/quality";
@@ -212,6 +212,7 @@ function preserveExistingReviewFields(existing: SourcedProduct, payload: Sourced
     last_observed_at: payload.last_observed_at ?? existing.last_observed_at,
     image_url: isUsableProductImageUrl(existing.image_url) ? existing.image_url : payload.image_url,
     affiliate_url: isUsableAffiliateUrl(existing.affiliate_url) ? existing.affiliate_url : payload.affiliate_url,
+    coupang_url: isUsableCoupangProductUrl(existing.coupang_url) ? existing.coupang_url : payload.coupang_url,
     raw_json: {
       ...(existing.raw_json ?? {}),
       ...(payload.raw_json ?? {})
