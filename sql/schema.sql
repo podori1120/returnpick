@@ -283,6 +283,128 @@ create table if not exists sourcing_runs (
   log_json jsonb default '{}'
 );
 
+-- Coordinate same-mode sourcing runs inside one database transaction. The
+-- transaction-scoped advisory lock serializes callers for a source mode while
+-- allowing different source modes to proceed concurrently.
+create or replace function create_coordinated_sourcing_run(
+  p_run_id uuid,
+  p_status text,
+  p_source_mode text,
+  p_started_at timestamptz,
+  p_finished_at timestamptz,
+  p_keyword_count integer,
+  p_found_count integer,
+  p_inserted_count integer,
+  p_updated_count integer,
+  p_error_count integer,
+  p_error_message text,
+  p_log_json jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  existing_run sourcing_runs%rowtype;
+  created_run sourcing_runs%rowtype;
+  normalized_log_json jsonb;
+begin
+  if p_run_id is null then
+    raise exception 'SOURCING_RUN_ID_REQUIRED' using errcode = '22023';
+  end if;
+
+  if p_status is distinct from 'running' then
+    raise exception 'SOURCING_RUN_STATUS_INVALID' using errcode = '22023';
+  end if;
+
+  if p_source_mode is null or p_source_mode not in ('auto', 'public_web_only') then
+    raise exception 'SOURCING_RUN_SOURCE_MODE_INVALID' using errcode = '22023';
+  end if;
+
+  if p_started_at is null then
+    raise exception 'SOURCING_RUN_STARTED_AT_INVALID' using errcode = '22023';
+  end if;
+
+  perform pg_advisory_xact_lock(
+    hashtextextended('returnpick:sourcing:coordination:' || p_source_mode, 0)
+  );
+
+  -- A deterministic run id is idempotent even when the prior run is no longer active.
+  select *
+  into existing_run
+  from sourcing_runs
+  where id = p_run_id;
+
+  if found then
+    return jsonb_build_object('created', false, 'run', to_jsonb(existing_run));
+  end if;
+
+  -- Null/legacy mode and null timestamps fail closed. A typed timestamptz
+  -- cannot contain malformed text; null is the database representation of an
+  -- unavailable timestamp and is handled like the TypeScript NaN path.
+  select *
+  into existing_run
+  from sourcing_runs as candidate
+  where candidate.status = 'running'
+    and (
+      candidate.started_at is null
+      or (
+        abs(extract(epoch from (clock_timestamp() - candidate.started_at))) < 300
+        and (
+          jsonb_typeof(coalesce(candidate.log_json, '{}'::jsonb)) <> 'object'
+          or candidate.log_json->>'source_mode' is null
+          or candidate.log_json->>'source_mode' not in ('auto', 'public_web_only')
+          or candidate.log_json->>'source_mode' = p_source_mode
+        )
+      )
+    )
+  order by candidate.started_at asc nulls first, candidate.id asc
+  limit 1;
+
+  if found then
+    return jsonb_build_object('created', false, 'run', to_jsonb(existing_run));
+  end if;
+
+  -- Keep the source mode authoritative in every newly coordinated row so
+  -- future callers never have to guess whether this run is safe to compare.
+  normalized_log_json := case
+    when jsonb_typeof(coalesce(p_log_json, '{}'::jsonb)) = 'object'
+      then jsonb_set(coalesce(p_log_json, '{}'::jsonb), '{source_mode}', to_jsonb(p_source_mode), true)
+    else jsonb_build_object('source_mode', p_source_mode)
+  end;
+
+  insert into sourcing_runs (
+    id,
+    status,
+    started_at,
+    finished_at,
+    keyword_count,
+    found_count,
+    inserted_count,
+    updated_count,
+    error_count,
+    error_message,
+    log_json
+  ) values (
+    p_run_id,
+    p_status,
+    p_started_at,
+    p_finished_at,
+    p_keyword_count,
+    p_found_count,
+    p_inserted_count,
+    p_updated_count,
+    p_error_count,
+    p_error_message,
+    normalized_log_json
+  )
+  returning * into created_run;
+
+  return jsonb_build_object('created', true, 'run', to_jsonb(created_run));
+end;
+$$;
+
 create table if not exists telegram_logs (
   id uuid primary key default gen_random_uuid(),
   product_id uuid references sourced_products(id) on delete set null,
@@ -672,12 +794,44 @@ grant select (
   change_flags
 ) on table product_snapshots to anon, authenticated;
 
+-- Server routes use the service role only from the backend. Grant it the
+-- application tables' DML privileges without changing anon/authenticated
+-- access, and keep future objects in this schema covered as well.
+grant usage on schema public to service_role;
+grant select, insert, update, delete on table
+  returnpick_schema_meta,
+  sourcing_keywords,
+  sourced_products,
+  deal_scores,
+  sourcing_runs,
+  telegram_logs,
+  distribution_deliveries,
+  product_snapshots,
+  affiliate_events
+to service_role;
+grant usage, select on all sequences in schema public to service_role;
+grant execute on all functions in schema public to service_role;
+
+alter default privileges in schema public
+  grant select, insert, update, delete on tables to service_role;
+alter default privileges in schema public
+  grant usage, select on sequences to service_role;
+alter default privileges in schema public
+  grant execute on functions to service_role;
+
 revoke all on function list_distribution_candidate_ids(text, integer, integer, timestamptz, uuid) from public, anon, authenticated;
 grant execute on function list_distribution_candidate_ids(text, integer, integer, timestamptz, uuid) to service_role;
+
+revoke all on function create_coordinated_sourcing_run(
+  uuid, text, text, timestamptz, timestamptz, integer, integer, integer, integer, integer, text, jsonb
+) from public, anon, authenticated;
+grant execute on function create_coordinated_sourcing_run(
+  uuid, text, text, timestamptz, timestamptz, integer, integer, integer, integer, integer, text, jsonb
+) to service_role;
 
 -- Record the version only after every table, migration, policy, grant, and
 -- compatibility backfill above has completed successfully.
 insert into returnpick_schema_meta (key, value, updated_at)
-values ('schema_version', '2026-08-11-hotdeals-identity-v1', now())
+values ('schema_version', '2026-08-12-sourcing-coordination-v1', now())
 on conflict (key)
 do update set value = excluded.value, updated_at = now();

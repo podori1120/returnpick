@@ -132,7 +132,7 @@ npm run schema:setup
 
 `schema.sql`은 새로 공개되는 상품이 `https://link.coupang.com/a/짧은코드` 형태의 엄격한 쿠팡 파트너스 단축 링크 없이 `published` 상태가 되는 것을 DB 레벨에서도 막습니다. 테스트·샘플처럼 보이는 단축 코드는 서버와 DB 양쪽에서 거부합니다. 이 제약은 `not valid`로 추가되어 기존 레거시 데이터 때문에 SQL 적용이 중단되지는 않지만, 이후 새로 저장하거나 수정하는 공개 상품에는 바로 적용됩니다. 기존 문제 데이터는 `/admin` 실제 연결 테스트의 `공개 데이터 품질` 항목에서 찾아 정리하세요.
 
-`schema.sql`은 `returnpick_schema_meta` 테이블에 `schema_version=2026-08-11-hotdeals-identity-v1` 표식도 기록합니다. `/admin`의 실제 연결 테스트는 이 값을 확인하므로, Supabase 테이블은 있어도 최신 SQL을 다시 적용하지 않은 경우 `Supabase 운영 DB` 카드에서 바로 드러납니다. `last_observed_at`은 자동 소싱이 상품을 다시 찾은 시각만 기록하며, 관리자 수정 시각과 섞이지 않습니다. 관리자 수동 후보는 자동 관측 시각을 부여하지 않으므로, 수동 입력만으로 `24시간 내 수집` 상태가 되지 않고 구매 전 쿠팡 페이지 재확인이 계속 표시됩니다. 다만 관리자가 상품별 링크·이미지·가격을 확인해 명시적으로 게시하면 `manual_catalog_review` 증거를 남기고, 승인 대기용 임시 카탈로그에는 그 수동 검토 시각을 사용합니다. 수동 검토 증거는 7일 뒤 만료되어 다시 게시 검토와 카탈로그 내보내기가 필요합니다.
+`schema.sql`은 `returnpick_schema_meta` 테이블에 `schema_version=2026-08-12-sourcing-coordination-v1` 표식도 기록합니다. `/admin`의 실제 연결 테스트는 이 값을 확인하므로, Supabase 테이블은 있어도 최신 SQL을 다시 적용하지 않은 경우 `Supabase 운영 DB` 카드에서 바로 드러납니다. 같은 소싱 모드의 중복 실행은 DB 트랜잭션 advisory lock으로 원자적으로 조정되며, 조정 RPC는 service role에서만 실행할 수 있습니다. `last_observed_at`은 자동 소싱이 상품을 다시 찾은 시각만 기록하며, 관리자 수정 시각과 섞이지 않습니다. 관리자 수동 후보는 자동 관측 시각을 부여하지 않으므로, 수동 입력만으로 `24시간 내 수집` 상태가 되지 않고 구매 전 쿠팡 페이지 재확인이 계속 표시됩니다. 다만 관리자가 상품별 링크·이미지·가격을 확인해 명시적으로 게시하면 `manual_catalog_review` 증거를 남기고, 승인 대기용 임시 카탈로그에는 그 수동 검토 시각을 사용합니다. 수동 검토 증거는 7일 뒤 만료되어 다시 게시 검토와 카탈로그 내보내기가 필요합니다.
 
 또한 실제 연결 테스트는 Supabase RPC로 `is_strict_coupang_partners_url` 함수를 직접 호출해 정상 파트너스 단축 링크는 허용하고, 테스트 코드처럼 보이는 링크와 일반 쿠팡 상품 URL은 거부하는지 확인합니다. 버전 표식만 맞고 DB 함수가 빠졌거나 다르게 적용된 상태도 이 단계에서 막힙니다.
 
@@ -437,7 +437,7 @@ npm run env:check:launch
 npm run env:repair
 ```
 
-This repair plan also prints the external hourly scheduler checklist: set GitHub Repository secret `RETURNPICK_CRON_SECRET` to the same value as Vercel `CRON_SECRET`, set Repository variable `RETURNPICK_SITE_URL` to the public site URL, then manually run `ReturnPick Hourly Scheduler` and confirm `/api/cron/sourcing` plus `/api/cron/telegram-digest?limit=1` succeed.
+This repair plan also prints the external hourly scheduler checklist: set GitHub Repository secret `RETURNPICK_CRON_SECRET` to the same value as Vercel `CRON_SECRET`, set Repository variable `RETURNPICK_SITE_URL` to the public site URL, then manually run `ReturnPick Hourly Scheduler` and confirm `/api/cron/sourcing`, `/api/cron/affiliate-backfill`, `/api/cron/blogger-digest`, and `/api/cron/telegram-digest?limit=1` succeed.
 
 ```bash
 RETURNPICK_ADMIN_PASSWORD=운영관리자비밀번호 npm run check:production
@@ -779,9 +779,10 @@ ReturnPick은 Vercel Cron 또는 외부 스케줄러로 반복 운영할 수 있
 
 - `https://배포주소/api/cron/sourcing`
 - `https://배포주소/api/cron/affiliate-backfill`
+- `https://배포주소/api/cron/blogger-digest`
 - `https://배포주소/api/cron/telegram-digest`
 
-이 저장소에는 `.github/workflows/returnpick-hourly.yml`도 포함되어 있습니다. GitHub에 연결해 두면 Vercel Hobby에서도 GitHub Actions가 1시간마다 위 세 Cron API를 수집 → 링크 보강 → 텔레그램 순서로 호출할 수 있습니다.
+이 저장소에는 `.github/workflows/returnpick-hourly.yml`도 포함되어 있습니다. GitHub에 연결해 두면 Vercel Hobby에서도 GitHub Actions가 1시간마다 위 네 Cron API를 수집 → 링크 보강 → Blogger → 텔레그램 순서로 호출할 수 있습니다.
 
 GitHub Actions 1시간 스케줄러 설정:
 
@@ -789,7 +790,8 @@ GitHub Actions 1시간 스케줄러 설정:
 2. Repository secret `RETURNPICK_CRON_SECRET`에 Vercel의 `CRON_SECRET`과 같은 값을 넣습니다.
 3. Repository variable `RETURNPICK_SITE_URL`에 `https://returnpick.vercel.app`을 넣습니다. 값을 넣지 않아도 워크플로 기본값은 `https://returnpick.vercel.app`입니다.
 4. Actions 탭에서 `ReturnPick Hourly Scheduler`를 수동 실행해 200 응답을 확인합니다.
-5. 이후 매시 정각마다 `/api/cron/sourcing`을 먼저 호출하고, `/api/cron/affiliate-backfill`을 실행한 다음 `/api/cron/telegram-digest?limit=1`을 호출합니다.
+5. 이후 매시 정각마다 `/api/cron/sourcing`을 먼저 호출하고, `/api/cron/affiliate-backfill`을 실행한 다음 `/api/cron/blogger-digest`, `/api/cron/telegram-digest?limit=1` 순서로 호출합니다.
+6. 수동 실행 화면의 `run_blogger`는 기본값이 `true`이며, Blogger 호출을 건너뛸 때만 `false`로 바꿉니다. 이 옵션은 Blogger만 건너뛰고 소싱·링크 보강·텔레그램은 계속 실행합니다. Blogger 다이제스트는 기존 `BLOGGER_DISTRIBUTION_ENABLED`와 `BLOGGER_PUBLISH_MODE` 설정을 그대로 따르며, `publish`가 아니면 초안으로 저장됩니다.
 
 관리자 페이지의 `자동 운영 센터`에서도 `GitHub Actions 설정 복사` 버튼으로 같은 설정값과 점검 절차를 복사할 수 있습니다.
 
@@ -797,7 +799,7 @@ GitHub Actions 1시간 스케줄러 설정:
 
 이 방식도 숨은 리다이렉트나 비공식 수집이 아니라, 이미 보호된 ReturnPick Cron API를 정해진 주기로 호출하는 구조입니다. 운영 준비가 끝나기 전에는 API가 `LAUNCH_NOT_READY` 또는 `FIRST_LAUNCH_NOT_CONFIRMED`로 안전하게 대기합니다.
 
-로컬에서도 GitHub Actions 1시간 스케줄러 파일이 정확한지 확인할 수 있습니다. 아래 명령은 `.github/workflows/returnpick-hourly.yml`의 매시 정각 cron, 보호 헤더, 소싱/텔레그램 Cron URL, `RETURNPICK_CRON_SECRET`, `RETURNPICK_SITE_URL` 연결명을 검사하고, GitHub secret 값은 출력하거나 요구하지 않습니다. `doctor:production`과 `doctor:production:launch`에도 이 검사가 포함됩니다.
+로컬에서도 GitHub Actions 1시간 스케줄러 파일이 정확한지 확인할 수 있습니다. 아래 명령은 `.github/workflows/returnpick-hourly.yml`의 매시 정각 cron, 보호 헤더, 소싱/제휴 링크/Blogger/텔레그램 Cron URL, `RETURNPICK_CRON_SECRET`, `RETURNPICK_SITE_URL` 연결명을 검사하고, GitHub secret 값은 출력하거나 요구하지 않습니다. `doctor:production`과 `doctor:production:launch`에도 이 검사가 포함됩니다.
 
 ```powershell
 npm run scheduler:check

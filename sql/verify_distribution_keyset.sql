@@ -215,7 +215,28 @@ begin
   ) then
     raise exception 'authenticated can execute private keyset candidate RPC';
   end if;
-  if applied_version <> '2026-08-11-hotdeals-identity-v1' then
+  if not has_function_privilege(
+    'service_role',
+    'create_coordinated_sourcing_run(uuid,text,text,timestamptz,timestamptz,integer,integer,integer,integer,integer,text,jsonb)',
+    'execute'
+  ) then
+    raise exception 'service_role cannot execute sourcing coordination RPC';
+  end if;
+  if has_function_privilege(
+    'anon',
+    'create_coordinated_sourcing_run(uuid,text,text,timestamptz,timestamptz,integer,integer,integer,integer,integer,text,jsonb)',
+    'execute'
+  ) then
+    raise exception 'anon can execute private sourcing coordination RPC';
+  end if;
+  if has_function_privilege(
+    'authenticated',
+    'create_coordinated_sourcing_run(uuid,text,text,timestamptz,timestamptz,integer,integer,integer,integer,integer,text,jsonb)',
+    'execute'
+  ) then
+    raise exception 'authenticated can execute private sourcing coordination RPC';
+  end if;
+  if applied_version <> '2026-08-12-sourcing-coordination-v1' then
     raise exception 'schema version mismatch: %', applied_version;
   end if;
 end;

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { listSourcingExecutionRuns } from "@/lib/dataStore";
 import { getApiReadinessSummary } from "@/lib/apiReadiness";
 import { getPublicWebRuntimeProfile, matchesRequiredPublicWebProfile } from "@/lib/providers/publicWebProfile";
-import { runSourcing } from "@/lib/sourcing";
+import { isSourcingRunConflict, runSourcing } from "@/lib/sourcing";
 import { getNextSourcingKeywordOffset } from "@/lib/sourcingCursor";
 import { diagnoseSourcingRun } from "@/lib/sourcingDiagnostics";
 import { requireAdmin, requirePersistentStorage } from "@/lib/validators";
@@ -20,6 +20,28 @@ const MOCK_FALLBACK_BLOCKED_AFTER_API_READY = "MOCK_FALLBACK_BLOCKED_AFTER_API_R
 function sourcingErrorResponse(error: unknown) {
   const message = error instanceof Error && error.message ? error.message.slice(0, 300) : "UNKNOWN_SOURCING_RUN_ERROR";
   return NextResponse.json({ error: "SOURCING_RUN_FAILED", message }, { status: 500 });
+}
+
+function sourcingConflictResponse(error: unknown) {
+  if (!isSourcingRunConflict(error)) return null;
+  return NextResponse.json(
+    {
+      error: "SOURCING_RUN_CONFLICT",
+      message: "같은 소싱 모드의 짧은 실행 창에서 이미 작업이 시작되어 이번 요청은 안전하게 건너뛰었습니다.",
+      status: "skipped",
+      skipped: true,
+      skipped_reason: "SOURCING_RUN_CONFLICT",
+      source_mode: error.execution.sourceMode,
+      conflict: {
+        run_id: error.run.id,
+        run_status: error.run.status,
+        execution_key: error.execution.executionKey,
+        execution_window_start: error.execution.windowStart,
+        execution_window_end: error.execution.windowEnd
+      }
+    },
+    { status: 409 }
+  );
 }
 
 function getMockFallbackDecision(body: Record<string, unknown>) {
@@ -112,6 +134,7 @@ export async function POST(request: Request) {
     const run = await runSourcing({
       useMockFallback: mockFallbackDecision.useMockFallback,
       sourceMode: publicWebOnlyAllowed ? "public_web_only" : "auto",
+      coordinateExecution: true,
       keywordLimit: positiveInteger(body.keywordLimit),
       keywordOffset,
       timeBudgetMs: positiveInteger(body.timeBudgetMs)
@@ -123,6 +146,8 @@ export async function POST(request: Request) {
       defaults: mockFallbackDecision
     });
   } catch (error) {
+    const conflict = sourcingConflictResponse(error);
+    if (conflict) return conflict;
     return sourcingErrorResponse(error);
   }
 }

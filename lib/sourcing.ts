@@ -5,6 +5,7 @@ import { calculateDealScore } from "@/lib/scoring";
 import { parseSpecsFromTitle } from "@/lib/specParser";
 import {
   createDealScore,
+  createCoordinatedSourcingRun,
   createSourcingRun,
   ensureDefaultSourcingKeywords,
   listKeywords,
@@ -22,6 +23,12 @@ import { searchPublicWebProducts } from "@/lib/providers/publicWebProvider";
 import type { ProviderProduct, ProviderSearchResult } from "@/lib/providers/types";
 import { mergeProviderProductBatches } from "@/lib/providerProductMerge";
 import type { JsonValue, SourcedProduct, SourcingKeyword, SourcingStatus } from "@/lib/types";
+import {
+  getSourcingRunExecutionLog,
+  getSourcingRunExecutionWindow,
+  type SourcingRunExecutionWindow
+} from "@/lib/sourcingRunCoordination";
+import type { SourcingRun } from "@/lib/types";
 import { mergeStoredWebReturnInfo, resolveStoredWebReturnInfo, resolveWebReturnEvidence } from "@/lib/webReturnInfo";
 
 function isWithinKeywordPrice(product: ProviderProduct, keyword: SourcingKeyword) {
@@ -72,10 +79,31 @@ type ProductEnrichmentResult =
 export type RunSourcingOptions = {
   useMockFallback?: boolean;
   sourceMode?: "auto" | "public_web_only";
+  coordinateExecution?: boolean;
   keywordLimit?: number | null;
   keywordOffset?: number | null;
   timeBudgetMs?: number | null;
 };
+
+export class SourcingRunConflictError extends Error {
+  readonly code = "SOURCING_RUN_CONFLICT";
+  readonly run: SourcingRun;
+  readonly execution: SourcingRunExecutionWindow;
+
+  constructor(run: SourcingRun, execution: SourcingRunExecutionWindow) {
+    super("SOURCING_RUN_CONFLICT");
+    this.name = "SourcingRunConflictError";
+    this.run = run;
+    this.execution = execution;
+  }
+}
+
+export function isSourcingRunConflict(error: unknown): error is SourcingRunConflictError {
+  if (error instanceof SourcingRunConflictError) return true;
+  if (!error || typeof error !== "object" || (error as { code?: unknown }).code !== "SOURCING_RUN_CONFLICT") return false;
+  const candidate = error as { run?: unknown; execution?: unknown };
+  return Boolean(candidate.run && typeof candidate.run === "object" && candidate.execution && typeof candidate.execution === "object");
+}
 
 const defaultSourcingTimeBudgetMs = 52000;
 const minSourcingTimeBudgetMs = 5000;
@@ -377,7 +405,15 @@ export async function runSourcing(options?: RunSourcingOptions) {
   const keywordLimit = normalizePositiveInteger(options?.keywordLimit);
   const requestedKeywordOffset = options?.keywordOffset ?? 0;
   const timeBudgetMs = normalizeTimeBudgetMs(options?.timeBudgetMs);
-  const run = await createSourcingRun({ status: "running" });
+  const execution = options?.coordinateExecution
+    ? getSourcingRunExecutionWindow(sourceMode, Date.now(), requestedKeywordOffset)
+    : null;
+  const executionLog = execution ? getSourcingRunExecutionLog(execution) : {};
+  const runResult = execution
+    ? await createCoordinatedSourcingRun({ status: "running", id: execution.executionKey, log_json: executionLog })
+    : { created: true as const, run: await createSourcingRun({ status: "running" }) };
+  if (!runResult.created) throw new SourcingRunConflictError(runResult.run, execution!);
+  const run = runResult.run;
   const logs: Array<Record<string, JsonValue>> = [];
   let foundCount = 0;
   let insertedCount = 0;
@@ -640,6 +676,7 @@ export async function runSourcing(options?: RunSourcingOptions) {
       error_count: errorCount,
       error_message: errorMessage,
       log_json: {
+        ...executionLog,
         logs,
         active_keyword_count: activeKeywordCount,
         target_keyword_count: targetKeywordCount,
@@ -666,6 +703,7 @@ export async function runSourcing(options?: RunSourcingOptions) {
       error_count: errorCount + 1,
       error_message: errorMessage,
       log_json: {
+        ...executionLog,
         logs,
         active_keyword_count: activeKeywordCount,
         target_keyword_count: targetKeywordCount,

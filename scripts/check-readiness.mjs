@@ -1905,7 +1905,7 @@ if (fileExists("scripts/verify-scheduled-affiliate-backfill.mjs")) {
 
 if (fileExists("sql/schema.sql")) {
   const schema = readText("sql/schema.sql");
-  const schemaVersion = "2026-08-11-hotdeals-identity-v1";
+  const schemaVersion = "2026-08-12-sourcing-coordination-v1";
   const apiReadinessSource = fileExists("lib/apiReadiness.ts") ? readText("lib/apiReadiness.ts") : "";
   const distributionQueueSource = fileExists("lib/distributionQueue.ts") ? readText("lib/distributionQueue.ts") : "";
   check(
@@ -1921,6 +1921,16 @@ if (fileExists("sql/schema.sql")) {
     schemaVersionWriteIndex > schema.indexOf("create table if not exists distribution_deliveries") &&
       schemaVersionWriteIndex > schemaGrantIndex,
     "schema.sql updates the readiness version only after tables, migrations, policies, grants, and backfills complete",
+    "required"
+  );
+  check(
+    "schema: atomic sourcing coordination",
+    schema.includes("create or replace function create_coordinated_sourcing_run") &&
+      schema.includes("pg_advisory_xact_lock") &&
+      schema.includes("revoke all on function create_coordinated_sourcing_run") &&
+      schema.includes("grant execute on function create_coordinated_sourcing_run") &&
+      schema.includes("to service_role"),
+    "same-mode sourcing runs use a transaction-scoped database lock and service-role-only RPC",
     "required"
   );
   check(
@@ -3551,7 +3561,7 @@ if (fileExists("lib/apiReadiness.ts")) {
   check(
     "readiness: supabase schema version marker",
     readiness.includes("EXPECTED_SCHEMA_VERSION") &&
-      readiness.includes("2026-08-11-hotdeals-identity-v1") &&
+      readiness.includes("2026-08-12-sourcing-coordination-v1") &&
       readiness.includes("returnpick_schema_meta") &&
       readiness.includes("schema_version"),
     "admin readiness verifies the deployed DB has the latest schema.sql marker",

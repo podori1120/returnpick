@@ -77,7 +77,8 @@ function createFetch({
   secondBody = sourcingBody("second-run", { offset: 18, next: 26 }),
   changedKeywords = null,
   firstStatus = 200,
-  firstError = null
+  firstError = null,
+  firstBodyOverride = null
 } = {}) {
   const calls = [];
   let sourcingPosts = 0;
@@ -102,7 +103,7 @@ function createFetch({
     if (parsed.pathname === "/api/admin/sourcing/run" && method === "POST") {
       sourcingPosts += 1;
       if (sourcingPosts === 1 && firstError) throw firstError;
-      if (sourcingPosts === 1) return jsonResponse(firstStatus, firstBody);
+      if (sourcingPosts === 1) return jsonResponse(firstStatus, firstBodyOverride ?? firstBody);
       return jsonResponse(200, secondBody);
     }
     return jsonResponse(404, { error: "NOT_FOUND" });
@@ -212,6 +213,17 @@ for (const [field, value] of [
 }
 
 {
+  const harness = createFetch({
+    firstStatus: 409,
+    firstBodyOverride: { error: "SOURCING_RUN_CONFLICT" }
+  });
+  const result = await run(harness.fetchImpl);
+  assert.equal(result.exitCode, 3);
+  assert.equal(result.report.status, "BLOCKED_NOOP");
+  assert.equal(result.report.reason, "SOURCING_RUN_CONFLICT");
+}
+
+{
   const writeError = new Error("ambiguous write response");
   writeError.name = "AbortError";
   const harness = createFetch({ firstError: writeError });
@@ -253,4 +265,4 @@ for (const [field, value] of [
   assert.equal(called, false);
 }
 
-console.log("Production public-web intake checks passed (15 scenarios).");
+console.log("Production public-web intake checks passed (16 scenarios).");

@@ -5,7 +5,7 @@ import { isCapabilityReady } from "@/lib/launchCapabilityPolicy";
 import { getFirstLaunchConfirmation } from "@/lib/launchState";
 import { isPublicDealReady } from "@/lib/publicDeal";
 import { getLatestScore } from "@/lib/scoring";
-import { runSourcing } from "@/lib/sourcing";
+import { isSourcingRunConflict, runSourcing } from "@/lib/sourcing";
 import { getNextSourcingKeywordOffset, getRunNextKeywordOffset } from "@/lib/sourcingCursor";
 import { hasSupabaseConfig } from "@/lib/supabase";
 import { sendTelegramForProduct } from "@/lib/telegram";
@@ -218,13 +218,44 @@ export async function runScheduledSourcing() {
   }
 
   const keywordOffset = await getNextSourcingKeywordOffset();
-  const run = await runSourcing({
-    useMockFallback: publicWebOnly ? false : useMockFallback,
-    sourceMode: publicWebOnly ? "public_web_only" : "auto",
-    keywordLimit,
-    keywordOffset,
-    timeBudgetMs
-  });
+  let run;
+  try {
+    run = await runSourcing({
+      useMockFallback: publicWebOnly ? false : useMockFallback,
+      sourceMode: publicWebOnly ? "public_web_only" : "auto",
+      coordinateExecution: true,
+      keywordLimit,
+      keywordOffset,
+      timeBudgetMs
+    });
+  } catch (error) {
+    if (!isSourcingRunConflict(error)) throw error;
+    return {
+      type: "sourcing",
+      status: "skipped",
+      skipped_reason: "SOURCING_RUN_CONFLICT",
+      source_mode: error.execution.sourceMode,
+      conflicting_run_id: error.run.id,
+      conflicting_run_status: error.run.status,
+      execution_key: error.execution.executionKey,
+      execution_window_start: error.execution.windowStart,
+      execution_window_end: error.execution.windowEnd,
+      first_launch_confirmed: gate.firstLaunchConfirmed,
+      launch_confirmation_id: gate.launchConfirmation?.id ?? null,
+      use_mock_fallback: publicWebOnly ? false : useMockFallback,
+      keyword_limit: keywordLimit,
+      keyword_offset: keywordOffset,
+      next_keyword_offset: null,
+      time_budget_ms: timeBudgetMs,
+      persistent_storage: hasSupabaseConfig(),
+      run_id: null,
+      keyword_count: 0,
+      found_count: 0,
+      inserted_count: 0,
+      updated_count: 0,
+      error_count: 0
+    };
+  }
 
   return {
     type: "sourcing",
@@ -419,6 +450,25 @@ export async function runScheduledBloggerDigest() {
     results: [] as Array<Record<string, string | null>>
   };
 
+  const gate = await getScheduledAutomationGate();
+  if (gate.shouldGate) {
+    return {
+      ...baseResult,
+      status: "not_ready",
+      skipped_reason: gate.skippedReason,
+      persistent_storage: hasSupabaseConfig(),
+      enabled: isBloggerDistributionEnabled(),
+      publish_mode: getBloggerPublishMode(),
+      readiness_mode: gate.readiness.mode,
+      blocking_item_ids: gate.readiness.blockingItemIds,
+      blocking_items: getSchedulerBlockingItems(gate.readiness),
+      blocking_env: gate.readiness.blockingEnv,
+      operator_action: getSchedulerOperatorAction(gate.skippedReason, gate.readiness),
+      first_launch_confirmed: gate.firstLaunchConfirmed,
+      launch_confirmation_id: gate.launchConfirmation?.id ?? null
+    };
+  }
+
   if (!hasSupabaseConfig()) {
     return {
       ...baseResult,
@@ -426,7 +476,9 @@ export async function runScheduledBloggerDigest() {
       skipped_reason: "PERSISTENT_STORAGE_NOT_CONFIGURED",
       persistent_storage: false,
       enabled: isBloggerDistributionEnabled(),
-      publish_mode: getBloggerPublishMode()
+      publish_mode: getBloggerPublishMode(),
+      first_launch_confirmed: gate.firstLaunchConfirmed,
+      launch_confirmation_id: gate.launchConfirmation?.id ?? null
     };
   }
 
@@ -437,7 +489,9 @@ export async function runScheduledBloggerDigest() {
       skipped_reason: "BLOGGER_DISTRIBUTION_DISABLED",
       persistent_storage: true,
       enabled: false,
-      publish_mode: getBloggerPublishMode()
+      publish_mode: getBloggerPublishMode(),
+      first_launch_confirmed: gate.firstLaunchConfirmed,
+      launch_confirmation_id: gate.launchConfirmation?.id ?? null
     };
   }
 
@@ -448,7 +502,9 @@ export async function runScheduledBloggerDigest() {
       skipped_reason: "BLOGGER_NOT_CONFIGURED",
       persistent_storage: true,
       enabled: true,
-      publish_mode: getBloggerPublishMode()
+      publish_mode: getBloggerPublishMode(),
+      first_launch_confirmed: gate.firstLaunchConfirmed,
+      launch_confirmation_id: gate.launchConfirmation?.id ?? null
     };
   }
 
@@ -484,6 +540,8 @@ export async function runScheduledBloggerDigest() {
         persistent_storage: true,
         enabled: true,
         publish_mode: mode,
+        first_launch_confirmed: gate.firstLaunchConfirmed,
+        launch_confirmation_id: gate.launchConfirmation?.id ?? null,
         candidate_count: candidateCount,
         scanned_count: scannedCount,
         scanned_pages: scannedPages,
@@ -506,6 +564,8 @@ export async function runScheduledBloggerDigest() {
         persistent_storage: true,
         enabled: true,
         publish_mode: mode,
+        first_launch_confirmed: gate.firstLaunchConfirmed,
+        launch_confirmation_id: gate.launchConfirmation?.id ?? null,
         candidate_count: candidateCount,
         scanned_count: scannedCount,
         scanned_pages: scannedPages,
@@ -524,6 +584,8 @@ export async function runScheduledBloggerDigest() {
           persistent_storage: true,
           enabled: true,
           publish_mode: mode,
+          first_launch_confirmed: gate.firstLaunchConfirmed,
+          launch_confirmation_id: gate.launchConfirmation?.id ?? null,
           candidate_count: candidateCount,
           scanned_count: scannedCount,
           scanned_pages: scannedPages,
@@ -539,6 +601,8 @@ export async function runScheduledBloggerDigest() {
         persistent_storage: true,
         enabled: true,
         publish_mode: mode,
+        first_launch_confirmed: gate.firstLaunchConfirmed,
+        launch_confirmation_id: gate.launchConfirmation?.id ?? null,
         candidate_count: candidateCount,
         scanned_count: scannedCount,
         scanned_pages: scannedPages,
@@ -558,6 +622,8 @@ export async function runScheduledBloggerDigest() {
         persistent_storage: true,
         enabled: true,
         publish_mode: mode,
+        first_launch_confirmed: gate.firstLaunchConfirmed,
+        launch_confirmation_id: gate.launchConfirmation?.id ?? null,
         candidate_count: candidateCount,
         scanned_count: scannedCount,
         scanned_pages: scannedPages,
@@ -574,6 +640,8 @@ export async function runScheduledBloggerDigest() {
     persistent_storage: true,
     enabled: true,
     publish_mode: mode,
+    first_launch_confirmed: gate.firstLaunchConfirmed,
+    launch_confirmation_id: gate.launchConfirmation?.id ?? null,
     candidate_count: candidateCount,
     scanned_count: scannedCount,
     scanned_pages: scannedPages,

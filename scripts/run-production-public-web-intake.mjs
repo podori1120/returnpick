@@ -159,6 +159,10 @@ function requestErrorCode(error) {
   return String(error?.cause?.code ?? error?.name ?? "REQUEST_FAILED").slice(0, 80);
 }
 
+function isSourcingRunConflict(response) {
+  return response?.response?.status === 409 && response?.body?.error === "SOURCING_RUN_CONFLICT";
+}
+
 export async function runProductionPublicWebIntake({
   siteUrl = DEFAULT_SITE_URL,
   adminPassword,
@@ -247,6 +251,9 @@ export async function runProductionPublicWebIntake({
     if (firstResponse.response.status === 409 && firstResponse.body?.error === "PUBLIC_WEB_PROFILE_MISMATCH") {
       return { exitCode: 3, report: statusReport("BLOCKED_NOOP", "PUBLIC_WEB_PROFILE_MISMATCH", profileId) };
     }
+    if (isSourcingRunConflict(firstResponse)) {
+      return { exitCode: 3, report: statusReport("BLOCKED_NOOP", "SOURCING_RUN_CONFLICT", profileId) };
+    }
     if (firstResponse.response.status !== 200) {
       return {
         exitCode: 1,
@@ -295,6 +302,12 @@ export async function runProductionPublicWebIntake({
         return {
           exitCode: 1,
           report: statusReport("PARTIAL", "CONTINUATION_PROFILE_MISMATCH", profileId, runs)
+        };
+      }
+      if (isSourcingRunConflict(continuationResponse)) {
+        return {
+          exitCode: 1,
+          report: statusReport("PARTIAL", "CONTINUATION_SOURCING_RUN_CONFLICT", profileId, runs)
         };
       }
       if (continuationResponse.response.status !== 200) {

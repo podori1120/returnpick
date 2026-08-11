@@ -6,7 +6,7 @@ import { envValue, loadEnvFiles } from "./load-env-files.mjs";
 
 loadEnvFiles();
 
-const EXPECTED_SCHEMA_VERSION = "2026-08-11-hotdeals-identity-v1";
+const EXPECTED_SCHEMA_VERSION = "2026-08-12-sourcing-coordination-v1";
 const requiredTables = [
   "returnpick_schema_meta",
   "sourcing_keywords",
@@ -33,9 +33,7 @@ function env(name) {
 }
 
 function mask(value) {
-  if (!value) return "";
-  if (value.length <= 8) return "***";
-  return `${value.slice(0, 4)}...${value.slice(-4)}`;
+  return value ? "configured" : "";
 }
 
 function result(ok, name, detail) {
@@ -43,7 +41,8 @@ function result(ok, name, detail) {
 }
 
 async function tableCheck(client, table) {
-  const { error } = await client.from(table).select("id", { count: "exact", head: true });
+  const probeColumn = table === "returnpick_schema_meta" ? "key" : "id";
+  const { error } = await client.from(table).select(probeColumn, { count: "exact", head: true });
   return result(!error, `table:${table}`, error?.message ?? "select head ok");
 }
 
@@ -65,6 +64,27 @@ async function schemaVersionCheck(client) {
     return result(false, "schema_version", `expected ${EXPECTED_SCHEMA_VERSION}, got ${data.value || "empty"}`);
   }
   return result(true, "schema_version", `${data.value} at ${data.updated_at ?? "unknown time"}`);
+}
+
+async function sourcingCoordinationFunctionCheck(client) {
+  const timestamp = new Date().toISOString();
+  const { error } = await client.rpc("create_coordinated_sourcing_run", {
+    p_run_id: randomUUID(),
+    p_status: "running",
+    p_source_mode: "invalid_schema_probe",
+    p_started_at: timestamp,
+    p_finished_at: null,
+    p_keyword_count: 0,
+    p_found_count: 0,
+    p_inserted_count: 0,
+    p_updated_count: 0,
+    p_error_count: 0,
+    p_error_message: null,
+    p_log_json: { source: "schema_probe" }
+  });
+  const detail = error?.message ?? "unexpectedly accepted invalid source mode";
+  const ok = Boolean(error && (error.code === "22023" || /SOURCING_RUN_SOURCE_MODE_INVALID/i.test(error.message)));
+  return result(ok, "sourcing_coordination_function", ok ? "RPC exists and rejects invalid source mode before any insert" : detail);
 }
 
 async function strictAffiliateFunctionCheck(client) {
@@ -499,14 +519,22 @@ async function publicColumnBoundaryCheck(url, serviceClient, anonKey) {
   const cleanup = await serviceClient.from("sourced_products").delete().eq("id", productId);
   if (cleanup.error) checks.push(`cleanup: ${cleanup.error.message}`);
 
-  const failed = checks.filter((check) => check.includes("unexpectedly") || check.includes(": ") || check.startsWith("public product columns") || check.startsWith("public score columns") || check.startsWith("public snapshot columns") || check.startsWith("cleanup"));
+  const failed = checks.filter(
+    (check) =>
+      check.includes("unexpectedly") ||
+      check.includes(": ") ||
+      check.startsWith("public product columns:") ||
+      check.startsWith("public score columns:") ||
+      check.startsWith("public snapshot columns:") ||
+      check.startsWith("cleanup:")
+  );
   return result(!failed.length, "public:column_boundary", checks.join("; "));
 }
 
 async function authenticatedCandidateRpcBoundaryCheck(url, serviceClient, anonKey) {
   const userIdSuffix = randomUUID();
   const email = `returnpick-schema-${userIdSuffix}@example.invalid`;
-  const password = `Rp!${randomUUID()}-${randomUUID()}`;
+  const password = `Rp!${randomUUID()}-${randomUUID().slice(0, 16)}`;
   const created = await serviceClient.auth.admin.createUser({ email, password, email_confirm: true });
   if (created.error || !created.data.user) {
     return result(false, "authenticated:candidate_rpc_denied", `temporary auth user: ${created.error?.message ?? "not created"}`);
@@ -568,6 +596,7 @@ async function main() {
   for (const table of requiredTables) checks.push(await tableCheck(client, table));
   for (const check of requiredSchemaChecks) checks.push(await columnCheck(client, check));
   checks.push(await schemaVersionCheck(client));
+  checks.push(await sourcingCoordinationFunctionCheck(client));
   checks.push(await strictAffiliateFunctionCheck(client));
   checks.push(await discoveryIdentityPersistenceCheck(client));
   checks.push(await distributionDeliverySmokeCheck(client));

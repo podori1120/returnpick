@@ -9,7 +9,7 @@ import { markFirstLaunchConfirmed } from "@/lib/launchState";
 import { backfillNaverLowestPrices } from "@/lib/naverPriceBackfill";
 import { getNaverPriceTrust } from "@/lib/naverPriceTrust";
 import { isPublicDealReady } from "@/lib/publicDeal";
-import { runSourcing } from "@/lib/sourcing";
+import { isSourcingRunConflict, runSourcing } from "@/lib/sourcing";
 import { requireAdmin, requirePersistentStorage } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
@@ -362,6 +362,7 @@ export async function POST(request: Request) {
       const keywordOffset = await getNextSourcingKeywordOffset();
       const run = await runSourcing({
         useMockFallback: false,
+        coordinateExecution: true,
         keywordLimit: sourcingKeywordLimit,
         keywordOffset,
         timeBudgetMs: sourcingTimeBudgetMs
@@ -377,12 +378,30 @@ export async function POST(request: Request) {
         detail: run
       });
     } catch (error) {
-      steps.push({
-        id: "sourcing",
-        label: "목업 없는 첫 후보 수집",
-        status: "error",
-        message: error instanceof Error ? error.message : "SOURCING_LAUNCH_FAILED"
-      });
+      if (isSourcingRunConflict(error)) {
+        steps.push({
+          id: "sourcing",
+          label: "목업 없는 첫 후보 수집",
+          status: "skipped",
+          message: "같은 소싱 모드의 짧은 실행 창에서 이미 작업이 시작되어 이번 소싱은 안전하게 건너뛰었습니다.",
+          detail: {
+            skipped_reason: "SOURCING_RUN_CONFLICT",
+            conflicting_run_id: error.run.id,
+            conflicting_run_status: error.run.status,
+            execution_key: error.execution.executionKey,
+            execution_window_start: error.execution.windowStart,
+            execution_window_end: error.execution.windowEnd
+          },
+          blocking: false
+        });
+      } else {
+        steps.push({
+          id: "sourcing",
+          label: "목업 없는 첫 후보 수집",
+          status: "error",
+          message: error instanceof Error ? error.message : "SOURCING_LAUNCH_FAILED"
+        });
+      }
     }
   }
 

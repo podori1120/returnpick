@@ -30,7 +30,7 @@ type ReadinessState = "ready" | "missing" | "partial" | "disabled";
 type ReadinessMode = "pre_approval" | "manual_launch_ready" | "api_ready" | "launch_ready";
 export type ApiReadinessCheckMode = "full" | "read_only";
 
-const EXPECTED_SCHEMA_VERSION = "2026-08-11-hotdeals-identity-v1";
+const EXPECTED_SCHEMA_VERSION = "2026-08-12-sourcing-coordination-v1";
 
 export type ApiReadinessItem = {
   id: string;

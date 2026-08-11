@@ -14,6 +14,11 @@ on:
         required: false
         default: true
         type: boolean
+      run_blogger:
+        description: "Run Blogger digest after sourcing and affiliate backfill."
+        required: false
+        default: true
+        type: boolean
 
 concurrency:
   group: returnpick-hourly-scheduler
@@ -31,6 +36,7 @@ jobs:
       REPOSITORY_SITE_URL: ${{ vars.RETURNPICK_SITE_URL }}
       DISPATCH_SITE_URL: ${{ github.event.inputs.site_url }}
       RUN_TELEGRAM: ${{ github.event.inputs.run_telegram }}
+      RUN_BLOGGER: ${{ github.event.inputs.run_blogger }}
     steps:
       - name: Call ReturnPick scheduler endpoints
         shell: bash
@@ -81,6 +87,12 @@ jobs:
 
           call_returnpick "/api/cron/sourcing"
           call_returnpick "/api/cron/affiliate-backfill"
+
+          if [[ "${RUN_BLOGGER:-true}" != "false" ]]; then
+            call_returnpick "/api/cron/blogger-digest"
+          else
+            echo "Blogger digest skipped by workflow_dispatch input."
+          fi
 
           if [[ "${RUN_TELEGRAM:-true}" != "false" ]]; then
             call_returnpick "/api/cron/telegram-digest?limit=1"

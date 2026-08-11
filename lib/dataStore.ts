@@ -12,6 +12,10 @@ import { isDemoProduct, isLocalDemoModeEnabled } from "@/lib/publicDeal";
 import { compareProductIdsEqual } from "@/lib/compareIdentity";
 import { calculateDealScore, getLatestScore } from "@/lib/scoring";
 import { isSourcingExecutionRun } from "@/lib/sourcingRunKinds";
+import {
+  findCoordinatedActiveRun,
+  getCoordinatedSourceMode
+} from "@/lib/sourcingRunCoordination";
 import { getSupabaseServiceClient } from "@/lib/supabase";
 import { planDistributionClaim, type DistributionClaimOperation } from "@/lib/distributionDeliveryState";
 import type { DistributionCandidateCursor, DistributionCandidatePage } from "@/lib/distributionQueue";
@@ -898,7 +902,22 @@ export async function createDealScore(score: DealScore) {
 }
 
 export async function createSourcingRun(input: Partial<SourcingRun> & Pick<SourcingRun, "status">) {
-  const run: SourcingRun = {
+  const run = makeSourcingRun(input);
+
+  const client = getSupabaseServiceClient();
+  if (client) {
+    const { data, error } = await client.from("sourcing_runs").insert(run).select("*").single();
+    if (error) throw error;
+    return data as SourcingRun;
+  }
+
+  memoryRuns.unshift(run);
+  persistMemoryState();
+  return run;
+}
+
+function makeSourcingRun(input: Partial<SourcingRun> & Pick<SourcingRun, "status">): SourcingRun {
+  return {
     id: input.id ?? randomUUID(),
     status: input.status,
     started_at: input.started_at ?? now(),
@@ -911,17 +930,54 @@ export async function createSourcingRun(input: Partial<SourcingRun> & Pick<Sourc
     error_message: input.error_message ?? null,
     log_json: input.log_json ?? {}
   };
+}
 
+export async function createCoordinatedSourcingRun(input: Partial<SourcingRun> & Pick<SourcingRun, "status" | "id">) {
+  const run = makeSourcingRun(input);
+  const sourceMode = getCoordinatedSourceMode(run.log_json);
+  if (sourceMode == null) throw new Error("SOURCING_RUN_SOURCE_MODE_INVALID");
   const client = getSupabaseServiceClient();
   if (client) {
-    const { data, error } = await client.from("sourcing_runs").insert(run).select("*").single();
+    const { data, error } = await client.rpc("create_coordinated_sourcing_run", {
+      p_run_id: run.id,
+      p_status: run.status,
+      p_source_mode: sourceMode,
+      p_started_at: run.started_at,
+      p_finished_at: run.finished_at,
+      p_keyword_count: run.keyword_count,
+      p_found_count: run.found_count,
+      p_inserted_count: run.inserted_count,
+      p_updated_count: run.updated_count,
+      p_error_count: run.error_count,
+      p_error_message: run.error_message,
+      p_log_json: run.log_json
+    });
     if (error) throw error;
-    return data as SourcingRun;
+
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      throw new Error("SOURCING_RUN_COORDINATION_INVALID_RESPONSE");
+    }
+    const result = data as { created?: unknown; run?: unknown };
+    if (
+      typeof result.created !== "boolean" ||
+      !result.run ||
+      typeof result.run !== "object" ||
+      Array.isArray(result.run)
+    ) {
+      throw new Error("SOURCING_RUN_COORDINATION_INVALID_RESPONSE");
+    }
+    return { created: result.created, run: result.run as SourcingRun };
   }
+
+  const activeConflict = findCoordinatedActiveRun(memoryRuns, sourceMode);
+  if (activeConflict) return { created: false as const, run: activeConflict };
+
+  const existing = memoryRuns.find((candidate) => candidate.id === run.id);
+  if (existing) return { created: false as const, run: existing };
 
   memoryRuns.unshift(run);
   persistMemoryState();
-  return run;
+  return { created: true as const, run };
 }
 
 export async function updateSourcingRun(id: string, patch: Partial<SourcingRun>) {

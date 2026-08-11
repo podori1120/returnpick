@@ -141,9 +141,26 @@ requireSignals("Blogger cron route", cronRoute, [
   "CRON_BLOGGER_DIGEST_FAILED"
 ]);
 
-const bloggerScheduler = scheduler.slice(scheduler.indexOf("export async function runScheduledBloggerDigest"));
+const gateStart = scheduler.indexOf("export async function getScheduledAutomationGate");
+const bloggerStart = scheduler.indexOf("export async function runScheduledBloggerDigest");
+if (gateStart < 0 || bloggerStart < 0 || gateStart >= bloggerStart) {
+  throw new Error("Blogger scheduler must define the launch gate before the Blogger digest");
+}
+const automationGate = scheduler.slice(gateStart, bloggerStart);
+requireSignals("Scheduled automation gate", automationGate, [
+  "export async function getScheduledAutomationGate()",
+  "process.env.NODE_ENV === \"production\" && !readiness.launchReady",
+  "skippedReason: \"LAUNCH_NOT_READY\"",
+  "getFirstLaunchConfirmation()",
+  "process.env.NODE_ENV === \"production\" && !launchConfirmation",
+  "skippedReason: \"FIRST_LAUNCH_NOT_CONFIRMED\""
+]);
+
+const bloggerScheduler = scheduler.slice(bloggerStart);
 requireSignals("Blogger scheduler", bloggerScheduler, [
   "hasSupabaseConfig()",
+  "const gate = await getScheduledAutomationGate()",
+  "gate.shouldGate",
   "isBloggerDistributionEnabled()",
   "isBloggerConfigured()",
   "listDistributionCandidateProductPage(\"blogger\"",
@@ -158,8 +175,39 @@ requireSignals("Blogger scheduler", bloggerScheduler, [
   "NO_UNSENT_PUBLIC_CUSTOMER_READY_DEALS",
   "NO_CLAIMABLE_PUBLIC_CUSTOMER_READY_DEALS"
 ]);
-if (bloggerScheduler.includes("getScheduledAutomationGate") || bloggerScheduler.includes("isCapabilityReady")) {
-  throw new Error("Blogger scheduler must not depend on Coupang/API launch readiness gates");
+
+const gateCallOffset = bloggerScheduler.indexOf("const gate = await getScheduledAutomationGate()");
+const gateGuardOffset = bloggerScheduler.indexOf("if (gate.shouldGate)", gateCallOffset);
+const storageCheckOffset = bloggerScheduler.indexOf("if (!hasSupabaseConfig())", gateGuardOffset);
+const bloggerDeliveryOffset = bloggerScheduler.indexOf("sendBloggerForProduct(", gateCallOffset);
+if (
+  gateCallOffset < 0 ||
+  gateGuardOffset < 0 ||
+  storageCheckOffset < 0 ||
+  bloggerDeliveryOffset < 0 ||
+  gateCallOffset > bloggerDeliveryOffset ||
+  gateGuardOffset > bloggerDeliveryOffset
+) {
+  throw new Error("Blogger scheduler must fail closed before any Blogger delivery");
+}
+
+const gateResult = bloggerScheduler.slice(gateCallOffset, storageCheckOffset);
+requireSignals("Blogger launch gate result", gateResult, [
+  "status: \"not_ready\"",
+  "skipped_reason: gate.skippedReason",
+  "persistent_storage: hasSupabaseConfig()",
+  "enabled: isBloggerDistributionEnabled()",
+  "publish_mode: getBloggerPublishMode()",
+  "readiness_mode: gate.readiness.mode",
+  "blocking_item_ids: gate.readiness.blockingItemIds",
+  "blocking_items: getSchedulerBlockingItems(gate.readiness)",
+  "blocking_env: gate.readiness.blockingEnv",
+  "operator_action: getSchedulerOperatorAction(gate.skippedReason, gate.readiness)",
+  "first_launch_confirmed: gate.firstLaunchConfirmed",
+  "launch_confirmation_id: gate.launchConfirmation?.id ?? null"
+]);
+if (!gateResult.includes("if (gate.shouldGate)")) {
+  throw new Error("Blogger scheduler must return not_ready metadata from the launch gate");
 }
 if (blogger.includes("findSuccessfulBloggerLog") || blogger.includes("listTelegramLogs(BLOGGER_LOG_LIMIT)")) {
   throw new Error("Blogger delivery ledger must be the duplicate-prevention source, not a bounded Telegram log scan");
