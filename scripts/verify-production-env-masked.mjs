@@ -147,8 +147,13 @@ try {
   assertNoFixtureSecrets(localOnlyMask.output);
 
   const deploySource = await readFile(join(root, "scripts", "run-production-deploy.mjs"), "utf8");
+  const doctorSource = await readFile(join(root, "scripts", "run-production-doctor.mjs"), "utf8");
   assert.match(deploySource, /verify-production-env\.mjs", "--launch", "--allow-vercel-masked"/);
-  assert.match(deploySource, /run-production-doctor\.mjs/);
+  assert.match(deploySource, /run-production-doctor\.mjs", "--launch", "--allow-vercel-masked"/);
+  assert.match(doctorSource, /allowVercelMasked/);
+  assert.match(doctorSource, /envArgs\.push\("--allow-vercel-masked"\)/);
+  assert.match(doctorSource, /schemaValuesMasked/);
+  assert.match(doctorSource, /SQL schema verification needs a trusted environment/);
   console.log("Production env masked-value guard checks passed.");
 } finally {
   await rm(tempRoot, { recursive: true, force: true });

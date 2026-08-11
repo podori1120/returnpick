@@ -130,7 +130,7 @@ if (stopped) {
   say("Stop: deploy failed. Production doctor was not run.");
   printSummary();
 } else {
-  const doctorOk = runStep("Post-deploy launch doctor", process.execPath, ["scripts/run-production-doctor.mjs", "--launch", "--preset", preset]);
+  const doctorOk = runStep("Post-deploy launch doctor", process.execPath, ["scripts/run-production-doctor.mjs", "--launch", "--allow-vercel-masked", "--preset", preset]);
   if (doctorOk && executeFirstLaunch) {
     runStep("Production first launch", process.execPath, ["scripts/run-production-launch.mjs", "--preset", preset, "--confirm"]);
   }

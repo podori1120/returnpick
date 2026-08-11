@@ -3,10 +3,11 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { envValue, loadEnvFiles } from "./load-env-files.mjs";
+import { envRawEntries, envValue, loadEnvFiles } from "./load-env-files.mjs";
 
 const args = process.argv.slice(2);
 const requireLaunchReady = args.includes("--launch");
+const allowVercelMasked = args.includes("--allow-vercel-masked");
 const strictScheduler = args.includes("--strict-scheduler");
 const skipSchema = args.includes("--skip-schema");
 loadEnvFiles();
@@ -19,6 +20,18 @@ function argValue(name) {
 
 function env(name) {
   return envValue(name);
+}
+
+function hasQuotedVercelMask(name) {
+  return envRawEntries(name).some((entry) => {
+    const source = String(entry.source ?? "").trim().toLowerCase();
+    const raw = String(entry.value ?? "").trim();
+    if (!source.endsWith(" in .env.production") || raw.length < 2) return false;
+    const quote = raw[0];
+    if (!["'", '"'].includes(quote) || raw.at(-1) !== quote) return false;
+    const marker = raw.slice(1, -1).trim().toUpperCase();
+    return marker === "[SENSITIVE]" || marker === "[REDACTED]" || marker === "[ENCRYPTED]";
+  });
 }
 
 function isExternalHttpsSiteUrl(value) {
@@ -93,6 +106,14 @@ function handleSchemaStep() {
 
   const hasSchemaEnv = Boolean(env("NEXT_PUBLIC_SUPABASE_URL") && env("SUPABASE_SERVICE_ROLE_KEY"));
   if (!hasSchemaEnv) {
+    const schemaValuesMasked = hasQuotedVercelMask("NEXT_PUBLIC_SUPABASE_URL") && hasQuotedVercelMask("SUPABASE_SERVICE_ROLE_KEY");
+    if (requireLaunchReady && allowVercelMasked && schemaValuesMasked) {
+      addOutcome("SKIP", "Supabase schema", "Vercel masks the local URL/service-role values; live readiness passed, but SQL schema verification needs a trusted environment with the real keys");
+      console.log("");
+      console.log("== Supabase schema ==");
+      console.log("SKIP Vercel masked the local Supabase URL/service-role values; run schema verification from a trusted environment with the real keys.");
+      return;
+    }
     const status = requireLaunchReady ? "FAIL" : "WARN";
     addOutcome(status, "Supabase schema", "NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for live schema verification");
     console.log("");
@@ -106,6 +127,7 @@ function handleSchemaStep() {
 
 function handleEnvStep() {
   const envArgs = requireLaunchReady ? ["--launch"] : [];
+  if (allowVercelMasked) envArgs.push("--allow-vercel-masked");
   return runNodeStep("Production env", "verify-production-env.mjs", envArgs, true);
 }
 
