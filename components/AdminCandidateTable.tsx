@@ -50,6 +50,8 @@ type RevenueMetricsResponse = {
   message?: string;
 };
 
+const HIGH_VALUE_REVIEW_PRICE = 500_000;
+
 function noticeClassName(type: "info" | "success" | "error") {
   if (type === "error") return "border-coral/30 bg-coral/10 text-coral";
   if (type === "success") return "border-pine/30 bg-pine/10 text-pine";
@@ -66,6 +68,11 @@ function isCustomerPublishReady(product: ProductWithScore) {
 
 function isPublishedPublicBlocked(product: ProductWithScore) {
   return product.is_published && product.sourcing_status === "published" && !isCustomerPublishReady(product);
+}
+
+function getEffectiveProductPrice(product: ProductWithScore) {
+  const price = product.return_price ?? product.source_price ?? product.new_price ?? 0;
+  return price > 0 ? price : 0;
 }
 
 export default function AdminCandidateTable({ password, refreshToken }: { password: string; refreshToken: number }) {
@@ -203,7 +210,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
       .filter((product) => (query ? product.title.toLowerCase().includes(query.toLowerCase()) : true))
       .filter((product) => (product.latest_score?.total_score ?? 0) >= minScoreValue)
       .filter((product) => {
-        const price = product.return_price ?? product.source_price ?? product.new_price ?? 0;
+        const price = getEffectiveProductPrice(product);
         return price >= minPriceValue && price <= maxPriceValue;
       })
       .sort((a, b) => {
@@ -213,7 +220,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
           const bd = getAppliedDiscountRate(b) ?? -1;
           return bd - ad;
         }
-        if (sort === "price") return (b.return_price ?? b.source_price ?? 0) - (a.return_price ?? a.source_price ?? 0);
+        if (sort === "price") return getEffectiveProductPrice(b) - getEffectiveProductPrice(a);
         return b.created_at.localeCompare(a.created_at);
       });
   }, [products, status, category, conditionUnknownOnly, missingAffiliateOnly, publishReadyOnly, publicBlockedOnly, naverPriceNeedsReviewOnly, query, minScore, minPrice, maxPrice, sort, focusProductIds]);
@@ -222,12 +229,14 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
     const needsReview = products.filter((product) => product.sourcing_status === "needs_review");
     const publishReady = needsReview.filter(isCustomerPublishReady);
     const linkBackfillNeeded = needsReview.filter((product) => !isProductPublishReady(product));
+    const highValue = needsReview.filter((product) => getEffectiveProductPrice(product) >= HIGH_VALUE_REVIEW_PRICE);
     const publicBlocked = products.filter(isPublishedPublicBlocked);
     const naverPriceNeedsReview = products.filter((product) => getNaverPriceTrust(product).trustedPrice == null);
     return {
       needsReviewCount: needsReview.length,
       publishReadyCount: publishReady.length,
       linkBackfillNeededCount: linkBackfillNeeded.length,
+      highValueCount: highValue.length,
       publicBlockedCount: publicBlocked.length,
       naverPriceNeedsReviewCount: naverPriceNeedsReview.length
     };
@@ -264,6 +273,23 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
     setNaverPriceNeedsReviewOnly(true);
     setSelectedProductIds([]);
     setSort("latest");
+  }
+
+  function showHighValueReviewQueue() {
+    setFocusProductIds([]);
+    setStatus("needs_review");
+    setCategory("all");
+    setQuery("");
+    setMinScore("");
+    setMinPrice(String(HIGH_VALUE_REVIEW_PRICE));
+    setMaxPrice("");
+    setConditionUnknownOnly(false);
+    setMissingAffiliateOnly(false);
+    setPublishReadyOnly(false);
+    setPublicBlockedOnly(false);
+    setNaverPriceNeedsReviewOnly(false);
+    setSelectedProductIds([]);
+    setSort("price");
   }
 
   const publishReadyFiltered = useMemo(() => filtered.filter(isCustomerPublishReady), [filtered]);
@@ -427,7 +453,7 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
           </div>
         ) : null}
 
-        <div className="mb-4 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+        <div className="mb-4 grid gap-2 md:grid-cols-2 xl:grid-cols-6">
           <button
             className="focus-ring rounded-lg border border-line bg-mist p-3 text-left hover:border-pine hover:bg-white"
             onClick={showReviewQueue}
@@ -472,6 +498,16 @@ export default function AdminCandidateTable({ password, refreshToken }: { passwo
             <span className="block text-xs font-black text-sky-800">네이버 가격 보강</span>
             <span className="mt-1 block text-2xl font-black">{reviewStats.naverPriceNeedsReviewCount.toLocaleString("ko-KR")}건</span>
             <span className="mt-1 block text-xs font-bold text-steel">없음·검증 필요</span>
+          </button>
+          <button
+            aria-label="고가 우선 검토 큐 (50만원 이상)"
+            className="focus-ring rounded-lg border border-ink/20 bg-ink/5 p-3 text-left text-ink hover:bg-ink/10"
+            onClick={showHighValueReviewQueue}
+            type="button"
+          >
+            <span className="block text-xs font-black">고가 우선 (50만원+)</span>
+            <span className="mt-1 block text-2xl font-black">{reviewStats.highValueCount.toLocaleString("ko-KR")}건</span>
+            <span className="mt-1 block text-xs font-bold">검토 우선순위 큐 · 50만원 이상</span>
           </button>
         </div>
 
