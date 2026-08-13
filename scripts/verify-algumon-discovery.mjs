@@ -179,17 +179,11 @@ assert.deepEqual(
   ),
   []
 );
-assert.deepEqual(
-  parseHotDealsCoupangDiscovery(
-    [
-      ...Array.from({ length: MAX_HOTDEALS_RECORDS_SCANNED }, (_, index) => `<a href="/deals/k/navigation-${index}">navigation</a>`),
-      hotDealsLiveFixture
-    ].join(""),
-    hotDealsPageUrl,
-    "LG 그램 16"
-  ),
-  []
-);
+const hotDealsBeyondScanCapFixture = [
+  ...Array.from({ length: MAX_HOTDEALS_RECORDS_SCANNED }, (_, index) => `<a href="/deals/k/navigation-${index}">navigation</a>`),
+  hotDealsLiveFixture
+].join("");
+assert.deepEqual(parseHotDealsCoupangDiscovery(hotDealsBeyondScanCapFixture, hotDealsPageUrl, "LG 그램 16"), []);
 assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] LG그램 16 노트북", "LG 그램"), true);
 assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] 갤럭시북 프로", "LG 그램"), false);
 assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] LG 그램 파우치", "LG 그램"), true);

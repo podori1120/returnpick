@@ -1,6 +1,6 @@
 export const MAX_HOTDEALS_DISCOVERY_RESULTS = 8;
 export const MAX_HOTDEALS_HTML_CHARS = 750_000;
-export const MAX_HOTDEALS_RECORDS_SCANNED = 120;
+export const MAX_HOTDEALS_RECORDS_SCANNED = 240;
 export const HOTDEALS_DISCOVERY_FEED_PATH = "/feeds/deals.xml";
 
 const HOTDEALS_CANONICAL_HOST = "www.hotdeals.kr";
