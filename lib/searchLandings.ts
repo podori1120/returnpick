@@ -20,6 +20,8 @@ export type SearchIntentLanding = {
   intro: string;
   searchQueries: string[];
   excludeQueries?: string[];
+  /** Each group must match one alternative in the product identity fields. */
+  requiredIdentityQueryGroups?: string[][];
   searchLabel: string;
   comparePoints: Array<{ title: string; detail: string }>;
   faqs: Array<{ question: string; answer: string }>;
@@ -84,6 +86,69 @@ export const searchIntentLandings: SearchIntentLanding[] = [
     faqs: [
       { question: "그램 반품은 무게만 확인하면 되나요?", answer: "무게 외에도 화면 크기, 메모리, 저장장치, 충전기와 배터리 상태가 실제 만족도를 좌우합니다. 모델번호를 기준으로 확인하세요." },
       { question: "반품 상품의 배터리 수명도 알 수 있나요?", answer: "공개 근거가 있는 경우에만 반영하고, 없으면 사용 배터리 위험으로 남깁니다. 구매 후 배터리 상태를 먼저 점검하세요." }
+    ]
+  },
+  {
+    slug: "vivobook-laptop",
+    category: "laptop",
+    label: "비보북 노트북",
+    icon: "laptop",
+    seoTitle: "비보북 노트북 구매 전 모델·CPU·구성 확인 가이드",
+    seoDescription: "비보북 노트북의 모델번호, CPU, RAM·SSD, 운영체제와 배터리·국내 AS 정보를 확인하는 기준을 정리합니다.",
+    intro: "비보북은 같은 제품군에서도 모델번호와 CPU, RAM·SSD, 운영체제가 달라질 수 있습니다. 리턴픽은 구매 가능한 것으로 확인된 상품만 노출하며, 확인되지 않은 사양·배터리·국내 AS 정보는 확인필요로 남깁니다.",
+    searchQueries: ["비보북", "Vivobook", "ASUS"],
+    requiredIdentityQueryGroups: [["비보북", "Vivobook"]],
+    searchLabel: "비보북·Vivobook·ASUS 노트북",
+    comparePoints: [
+      { title: "모델과 CPU", detail: "정확한 모델번호와 CPU 세대·등급이 찾는 용도와 맞는지 확인합니다." },
+      { title: "RAM·SSD·운영체제", detail: "메모리와 저장장치 용량, Windows 등 운영체제 포함 여부를 분리해 봅니다." },
+      { title: "배터리·국내 AS", detail: "배터리 상태와 충전기, 국내 AS 또는 보증 범위가 공개됐는지 확인하고 없으면 확인필요로 둡니다." }
+    ],
+    faqs: [
+      { question: "비보북은 이름만으로 세부 사양을 알 수 있나요?", answer: "알기 어렵습니다. 모델번호를 기준으로 CPU, RAM·SSD와 운영체제를 맞추고, 확인되지 않은 값은 확인필요로 남겨야 합니다." },
+      { question: "배터리와 AS 정보가 없으면 어떻게 보나요?", answer: "구매 가능한 것으로 확인된 상품만 비교 대상이 되며, 배터리·충전기·국내 AS 근거가 없으면 결론을 단정하지 않습니다." }
+    ]
+  },
+  {
+    slug: "lg-gram-pro",
+    category: "laptop",
+    label: "LG 그램 프로",
+    icon: "laptop",
+    seoTitle: "LG 그램 프로 구매 전 크기·무게·구성 확인 가이드",
+    seoDescription: "LG 그램 프로의 화면 크기와 무게, 디스플레이, RAM·SSD, 배터리 정보를 확인하는 기준을 정리합니다.",
+    intro: "LG 그램 프로는 화면 크기와 무게뿐 아니라 디스플레이 구성, RAM·SSD와 배터리 조건을 함께 봐야 합니다. 리턴픽은 구매 가능한 것으로 확인된 상품만 노출하며, 확인되지 않은 값은 확인필요로 남깁니다.",
+    searchQueries: ["LG 그램 프로", "그램 프로", "LG 그램", "LG Gram Pro"],
+    requiredIdentityQueryGroups: [["LG 그램", "LG Gram"], ["프로", "Pro"]],
+    searchLabel: "LG 그램 프로·그램 프로·LG 그램",
+    comparePoints: [
+      { title: "화면 크기·무게", detail: "화면 크기와 본체 무게가 휴대와 작업 공간에 맞는지 모델별로 확인합니다." },
+      { title: "디스플레이", detail: "해상도와 패널, 밝기 등 디스플레이 세부 구성이 명확히 확인되는지 봅니다." },
+      { title: "RAM·SSD·배터리", detail: "메모리와 저장장치 용량, 배터리 상태와 충전기 조건을 함께 확인하고 모호한 값은 확인필요로 둡니다." }
+    ],
+    faqs: [
+      { question: "LG 그램 프로는 화면 크기만 비교하면 되나요?", answer: "아닙니다. 화면 크기와 무게, 디스플레이, RAM·SSD, 배터리와 충전기 조건을 같은 모델 기준으로 맞춰야 합니다." },
+      { question: "배터리 정보가 확인되지 않으면 어떻게 판단하나요?", answer: "확인된 근거가 없는 배터리 상태를 추정하지 않습니다. 구매 가능한 것으로 확인된 상품이라도 해당 값은 확인필요로 남기고 조건을 다시 확인해야 합니다." }
+    ]
+  },
+  {
+    slug: "galaxy-book-pro",
+    category: "laptop",
+    label: "갤럭시북 프로",
+    icon: "laptop",
+    seoTitle: "갤럭시북 프로 구매 전 모델번호·구성 확인 가이드",
+    seoDescription: "갤럭시북 프로의 모델번호, CPU, RAM·SSD, 운영체제와 충전기·배터리 조건을 확인하는 기준을 정리합니다.",
+    intro: "갤럭시북 프로는 세대와 화면 구성에 따라 모델번호, CPU, RAM·SSD와 운영체제가 달라질 수 있습니다. 리턴픽은 구매 가능한 것으로 확인된 상품만 노출하며, 확인되지 않은 구성·충전기·배터리 정보는 확인필요로 남깁니다.",
+    searchQueries: ["갤럭시북 프로", "갤럭시북 5 프로", "Galaxy Book Pro"],
+    requiredIdentityQueryGroups: [["갤럭시북", "Galaxy Book"], ["프로", "Pro"]],
+    searchLabel: "갤럭시북 프로·갤럭시북 5 프로·Galaxy Book Pro",
+    comparePoints: [
+      { title: "모델번호·CPU", detail: "모델번호와 세대, CPU 계열이 검색하려는 갤럭시북 프로 구성과 같은지 확인합니다." },
+      { title: "RAM·SSD·운영체제", detail: "RAM·SSD 용량과 Windows 등 운영체제 포함 여부를 상품 정보에서 분리해 맞춥니다." },
+      { title: "충전기·배터리", detail: "정품 충전기 포함 여부와 배터리 상태·보증 정보가 확인되는지 보고 모호하면 확인필요로 둡니다." }
+    ],
+    faqs: [
+      { question: "갤럭시북 프로는 제품군 이름만으로 비교할 수 있나요?", answer: "제품군 이름만으로는 세대와 세부 구성을 확정하기 어렵습니다. 모델번호, CPU, RAM·SSD와 운영체제를 함께 확인해야 합니다." },
+      { question: "충전기나 배터리 정보가 없으면 어떻게 하나요?", answer: "구성품과 배터리 상태를 추정하지 않고 확인필요로 남깁니다. 해당 근거를 확인할 수 있는 경우에만 구매 판단에 반영합니다." }
     ]
   },
   {
@@ -168,6 +233,27 @@ export const searchIntentLandings: SearchIntentLanding[] = [
     ]
   },
   {
+    slug: "odyssey-monitor",
+    category: "monitor",
+    label: "삼성 오디세이 모니터",
+    icon: "monitor",
+    seoTitle: "삼성 오디세이 모니터 구매 전 패널·주사율 확인 가이드",
+    seoDescription: "삼성 오디세이 모니터의 패널, 주사율, 포트와 스탠드, 불량 화소 확인 기준을 정리합니다.",
+    intro: "삼성 오디세이 모니터는 패널과 주사율만으로 판단하지 않고 포트, 스탠드와 불량 화소 확인 조건을 함께 살펴야 합니다. 리턴픽은 구매 가능한 것으로 확인된 상품만 노출하며, 확인되지 않은 값은 확인필요로 남깁니다.",
+    searchQueries: ["삼성 오디세이", "오디세이", "Odyssey"],
+    requiredIdentityQueryGroups: [["삼성", "Samsung"], ["오디세이", "Odyssey"]],
+    searchLabel: "삼성 오디세이·오디세이·Odyssey 모니터",
+    comparePoints: [
+      { title: "패널 상태", detail: "패널 방식과 화면 손상, 빛샘·멍 등 상태 확인 조건이 명확한지 봅니다." },
+      { title: "주사율·포트", detail: "필요한 주사율을 HDMI·DisplayPort 등 실제 입력 포트와 케이블이 지원하는지 확인합니다." },
+      { title: "스탠드·불량 화소", detail: "정품 스탠드 포함 여부와 불량 화소 확인·교환 조건이 공개됐는지 살펴봅니다." }
+    ],
+    faqs: [
+      { question: "삼성 오디세이 모니터는 주사율만 보면 되나요?", answer: "아닙니다. 패널 상태와 입력 포트, 스탠드 구성, 불량 화소 확인 조건을 같은 모델 기준으로 함께 봐야 합니다." },
+      { question: "불량 화소 확인 조건이 없으면 어떻게 판단하나요?", answer: "확인되지 않은 패널 상태를 정상으로 가정하지 않습니다. 구매 가능한 것으로 확인된 상품이어도 해당 조건은 확인필요로 남기고 수령 후 점검 기준을 확인해야 합니다." }
+    ]
+  },
+  {
     slug: "robot-vacuum",
     category: "robot_vacuum",
     label: "로봇청소기",
@@ -185,6 +271,30 @@ export const searchIntentLandings: SearchIntentLanding[] = [
     faqs: [
       { question: "로봇청소기는 도킹스테이션이 꼭 필요한가요?", answer: "모델에 따라 자동 비움·물걸레 관리 기능이 달라집니다. 본체와 도크가 같은 구성인지 상품 상세에서 확인하세요." },
       { question: "반품 로봇청소기는 어떤 테스트가 필요한가요?", answer: "지도 생성, 장애물 회피, 도킹 복귀, 흡입·물걸레, 누수와 배터리 충전을 순서대로 점검하는 것이 좋습니다." }
+    ]
+  },
+  {
+    slug: "premium-robot-vacuum",
+    category: "robot_vacuum",
+    label: "프리미엄 로봇청소기",
+    icon: "robot",
+    seoTitle: "프리미엄 로봇청소기 구매 전 도크·물걸레·AS 확인 가이드",
+    seoDescription: "프리미엄 로봇청소기의 도크, 물걸레, 센서, 배터리, 소모품과 국내 AS를 확인하는 기준을 정리합니다.",
+    intro: "프리미엄 로봇청소기는 본체 기능뿐 아니라 도크와 물걸레 구성, 센서·배터리 상태, 소모품과 국내 AS 조건을 함께 확인해야 합니다. 리턴픽은 구매 가능한 것으로 확인된 상품만 노출하며, 확인되지 않은 값은 확인필요로 남깁니다.",
+    searchQueries: ["로보락", "드리미", "로봇청소기", "Roborock", "Dreame"],
+    requiredIdentityQueryGroups: [
+      ["로보락", "Roborock", "드리미", "Dreame"],
+      ["Q Revo", "S8", "L10s", "L20", "X30", "Ultra", "MaxV", "울트라"]
+    ],
+    searchLabel: "로보락·드리미·로봇청소기",
+    comparePoints: [
+      { title: "도크·물걸레", detail: "자동 먼지비움과 물걸레 세척·건조, 물통과 도크 구성품이 모델에 맞게 포함되는지 봅니다." },
+      { title: "센서·배터리", detail: "라이다·카메라 등 센서 구성과 배터리 상태, 충전·도킹 동작을 확인합니다." },
+      { title: "소모품·국내 AS", detail: "필터·브러시·먼지봉투 등 소모품과 국내 AS·보증 조건이 확인되는지 살펴보고 없으면 확인필요로 둡니다." }
+    ],
+    faqs: [
+      { question: "로봇청소기는 본체 기능만 비교하면 되나요?", answer: "아닙니다. 도크와 물걸레 구성, 센서·배터리, 소모품과 국내 AS 조건을 함께 확인해야 실제 사용 조건을 판단할 수 있습니다." },
+      { question: "국내 AS나 소모품 정보가 확인되지 않으면 어떻게 하나요?", answer: "지원 범위와 비용을 추정하지 않습니다. 구매 가능한 것으로 확인된 상품이라도 관련 값은 확인필요로 남기고 확인된 근거가 있을 때만 비교에 반영합니다." }
     ]
   },
   {

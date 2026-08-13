@@ -11,6 +11,8 @@ export type SearchIntentRule = {
   category: string;
   searchQueries: string[];
   excludeQueries?: string[];
+  /** Each group must match one alternative in title, brand, or model_name. */
+  requiredIdentityQueryGroups?: string[][];
 };
 
 function collectSearchValues(value: unknown, output: string[]) {
@@ -47,9 +49,31 @@ function matchesQuery(product: SearchIntentProduct, query: string) {
   return terms.every((term) => fields.some((field) => field.includes(term)));
 }
 
+function matchesIdentityToken(token: string, term: string) {
+  if (token === term) return true;
+  if (/\p{N}/u.test(term)) return false;
+  const suffix = token.slice(term.length);
+  return token.startsWith(term) && /^\p{N}+$/u.test(suffix);
+}
+
+function matchesIdentityQuery(product: SearchIntentProduct, query: string) {
+  const terms = normalize(query).split(" ").filter(Boolean);
+  if (!terms.length) return false;
+  const values = [product.title, product.brand ?? "", product.model_name ?? ""];
+  const tokens = values
+    .map(normalize)
+    .filter(Boolean)
+    .flatMap((field) => field.split(" ").filter(Boolean));
+  return terms.every((term) => tokens.some((token) => matchesIdentityToken(token, term)));
+}
+
 export function matchesSearchIntent(product: SearchIntentProduct, rule: SearchIntentRule) {
   if (product.category !== rule.category) return false;
   const positiveMatch = rule.searchQueries.length === 0 || rule.searchQueries.some((query) => matchesQuery(product, query));
   if (!positiveMatch) return false;
+  const requiredGroupsMatch = (rule.requiredIdentityQueryGroups ?? []).every((group) =>
+    group.some((query) => matchesIdentityQuery(product, query))
+  );
+  if (!requiredGroupsMatch) return false;
   return !(rule.excludeQueries ?? []).some((query) => matchesQuery(product, query));
 }
