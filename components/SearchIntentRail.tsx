@@ -38,9 +38,14 @@ export default function SearchIntentRail({ limit = searchIntentLandings.length }
               반품 상품을 검색할 때 먼저 확인할 사양과 위험을 주제별로 정리했습니다. 검수와 구매 링크 확인을 마친 상품만 각 페이지에 추가됩니다.
             </p>
           </div>
-          <Link className="focus-ring inline-flex items-center gap-2 text-sm font-black text-pine hover:text-ink" href="/deals">
-            전체 공개 딜 보기 <ArrowRight size={16} aria-hidden />
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link className="focus-ring inline-flex items-center gap-2 rounded-lg bg-pine px-4 py-2.5 text-sm font-black text-white hover:bg-ink" href="/guide/high-value">
+              고가 제품 구매 가이드 모음 <ArrowRight size={16} aria-hidden />
+            </Link>
+            <Link className="focus-ring inline-flex items-center gap-2 text-sm font-black text-pine hover:text-ink" href="/deals">
+              전체 공개 딜 보기 <ArrowRight size={16} aria-hidden />
+            </Link>
+          </div>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {items.map((item) => {
