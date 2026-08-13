@@ -6,7 +6,7 @@ import { getFirstLaunchConfirmation } from "@/lib/launchState";
 import { isPublicDealReady } from "@/lib/publicDeal";
 import { getLatestScore } from "@/lib/scoring";
 import { isSourcingRunConflict, runSourcing } from "@/lib/sourcing";
-import { getNextSourcingKeywordOffset, getRunNextKeywordOffset } from "@/lib/sourcingCursor";
+import { getNextSourcingKeywordCursor, getRunNextKeywordOffset } from "@/lib/sourcingCursor";
 import { hasSupabaseConfig } from "@/lib/supabase";
 import { sendTelegramForProduct } from "@/lib/telegram";
 import { backfillCoupangAffiliateLinks } from "@/lib/affiliateLinkBackfill";
@@ -217,7 +217,7 @@ export async function runScheduledSourcing() {
     };
   }
 
-  const keywordOffset = await getNextSourcingKeywordOffset(publicWebOnly ? "public_web_only" : "auto");
+  const keywordCursor = await getNextSourcingKeywordCursor(publicWebOnly ? "public_web_only" : "auto");
   let run;
   try {
     run = await runSourcing({
@@ -225,7 +225,8 @@ export async function runScheduledSourcing() {
       sourceMode: publicWebOnly ? "public_web_only" : "auto",
       coordinateExecution: true,
       keywordLimit,
-      keywordOffset,
+      keywordOffset: keywordCursor.offset,
+      keywordOrderSnapshot: keywordCursor.keywordOrderSnapshot,
       timeBudgetMs
     });
   } catch (error) {
@@ -244,7 +245,7 @@ export async function runScheduledSourcing() {
       launch_confirmation_id: gate.launchConfirmation?.id ?? null,
       use_mock_fallback: publicWebOnly ? false : useMockFallback,
       keyword_limit: keywordLimit,
-      keyword_offset: keywordOffset,
+      keyword_offset: keywordCursor.offset,
       next_keyword_offset: null,
       time_budget_ms: timeBudgetMs,
       persistent_storage: hasSupabaseConfig(),
@@ -265,7 +266,7 @@ export async function runScheduledSourcing() {
     use_mock_fallback: publicWebOnly ? false : useMockFallback,
     source_mode: publicWebOnly ? "public_web_only" : "auto",
     keyword_limit: keywordLimit,
-    keyword_offset: keywordOffset,
+    keyword_offset: keywordCursor.offset,
     next_keyword_offset: getRunNextKeywordOffset(run),
     time_budget_ms: timeBudgetMs,
     persistent_storage: hasSupabaseConfig(),

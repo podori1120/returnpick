@@ -3,7 +3,7 @@ import { listSourcingExecutionRuns } from "@/lib/dataStore";
 import { getApiReadinessSummary } from "@/lib/apiReadiness";
 import { getPublicWebRuntimeProfile, matchesRequiredPublicWebProfile } from "@/lib/providers/publicWebProfile";
 import { isSourcingRunConflict, runSourcing } from "@/lib/sourcing";
-import { getNextSourcingKeywordOffset } from "@/lib/sourcingCursor";
+import { getNextSourcingKeywordCursor } from "@/lib/sourcingCursor";
 import { diagnoseSourcingRun } from "@/lib/sourcingDiagnostics";
 import { requireAdmin, requirePersistentStorage } from "@/lib/validators";
 
@@ -122,7 +122,7 @@ export async function POST(request: Request) {
         }
       }, { status: 409 });
     }
-    const keywordOffset = await getNextSourcingKeywordOffset(publicWebOnlyAllowed ? "public_web_only" : "auto");
+    const keywordCursor = await getNextSourcingKeywordCursor(publicWebOnlyAllowed ? "public_web_only" : "auto");
     const mockFallbackDecision = publicWebOnlyAllowed
       ? {
           useMockFallback: false,
@@ -136,7 +136,8 @@ export async function POST(request: Request) {
       sourceMode: publicWebOnlyAllowed ? "public_web_only" : "auto",
       coordinateExecution: true,
       keywordLimit: positiveInteger(body.keywordLimit),
-      keywordOffset,
+      keywordOffset: keywordCursor.offset,
+      keywordOrderSnapshot: keywordCursor.keywordOrderSnapshot,
       timeBudgetMs: positiveInteger(body.timeBudgetMs)
     });
     return NextResponse.json({

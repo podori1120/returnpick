@@ -524,7 +524,7 @@ export async function ensureDefaultSourcingKeywords() {
   const missingDefaults = DEFAULT_SOURCING_KEYWORDS.filter(
     (keyword) => !existingKeys.has(`${keyword.category}:${normalizeKeywordKey(keyword.keyword)}`)
   );
-  if (!missingDefaults.length) return { inserted_count: 0, skipped: true, keyword_count: existing.length };
+  if (!missingDefaults.length) return { inserted_count: 0, missing_count: 0, skipped: true, keyword_count: existing.length };
 
   const client = getSupabaseServiceClient();
   if (client) {
@@ -536,7 +536,12 @@ export async function ensureDefaultSourcingKeywords() {
       })
       .select("*");
     if (error) throw error;
-    return { inserted_count: data?.length ?? 0, skipped: false, keyword_count: existing.length + (data?.length ?? 0) };
+    return {
+      inserted_count: data?.length ?? 0,
+      missing_count: missingDefaults.length,
+      skipped: false,
+      keyword_count: existing.length + (data?.length ?? 0)
+    };
   }
 
   const created = missingDefaults.map((input) =>
@@ -544,7 +549,12 @@ export async function ensureDefaultSourcingKeywords() {
   );
   memoryKeywords.unshift(...created);
   persistMemoryState();
-  return { inserted_count: created.length, skipped: false, keyword_count: existing.length + created.length };
+  return {
+    inserted_count: created.length,
+    missing_count: missingDefaults.length,
+    skipped: false,
+    keyword_count: existing.length + created.length
+  };
 }
 
 export async function createKeyword(input: KeywordInput) {

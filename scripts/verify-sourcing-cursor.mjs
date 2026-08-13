@@ -7,6 +7,7 @@ import { stripTypeScriptTypes } from "node:module";
 const source = readFileSync(new URL("../lib/sourcingCursor.ts", import.meta.url), "utf8")
   .replace(/^import .*;\r?\n/gm, "")
   .replace(/^export /gm, "");
+const sourcingSource = readFileSync(new URL("../lib/sourcing.ts", import.meta.url), "utf8");
 const orderSource = readFileSync(new URL("../lib/sourcingKeywordOrder.ts", import.meta.url), "utf8")
   .replace(/^import .*;\r?\n/gm, "")
   .replace(/^export /gm, "");
@@ -38,6 +39,8 @@ function isSourcingExecutionRun(run) {
 ${orderSource}
 ${source}
 export { getNextSourcingKeywordOffset };
+export { getNextSourcingKeywordCursor };
+export { getSourcingKeywordOffsetAfterDefaultSeed };
 export { getSourcingKeywordOrderSnapshot };
 export { mockRuns, mockKeywords, keywordCalls };
 export { setKeywordError };
@@ -45,7 +48,23 @@ export { setKeywordError };
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(mockModule, { mode: "transform" })).toString("base64")}`;
 const cursor = await import(moduleUrl);
 
-function run(id, { startedAt, finishedAt = null, offset, launchMarker = false, sourceMode, keywordOrderSnapshot, keywordOrderVersion } = {}) {
+assert.match(
+  sourcingSource,
+  /getSourcingKeywordOffsetAfterDefaultSeed\([\s\S]*?defaultKeywordSeed\.missing_count/,
+  "sourcing must reset the requested cursor after seeding default keywords"
+);
+assert.equal(
+  cursor.getSourcingKeywordOffsetAfterDefaultSeed(32, 1),
+  0,
+  "a newly detected default keyword must restart the cursor before public-web priority ordering"
+);
+assert.equal(
+  cursor.getSourcingKeywordOffsetAfterDefaultSeed(32, 0),
+  32,
+  "an unchanged keyword catalog must preserve the requested continuation cursor"
+);
+
+function run(id, { startedAt, finishedAt = null, offset, launchMarker = false, sourceMode, keywordOrderSnapshot, keywordOrderVersion, defaultKeywordsInserted = 1, defaultKeywordsMissing = 0 } = {}) {
   return {
     id,
     status: launchMarker ? "launch_confirmed" : "completed",
@@ -56,6 +75,7 @@ function run(id, { startedAt, finishedAt = null, offset, launchMarker = false, s
       ...(sourceMode ? { source_mode: sourceMode } : {}),
       ...(keywordOrderSnapshot ? { keyword_order_snapshot: keywordOrderSnapshot } : {}),
       ...(keywordOrderVersion ? { keyword_order_version: keywordOrderVersion } : {}),
+      ...(defaultKeywordsMissing > 0 ? { logs: [{ status: "default_keywords_seeded", inserted_count: defaultKeywordsInserted, missing_count: defaultKeywordsMissing }] } : {}),
       ...(launchMarker ? { kind: "post_approval_first_launch" } : {})
     }
   };
@@ -186,6 +206,29 @@ await expectOffset(
   null,
   "public_web_only"
 );
+const seededPublicKeywords = [...publicKeywords, richKeyword("seeded", 1_500_000, "2026-08-13T02:09:00.000Z")];
+cursor.mockRuns.splice(0, cursor.mockRuns.length, run("latest-before-seed", {
+  startedAt: "2026-08-13T02:08:00.000Z",
+  finishedAt: "2026-08-13T02:08:10.000Z",
+  offset: 32,
+  sourceMode: "public_web_only",
+  keywordOrderSnapshot: publicSnapshot
+}));
+cursor.mockKeywords.splice(0, cursor.mockKeywords.length, ...publicKeywords);
+const cursorReadBeforeConcurrentSeed = await cursor.getNextSourcingKeywordCursor("public_web_only");
+cursor.mockKeywords.splice(0, cursor.mockKeywords.length, ...seededPublicKeywords);
+const seededPublicSnapshot = cursor.getSourcingKeywordOrderSnapshot(seededPublicKeywords, "public_web_only");
+assert.equal(cursorReadBeforeConcurrentSeed.offset, 32, "the first mode reads its continuation before the concurrent seed");
+assert.equal(
+  cursor.getSourcingKeywordOffsetAfterDefaultSeed(
+    cursorReadBeforeConcurrentSeed.offset,
+    0,
+    cursorReadBeforeConcurrentSeed.keywordOrderSnapshot,
+    seededPublicSnapshot
+  ),
+  0,
+  "a concurrent seed observed after cursor lookup must restart the stale continuation"
+);
 await expectOffset(
   "automatic mode does not reuse a public-web cursor",
   0,
@@ -198,6 +241,22 @@ await expectOffset(
   "public-web mode resumes only its matching snapshot",
   7,
   [run("latest-public", { startedAt: "2026-08-11T00:00:00.000Z", finishedAt: "2026-08-11T00:01:00.000Z", offset: 7, sourceMode: "public_web_only", keywordOrderSnapshot: publicSnapshot })],
+  publicKeywords,
+  null,
+  "public_web_only"
+);
+await expectOffset(
+  "a run that seeded defaults restarts the next cursor at zero",
+  0,
+  [run("seeded-public", {
+    startedAt: "2026-08-13T02:09:38.000Z",
+    finishedAt: "2026-08-13T02:09:50.000Z",
+    offset: 40,
+    sourceMode: "public_web_only",
+    keywordOrderSnapshot: publicSnapshot,
+    defaultKeywordsInserted: 0,
+    defaultKeywordsMissing: 1
+  })],
   publicKeywords,
   null,
   "public_web_only"

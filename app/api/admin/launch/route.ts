@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { backfillCoupangAffiliateLinks } from "@/lib/affiliateLinkBackfill";
 import { getApiReadinessSummary, runApiConnectionChecks, type ApiConnectionCheck, type ApiReadinessSummary } from "@/lib/apiReadiness";
 import { listProducts } from "@/lib/dataStore";
-import { getNextSourcingKeywordOffset } from "@/lib/sourcingCursor";
+import { getNextSourcingKeywordCursor } from "@/lib/sourcingCursor";
 import { isUsableAffiliateUrl } from "@/lib/coupangLink";
 import { hasBlockingLaunchError } from "@/lib/launchCapabilityPolicy";
 import { markFirstLaunchConfirmed } from "@/lib/launchState";
@@ -359,12 +359,13 @@ export async function POST(request: Request) {
     });
   } else {
     try {
-      const keywordOffset = await getNextSourcingKeywordOffset("auto");
+      const keywordCursor = await getNextSourcingKeywordCursor("auto");
       const run = await runSourcing({
         useMockFallback: false,
         coordinateExecution: true,
         keywordLimit: sourcingKeywordLimit,
-        keywordOffset,
+        keywordOffset: keywordCursor.offset,
+        keywordOrderSnapshot: keywordCursor.keywordOrderSnapshot,
         timeBudgetMs: sourcingTimeBudgetMs
       });
       progressSignal.sourcing_found_count = run.found_count;

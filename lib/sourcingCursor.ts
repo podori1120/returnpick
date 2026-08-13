@@ -11,6 +11,24 @@ export function getRunNextKeywordOffset(run: SourcingRun | null | undefined) {
   return numberFromRunLog(run?.log_json?.next_keyword_offset);
 }
 
+export function getSourcingKeywordOffsetAfterDefaultSeed(
+  offset: number | null | undefined,
+  missingDefaultCount: number,
+  requestedKeywordOrderSnapshot: string | null = null,
+  currentKeywordOrderSnapshot: string | null = null
+) {
+  const catalogChanged =
+    requestedKeywordOrderSnapshot != null &&
+    currentKeywordOrderSnapshot != null &&
+    requestedKeywordOrderSnapshot !== currentKeywordOrderSnapshot;
+  return missingDefaultCount > 0 || catalogChanged ? 0 : offset ?? 0;
+}
+
+export type SourcingKeywordCursor = {
+  offset: number;
+  keywordOrderSnapshot: string | null;
+};
+
 function parseTimestamp(value: string | null | undefined) {
   if (typeof value !== "string" || !value.trim()) return null;
   const timestamp = Date.parse(value);
@@ -29,6 +47,13 @@ function getRunSourceMode(run: SourcingRun | null | undefined): SourcingMode {
 function getRunKeywordOrderSnapshot(run: SourcingRun | null | undefined) {
   const value = run?.log_json?.keyword_order_snapshot;
   return typeof value === "string" ? value : null;
+}
+
+function hasDefaultKeywordSeeded(run: SourcingRun | null | undefined) {
+  const logs = run?.log_json?.logs;
+  return Array.isArray(logs) && logs.some((item) => {
+    return Boolean(item && typeof item === "object" && !Array.isArray(item) && item.status === "default_keywords_seeded");
+  });
 }
 
 function isCursorCompatibleRun(run: SourcingRun, sourceMode: SourcingMode) {
@@ -69,25 +94,34 @@ function getNumericFallbackOffset(runs: SourcingRun[], sourceMode: SourcingMode)
 }
 
 export async function getNextSourcingKeywordOffset(sourceMode: SourcingMode = "auto", limit = 10) {
+  return (await getNextSourcingKeywordCursor(sourceMode, limit)).offset;
+}
+
+export async function getNextSourcingKeywordCursor(sourceMode: SourcingMode = "auto", limit = 10): Promise<SourcingKeywordCursor> {
   const executionRuns = await listSourcingExecutionRuns(limit);
   const numericFallbackOffset = getNumericFallbackOffset(executionRuns, sourceMode);
   const latestRun = executionRuns.find((run) => isSourcingExecutionRun(run) && isCursorCompatibleRun(run, sourceMode));
   const latestOffset = getRunNextKeywordOffset(latestRun);
 
-  if (latestOffset == null || !latestRun) return numericFallbackOffset;
+  if (latestOffset == null || !latestRun) return { offset: numericFallbackOffset, keywordOrderSnapshot: null };
 
   let activeKeywords: SourcingKeyword[];
   try {
     activeKeywords = await listKeywords({ activeOnly: true });
   } catch {
-    return numericFallbackOffset;
+    return { offset: numericFallbackOffset, keywordOrderSnapshot: null };
   }
 
+  const currentKeywordOrderSnapshot = getSourcingKeywordOrderSnapshot(activeKeywords, sourceMode);
   if (getRunKeywordOrderSnapshot(latestRun) != null) {
-    if (getSourcingKeywordOrderSnapshot(activeKeywords, sourceMode) !== getRunKeywordOrderSnapshot(latestRun)) return 0;
+    if (currentKeywordOrderSnapshot !== getRunKeywordOrderSnapshot(latestRun)) {
+      return { offset: 0, keywordOrderSnapshot: currentKeywordOrderSnapshot };
+    }
   } else if (sourceMode === "public_web_only") {
-    return 0;
+    return { offset: 0, keywordOrderSnapshot: currentKeywordOrderSnapshot };
   }
-  if (hasActiveKeywordCreatedAfter(activeKeywords, latestRun) === true) return 0;
-  return latestOffset;
+  if (hasDefaultKeywordSeeded(latestRun) || hasActiveKeywordCreatedAfter(activeKeywords, latestRun) === true) {
+    return { offset: 0, keywordOrderSnapshot: currentKeywordOrderSnapshot };
+  }
+  return { offset: latestOffset, keywordOrderSnapshot: currentKeywordOrderSnapshot };
 }

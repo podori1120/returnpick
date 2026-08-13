@@ -30,6 +30,7 @@ import {
 } from "@/lib/sourcingRunCoordination";
 import type { SourcingRun } from "@/lib/types";
 import { mergeStoredWebReturnInfo, resolveStoredWebReturnInfo, resolveWebReturnEvidence } from "@/lib/webReturnInfo";
+import { getSourcingKeywordOffsetAfterDefaultSeed } from "@/lib/sourcingCursor";
 import {
   getOrderedSourcingKeywords,
   getSourcingKeywordOrderSnapshot,
@@ -87,6 +88,7 @@ export type RunSourcingOptions = {
   coordinateExecution?: boolean;
   keywordLimit?: number | null;
   keywordOffset?: number | null;
+  keywordOrderSnapshot?: string | null;
   timeBudgetMs?: number | null;
 };
 
@@ -436,10 +438,11 @@ export async function runSourcing(options?: RunSourcingOptions) {
 
   try {
     const defaultKeywordSeed = await ensureDefaultSourcingKeywords();
-    if (defaultKeywordSeed.inserted_count > 0) {
+    if (defaultKeywordSeed.missing_count > 0) {
       logs.push({
         status: "default_keywords_seeded",
-        inserted_count: defaultKeywordSeed.inserted_count
+        inserted_count: defaultKeywordSeed.inserted_count,
+        missing_count: defaultKeywordSeed.missing_count
       });
     }
 
@@ -447,7 +450,13 @@ export async function runSourcing(options?: RunSourcingOptions) {
     const orderedActiveKeywords = getOrderedSourcingKeywords(activeKeywords, sourceMode);
     keywordOrderSnapshot = getSourcingKeywordOrderSnapshot(activeKeywords, sourceMode);
     activeKeywordCount = orderedActiveKeywords.length;
-    keywordStartOffset = normalizeOffset(requestedKeywordOffset, activeKeywordCount);
+    const keywordOffset = getSourcingKeywordOffsetAfterDefaultSeed(
+      requestedKeywordOffset,
+      defaultKeywordSeed.missing_count,
+      options?.keywordOrderSnapshot ?? null,
+      keywordOrderSnapshot
+    );
+    keywordStartOffset = normalizeOffset(keywordOffset, activeKeywordCount);
     nextKeywordOffset = keywordStartOffset;
     const orderedKeywords = keywordStartOffset
       ? [...orderedActiveKeywords.slice(keywordStartOffset), ...orderedActiveKeywords.slice(0, keywordStartOffset)]

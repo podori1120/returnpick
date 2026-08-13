@@ -5615,7 +5615,7 @@ if (fileExists("lib/scheduler.ts")) {
   check("cron: production real-source default", scheduler.includes("getScheduledMockFallback") && scheduler.includes('process.env.NODE_ENV !== "production"'), "production cron does not use mock fallback unless explicitly enabled", "required");
   check("cron: sourcing time budget env", scheduler.includes("SOURCING_TIME_BUDGET_MS") && scheduler.includes("SOURCING_KEYWORD_LIMIT") && sourcingSource.includes("SOURCING_ENRICHMENT_CONCURRENCY"), "cron sourcing can be bounded by time, keyword, and enrichment concurrency settings", "required");
   check("cron: affiliate link backfill isolation", scheduler.includes("runScheduledAffiliateBackfill") && scheduler.includes("backfillCoupangAffiliateLinks") && scheduler.includes("AFFILIATE_BACKFILL_LIMIT"), "scheduled Partners link repair runs in a separate bounded job after sourcing", "required");
-  check("cron: keyword cursor resume", scheduler.includes("getNextSourcingKeywordOffset") && scheduler.includes("keywordOffset"), "scheduled sourcing resumes from the previous keyword cursor", "required");
+  check("cron: keyword cursor resume", scheduler.includes("getNextSourcingKeywordCursor") && scheduler.includes("keywordCursor") && scheduler.includes("keywordOffset"), "scheduled sourcing resumes from the previous keyword cursor", "required");
   check("cron: persistent storage signal", scheduler.includes("persistent_storage") && scheduler.includes("hasSupabaseConfig"), "scheduler result exposes whether run logs are persisted", "required");
   check(
     "cron: launch readiness gate",
