@@ -30,6 +30,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: "/picks", changeFrequency: "daily", priority: 0.82 },
     { path: "/guide/return-checklist", changeFrequency: "monthly", priority: 0.4 },
     { path: "/guide/safe-categories", changeFrequency: "monthly", priority: 0.4 },
+    { path: "/guide/high-value", changeFrequency: "weekly", priority: 0.74 },
     { path: "/disclosure", changeFrequency: "yearly", priority: 0.2 },
     { path: "/picks/novatech-s1-window-cleaner", changeFrequency: "weekly", priority: 0.8 }
   ];
