@@ -1,7 +1,7 @@
 import type { Category, ConditionGrade, JsonValue } from "@/lib/types";
 import type { ProviderProduct, ProviderSearchResult } from "@/lib/providers/types";
 import { parseAlgumonCoupangDiscovery } from "@/lib/providers/algumonDiscoveryParser";
-import { parseHotDealsCoupangDiscovery } from "@/lib/providers/hotdealsDiscoveryParser";
+import { HOTDEALS_DISCOVERY_FEED_PATH, parseHotDealsCoupangDiscovery, parseHotDealsCoupangDiscoveryFeed } from "@/lib/providers/hotdealsDiscoveryParser";
 import { HOTDEALS_DISCOVERY_HOST } from "@/lib/providers/publicWebProfile";
 import { cleanText, extractListedPriceCandidatesFromText, extractListedPriceFromText, extractReturnInfoFromText, toReturnInfoJson } from "@/lib/webReturnInfo";
 import { getSiteUrl } from "@/lib/siteUrl";
@@ -385,6 +385,13 @@ function safeTemplateUrl(template: string, keyword: string) {
 function isHtmlContentType(value: string | null) {
   const contentType = (value ?? "").toLowerCase();
   return contentType.includes("text/html") || contentType.includes("application/xhtml+xml");
+}
+
+function isAllowedPublicWebSearchContentType(value: string | null, pageUrl: URL) {
+  if (isHtmlContentType(value)) return true;
+  if (!isHotDealsFeedPage(pageUrl)) return false;
+  const contentType = (value ?? "").toLowerCase();
+  return contentType.includes("application/rss+xml") || contentType.includes("application/atom+xml") || contentType.includes("application/xml") || contentType.includes("text/xml");
 }
 
 function safeRedirectTarget(location: string | null, baseUrl: URL, status: number) {
@@ -890,6 +897,10 @@ function isHotDealsKeywordSearchPage(url: URL) {
   return url.protocol === "https:" && isHotDealsHost(url) && /^\/deals\/k\/[^/]+$/u.test(url.pathname);
 }
 
+function isHotDealsFeedPage(url: URL) {
+  return url.protocol === "https:" && isHotDealsHost(url) && url.pathname === HOTDEALS_DISCOVERY_FEED_PATH;
+}
+
 function isAllowedHotDealsHost(url: URL, allowedHosts: ReadonlySet<string>) {
   return allowedHosts.has(url.hostname.toLowerCase()) || (isHotDealsHost(url) && (allowedHosts.has(HOTDEALS_DISCOVERY_HOST) || allowedHosts.has("hotdeals.kr")));
 }
@@ -984,6 +995,42 @@ function extractCards(html: string, category: Category, keyword: string, pageUrl
   }
   if (isHotDealsHost(base)) {
     if (!isAllowedHotDealsHost(base, allowedHosts)) return [];
+    if (isHotDealsFeedPage(base)) {
+      const observedAt = new Date().toISOString();
+      return parseHotDealsCoupangDiscoveryFeed(html, pageUrl, keyword).map((record) => ({
+        source: "hotdeals_discovery",
+        source_product_id: `hotdeals:${record.siteId}:${record.dealId}`,
+        category,
+        keyword,
+        title: record.title.slice(0, 140),
+        brand: null,
+        model_name: null,
+        image_url: null,
+        source_url: record.sourceUrl,
+        coupang_url: null,
+        affiliate_url: null,
+        source_price: null,
+        return_price: null,
+        new_price: null,
+        condition_grade: "확인필요",
+        stock_count: null,
+        raw_json: {
+          provider: "hotdeals_discovery",
+          candidate_kind: "discovery_only",
+          discovery_only: true,
+          source_title: record.title,
+          source_site: record.siteId,
+          source_site_id: record.siteId,
+          source_deal_id: record.dealId,
+          source_url: record.sourceUrl,
+          page_url: pageUrl,
+          observed_at: observedAt,
+          requires_manual_coupang_url: true,
+          outbound_not_fetched: true,
+          feed_only: true
+        }
+      }));
+    }
     return isHotDealsKeywordSearchPage(base) ? extractHotDealsDiscoveryCards(html, category, keyword, pageUrl) : [];
   }
   const anchorMatches = extractVisibleAnchorBlocks(html).filter((match) => match.inner.length <= 1500);
@@ -1569,7 +1616,7 @@ export async function searchPublicWebProducts(keyword: string, category: Categor
     const response = await fetchWithTimeout(url, {
       headers: {
         "User-Agent": crawlUserAgent(),
-        Accept: "text/html,application/xhtml+xml"
+        Accept: "text/html,application/xhtml+xml,application/rss+xml,application/atom+xml,application/xml;q=0.9,text/xml;q=0.8"
       },
       redirect: "manual",
       cache: "no-store"
@@ -1590,7 +1637,7 @@ export async function searchPublicWebProducts(keyword: string, category: Categor
     }
 
     const contentType = response.headers.get("content-type");
-    if (!isHtmlContentType(contentType)) {
+    if (!isAllowedPublicWebSearchContentType(contentType, parsed)) {
       diagnostics.push({ stage: "search", status: "UNSUPPORTED_CONTENT_TYPE", url, content_type: contentType, error: contentType ?? "MISSING_CONTENT_TYPE" });
       continue;
     }

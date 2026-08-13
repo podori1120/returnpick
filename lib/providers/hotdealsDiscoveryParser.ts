@@ -1,6 +1,7 @@
 export const MAX_HOTDEALS_DISCOVERY_RESULTS = 8;
 export const MAX_HOTDEALS_HTML_CHARS = 750_000;
 export const MAX_HOTDEALS_RECORDS_SCANNED = 120;
+export const HOTDEALS_DISCOVERY_FEED_PATH = "/feeds/deals.xml";
 
 const HOTDEALS_CANONICAL_HOST = "www.hotdeals.kr";
 const HOTDEALS_HOSTS = new Set([HOTDEALS_CANONICAL_HOST, "hotdeals.kr"]);
@@ -33,6 +34,14 @@ type TagRange = { start: number; end: number };
 
 function isHotDealsHost(hostname: string) {
   return HOTDEALS_HOSTS.has(hostname.toLowerCase());
+}
+
+function readFeedElementText(item: string, name: string) {
+  const match = item.match(new RegExp(`<${name}\\b[^>]*>([\\s\\S]{0,2000}?)</${name}>`, "iu"));
+  if (!match) return null;
+  const value = match[1].replace(/^<!\[CDATA\[|\]\]>$/gu, "").replace(/<[^>]+>/gu, " ");
+  const decoded = decodeHtmlEntities(value).replace(/\s+/gu, " ").trim();
+  return decoded ? decoded.slice(0, MAX_HOTDEALS_TITLE_CHARS) : null;
 }
 
 function findHtmlTagEnd(source: string, start: number) {
@@ -357,6 +366,37 @@ function parseHotDealsDetailUrl(rawHref: string, page: URL) {
   } catch {
     return null;
   }
+}
+
+export function parseHotDealsCoupangDiscoveryFeed(xml: string, pageUrl: string, keyword?: string): HotDealsCoupangDiscoveryRecord[] {
+  if (!xml || xml.length > MAX_HOTDEALS_HTML_CHARS) return [];
+
+  let page: URL;
+  try {
+    page = new URL(pageUrl);
+  } catch {
+    return [];
+  }
+  if (page.protocol !== "https:" || !isHotDealsHost(page.hostname) || page.pathname !== HOTDEALS_DISCOVERY_FEED_PATH) return [];
+
+  const records: HotDealsCoupangDiscoveryRecord[] = [];
+  const seen = new Set<string>();
+  let scanned = 0;
+  for (const match of xml.matchAll(/<item\b[^>]*>([\s\S]{0,12000}?)<\/item>/giu)) {
+    if (scanned >= MAX_HOTDEALS_RECORDS_SCANNED || records.length >= MAX_HOTDEALS_DISCOVERY_RESULTS) break;
+    scanned += 1;
+    const item = match[1];
+    const title = readFeedElementText(item, "title");
+    const rawLink = readFeedElementText(item, "link");
+    const canonical = rawLink ? parseHotDealsDetailUrl(rawLink, page) : null;
+    if (!canonical || !title || !/^\[\s*쿠팡\s*\]/u.test(title)) continue;
+    if (keyword != null && !matchesHotDealsDiscoveryKeyword(title, keyword)) continue;
+    const key = `${canonical.siteId}:${canonical.dealId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    records.push({ ...canonical, title });
+  }
+  return records;
 }
 
 export function parseHotDealsCoupangDiscovery(html: string, pageUrl: string, keyword?: string): HotDealsCoupangDiscoveryRecord[] {

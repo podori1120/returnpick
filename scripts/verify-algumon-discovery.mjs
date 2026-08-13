@@ -5,11 +5,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { parseAlgumonCoupangDiscovery, MAX_ALGUMON_DISCOVERY_RESULTS } from "../lib/providers/algumonDiscoveryParser.ts";
 import {
+  HOTDEALS_DISCOVERY_FEED_PATH,
   MAX_HOTDEALS_DISCOVERY_RESULTS,
   MAX_HOTDEALS_HTML_CHARS,
   MAX_HOTDEALS_RECORDS_SCANNED,
   matchesHotDealsDiscoveryKeyword,
-  parseHotDealsCoupangDiscovery
+  parseHotDealsCoupangDiscovery,
+  parseHotDealsCoupangDiscoveryFeed
 } from "../lib/providers/hotdealsDiscoveryParser.ts";
 import {
   ALGUMON_DISCOVERY_HOST,
@@ -81,6 +83,23 @@ function hotDealsList(cards) {
 }
 
 const hotDealsPageUrl = "https://www.hotdeals.kr/deals/k/%EB%85%B8%ED%8A%B8%EB%B6%81";
+const hotDealsFeedUrl = `https://www.hotdeals.kr${HOTDEALS_DISCOVERY_FEED_PATH}?keyword=LG%20%EA%B7%B8%EB%9E%A8%2016`;
+const hotDealsFeedFixture = `<rss><channel>${[
+  `<item><title><![CDATA[[쿠팡] LG 그램 16ZD90SU-GXF6K]]></title><link>https://www.hotdeals.kr/deals/DomesticDealbada/31695</link><description>가격과 외부 링크는 읽지 않음</description></item>`,
+  `<item><title>[G마켓] LG 그램</title><link>https://www.hotdeals.kr/deals/DomesticDealbada/31696</link></item>`,
+  `<item><title>[쿠팡] LG 그램 중복</title><link>https://www.hotdeals.kr/deals/DomesticDealbada/31695</link></item>`,
+  `<item><title>[쿠팡] 갤럭시북</title><link>https://www.hotdeals.kr/deals/DomesticDealbada/31697</link></item>`
+].join("")}</channel></rss>`;
+assert.deepEqual(parseHotDealsCoupangDiscoveryFeed(hotDealsFeedFixture, hotDealsFeedUrl, "LG 그램 16"), [
+  {
+    siteId: "DomesticDealbada",
+    dealId: "31695",
+    title: "[쿠팡] LG 그램 16ZD90SU-GXF6K",
+    sourceUrl: "https://www.hotdeals.kr/deals/DomesticDealbada/31695"
+  }
+]);
+assert.equal(parseHotDealsCoupangDiscoveryFeed(hotDealsFeedFixture, "https://evil.example/feeds/deals.xml", "LG 그램").length, 0);
+assert.equal(parseHotDealsCoupangDiscoveryFeed("x".repeat(MAX_HOTDEALS_HTML_CHARS + 1), hotDealsFeedUrl).length, 0);
 const hotDealsLiveFixture = hotDealsList([
   hotDealsCard({
     href: "/deals/DomesticDealbada/31695",
@@ -454,6 +473,11 @@ assert.match(providerSource, /source_product_id: `hotdeals:\$\{record\.siteId\}:
 assert.match(providerSource, /source_url: record\.sourceUrl/);
 assert.match(providerSource, /parseHotDealsCoupangDiscovery/);
 assert.match(providerSource, /parseHotDealsCoupangDiscovery\(html, pageUrl, keyword\)/);
+assert.match(providerSource, /parseHotDealsCoupangDiscoveryFeed\(html, pageUrl, keyword\)/);
+assert.match(providerSource, /isHotDealsFeedPage/);
+assert.match(providerSource, /isAllowedPublicWebSearchContentType/);
+assert.match(providerSource, /application\/rss\+xml/);
+assert.match(providerSource, /feed_only: true/);
 assert.match(providerSource, /isHotDealsKeywordSearchPage/);
 assert.match(providerSource, /discovery_only: true/);
 assert.match(providerSource, /source_site_id: record\.siteId/);
