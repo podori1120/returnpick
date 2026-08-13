@@ -75,6 +75,8 @@ type ProductFilters = {
 const now = () => new Date().toISOString();
 
 export const DEFAULT_SOURCING_KEYWORDS: KeywordInput[] = [
+  { keyword: "노트북", category: "laptop", min_price: 800000, max_price: 3000000, min_discount_rate: 0.08 },
+  { keyword: "게이밍 노트북", category: "laptop", min_price: 900000, max_price: 3000000, min_discount_rate: 0.1 },
   { keyword: "갤럭시북", category: "laptop", min_price: 400000, max_price: 1800000, min_discount_rate: 0.1 },
   { keyword: "LG 그램", category: "laptop", min_price: 600000, max_price: 2200000, min_discount_rate: 0.1 },
   { keyword: "레노버 아이디어패드", category: "laptop", min_price: 350000, max_price: 1400000, min_discount_rate: 0.12 },
@@ -96,6 +98,7 @@ export const DEFAULT_SOURCING_KEYWORDS: KeywordInput[] = [
   { keyword: "맥북 프로", category: "laptop", min_price: 900000, max_price: 3000000, min_discount_rate: 0.08 },
   { keyword: "갤럭시북 5 프로", category: "laptop", min_price: 900000, max_price: 2600000, min_discount_rate: 0.1 },
   { keyword: "레노버 LOQ", category: "laptop", min_price: 700000, max_price: 2200000, min_discount_rate: 0.15 },
+  { keyword: "모니터", category: "monitor", min_price: 500000, max_price: 2000000, min_discount_rate: 0.1 },
   { keyword: "QHD 모니터", category: "monitor", min_price: 150000, max_price: 800000, min_discount_rate: 0.12 },
   { keyword: "4K 모니터", category: "monitor", min_price: 200000, max_price: 1100000, min_discount_rate: 0.12 },
   { keyword: "144Hz 모니터", category: "monitor", min_price: 150000, max_price: 900000, min_discount_rate: 0.12 },
@@ -108,6 +111,7 @@ export const DEFAULT_SOURCING_KEYWORDS: KeywordInput[] = [
   { keyword: "게이밍 모니터", category: "monitor", min_price: 150000, max_price: 1000000, min_discount_rate: 0.12 },
   { keyword: "OLED 게이밍 모니터", category: "monitor", min_price: 500000, max_price: 2000000, min_discount_rate: 0.12 },
   { keyword: "울트라와이드 모니터", category: "monitor", min_price: 300000, max_price: 1500000, min_discount_rate: 0.12 },
+  { keyword: "로봇청소기", category: "robot_vacuum", min_price: 600000, max_price: 2000000, min_discount_rate: 0.1 },
   { keyword: "로보락", category: "robot_vacuum", min_price: 300000, max_price: 1600000, min_discount_rate: 0.12 },
   { keyword: "드리미 로봇청소기", category: "robot_vacuum", min_price: 250000, max_price: 1500000, min_discount_rate: 0.12 },
   { keyword: "샤오미 로봇청소기", category: "robot_vacuum", min_price: 150000, max_price: 900000, min_discount_rate: 0.12 },
@@ -118,6 +122,7 @@ export const DEFAULT_SOURCING_KEYWORDS: KeywordInput[] = [
   { keyword: "올인원 로봇청소기", category: "robot_vacuum", min_price: 300000, max_price: 1800000, min_discount_rate: 0.12 },
   { keyword: "로보락 S8 MaxV Ultra", category: "robot_vacuum", min_price: 800000, max_price: 2000000, min_discount_rate: 0.12 },
   { keyword: "직배수 로봇청소기", category: "robot_vacuum", min_price: 600000, max_price: 1800000, min_discount_rate: 0.12 },
+  { keyword: "무선청소기", category: "cordless_vacuum", min_price: 450000, max_price: 1500000, min_discount_rate: 0.1 },
   { keyword: "다이슨 무선청소기", category: "cordless_vacuum", min_price: 250000, max_price: 1200000, min_discount_rate: 0.1 },
   { keyword: "삼성 제트", category: "cordless_vacuum", min_price: 200000, max_price: 1000000, min_discount_rate: 0.12 },
   { keyword: "LG 코드제로", category: "cordless_vacuum", min_price: 250000, max_price: 1200000, min_discount_rate: 0.12 },
@@ -127,6 +132,7 @@ export const DEFAULT_SOURCING_KEYWORDS: KeywordInput[] = [
   { keyword: "LG 코드제로 A9", category: "cordless_vacuum", min_price: 250000, max_price: 1200000, min_discount_rate: 0.12 },
   { keyword: "다이슨 Gen5 디텍트", category: "cordless_vacuum", min_price: 500000, max_price: 1500000, min_discount_rate: 0.1 },
   { keyword: "삼성 비스포크 제트", category: "cordless_vacuum", min_price: 300000, max_price: 1300000, min_discount_rate: 0.12 },
+  { keyword: "공기청정기", category: "air_purifier", min_price: 300000, max_price: 1200000, min_discount_rate: 0.1 },
   { keyword: "삼성 공기청정기", category: "air_purifier", min_price: 100000, max_price: 900000, min_discount_rate: 0.1 },
   { keyword: "LG 공기청정기", category: "air_purifier", min_price: 150000, max_price: 1000000, min_discount_rate: 0.1 },
   { keyword: "위닉스 공기청정기", category: "air_purifier", min_price: 80000, max_price: 600000, min_discount_rate: 0.1 },
@@ -136,6 +142,7 @@ export const DEFAULT_SOURCING_KEYWORDS: KeywordInput[] = [
   { keyword: "20평 공기청정기", category: "air_purifier", min_price: 100000, max_price: 700000, min_discount_rate: 0.1 },
   { keyword: "LG 퓨리케어 360", category: "air_purifier", min_price: 200000, max_price: 1200000, min_discount_rate: 0.1 },
   { keyword: "삼성 블루스카이 7000", category: "air_purifier", min_price: 150000, max_price: 1000000, min_discount_rate: 0.1 },
+  { keyword: "제습기", category: "dehumidifier", min_price: 300000, max_price: 1000000, min_discount_rate: 0.1 },
   { keyword: "위닉스 제습기", category: "dehumidifier", min_price: 100000, max_price: 700000, min_discount_rate: 0.1 },
   { keyword: "LG 제습기", category: "dehumidifier", min_price: 150000, max_price: 900000, min_discount_rate: 0.1 },
   { keyword: "삼성 제습기", category: "dehumidifier", min_price: 150000, max_price: 900000, min_discount_rate: 0.1 },
