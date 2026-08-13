@@ -17,11 +17,41 @@ const requiredAdditiveDefaults = [
 ];
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const defaults = [...dataStore.matchAll(/\{ keyword: "([^"]+)", category: "([^"]+)"/g)].map((match) => ({
+const defaultBlock = dataStore.match(/DEFAULT_SOURCING_KEYWORDS: KeywordInput\[\] = \[([\s\S]*?)\n\];/);
+assert.ok(defaultBlock, "code defaults block is present");
+const defaults = [...defaultBlock[1].matchAll(/\{ keyword: "([^"]+)", category: "([^"]+)"/g)].map((match) => ({
   keyword: match[1],
   category: match[2]
 }));
 
+assert.equal(defaults.some((item) => item.keyword === "LG전자"), false, "code defaults omit generic LG전자");
+assert.doesNotMatch(seed, /\('LG전자',\s*'/, "SQL seed omits generic LG전자");
+assert.match(
+  dataStore,
+  /(?:export )?const RETIRED_SOURCING_KEYWORD[^=]*=\s*\{\s*keyword: "LG전자",\s*category: "laptop"\s*\}/,
+  "code defines the exact LG전자/laptop retirement descriptor"
+);
+assert.match(
+  dataStore,
+  /\.from\("sourcing_keywords"\)\s*\.update\(\{\s*is_active: false,\s*updated_at: now\(\)\s*\}\)[\s\S]*?\.eq\("keyword_key", keywordKey\)[\s\S]*?\.eq\("category", descriptor\.category\)[\s\S]*?\.eq\("is_active", true\)/,
+  "Supabase retirement filters the normalized key, category, and active rows"
+);
+assert.match(
+  dataStore,
+  /memoryKeywords\.filter\(\s*\(keyword\) =>\s*keyword\.is_active\s*&&\s*keyword\.category === descriptor\.category\s*&&\s*normalizeKeywordKey\(keyword\.keyword\) === keywordKey/,
+  "memory retirement filters the normalized key, category, and active rows"
+);
+assert.match(
+  dataStore,
+  /const retired_count = await retireSourcingKeyword\(RETIRED_SOURCING_KEYWORD\);[\s\S]*?const existing = await listKeywords\(\);/,
+  "retirement runs before default keyword listing and backfill"
+);
+assert.match(dataStore, /options\?\.activeOnly\) query = query\.eq\("is_active", true\)/, "active Supabase keyword selection excludes retired rows");
+assert.match(
+  seed,
+  /update sourcing_keywords\s+set is_active = false,\s+updated_at = now\(\)\s+where keyword_key = 'lg전자'\s+and category = 'laptop'\s+and is_active = true\s*;/i,
+  "SQL seed retires only the exact LG전자/laptop row"
+);
 assert.ok(defaults.length >= 55, `expected at least 55 default sourcing keywords, found ${defaults.length}`);
 assert.deepEqual(
   new Set(defaults.map((item) => item.category)),

@@ -92,7 +92,6 @@ export const DEFAULT_SOURCING_KEYWORDS: KeywordInput[] = [
   { keyword: "갤럭시북 울트라", category: "laptop", min_price: 600000, max_price: 2800000, min_discount_rate: 0.1 },
   { keyword: "LG 그램 16", category: "laptop", min_price: 600000, max_price: 2200000, min_discount_rate: 0.1 },
   { keyword: "LG 그램 프로", category: "laptop", min_price: 800000, max_price: 2500000, min_discount_rate: 0.1 },
-  { keyword: "LG전자", category: "laptop", min_price: 300000, max_price: 2500000, min_discount_rate: 0.1 },
   { keyword: "아이디어패드 슬림", category: "laptop", min_price: 350000, max_price: 1400000, min_discount_rate: 0.12 },
   { keyword: "리전 5", category: "laptop", min_price: 700000, max_price: 2400000, min_discount_rate: 0.15 },
   { keyword: "맥북 에어", category: "laptop", min_price: 700000, max_price: 2600000, min_discount_rate: 0.08 },
@@ -170,6 +169,13 @@ export const DEFAULT_SOURCING_KEYWORDS: KeywordInput[] = [
   { keyword: "20L 제습기", category: "dehumidifier", min_price: 150000, max_price: 900000, min_discount_rate: 0.1 },
   { keyword: "위닉스 뽀송 19L", category: "dehumidifier", min_price: 150000, max_price: 800000, min_discount_rate: 0.1 }
 ];
+
+type RetiredKeywordDescriptor = Pick<KeywordInput, "keyword" | "category">;
+
+export const RETIRED_SOURCING_KEYWORD: RetiredKeywordDescriptor = {
+  keyword: "LG전자",
+  category: "laptop"
+};
 
 function makeKeyword(keyword: string, category: Category, min_price: number | null, max_price: number | null, min_discount_rate: number | null): SourcingKeyword {
   const stamp = now();
@@ -542,13 +548,48 @@ export async function listKeywords(options?: { activeOnly?: boolean }) {
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
+async function retireSourcingKeyword(descriptor: RetiredKeywordDescriptor) {
+  const keywordKey = normalizeKeywordKey(descriptor.keyword);
+  const client = getSupabaseServiceClient();
+  if (client) {
+    const { data, error } = await client
+      .from("sourcing_keywords")
+      .update({ is_active: false, updated_at: now() })
+      .eq("keyword_key", keywordKey)
+      .eq("category", descriptor.category)
+      .eq("is_active", true)
+      .select("id");
+    if (error) throw error;
+    return data?.length ?? 0;
+  }
+
+  const matching = memoryKeywords.filter(
+    (keyword) =>
+      keyword.is_active &&
+      keyword.category === descriptor.category &&
+      normalizeKeywordKey(keyword.keyword) === keywordKey
+  );
+  if (!matching.length) return 0;
+
+  const stamp = now();
+  for (const keyword of matching) {
+    keyword.is_active = false;
+    keyword.updated_at = stamp;
+  }
+  persistMemoryState();
+  return matching.length;
+}
+
 export async function ensureDefaultSourcingKeywords() {
+  const retired_count = await retireSourcingKeyword(RETIRED_SOURCING_KEYWORD);
   const existing = await listKeywords();
   const existingKeys = new Set(existing.map((keyword) => `${keyword.category}:${normalizeKeywordKey(keyword.keyword)}`));
   const missingDefaults = DEFAULT_SOURCING_KEYWORDS.filter(
     (keyword) => !existingKeys.has(`${keyword.category}:${normalizeKeywordKey(keyword.keyword)}`)
   );
-  if (!missingDefaults.length) return { inserted_count: 0, missing_count: 0, skipped: true, keyword_count: existing.length };
+  if (!missingDefaults.length) {
+    return { retired_count, inserted_count: 0, missing_count: 0, skipped: true, keyword_count: existing.length };
+  }
 
   const client = getSupabaseServiceClient();
   if (client) {
@@ -561,6 +602,7 @@ export async function ensureDefaultSourcingKeywords() {
       .select("*");
     if (error) throw error;
     return {
+      retired_count,
       inserted_count: data?.length ?? 0,
       missing_count: missingDefaults.length,
       skipped: false,
@@ -574,6 +616,7 @@ export async function ensureDefaultSourcingKeywords() {
   memoryKeywords.unshift(...created);
   persistMemoryState();
   return {
+    retired_count,
     inserted_count: created.length,
     missing_count: missingDefaults.length,
     skipped: false,

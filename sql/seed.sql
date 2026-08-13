@@ -17,7 +17,6 @@ values
   ('갤럭시북 울트라', 'laptop', 600000, 2800000, 0.10),
   ('LG 그램 16', 'laptop', 600000, 2200000, 0.10),
   ('LG 그램 프로', 'laptop', 800000, 2500000, 0.10),
-  ('LG전자', 'laptop', 300000, 2500000, 0.10),
   ('아이디어패드 슬림', 'laptop', 350000, 1400000, 0.12),
   ('리전 5', 'laptop', 700000, 2400000, 0.15),
   ('맥북 에어', 'laptop', 700000, 2600000, 0.08),
@@ -95,3 +94,10 @@ values
   ('20L 제습기', 'dehumidifier', 150000, 900000, 0.10),
   ('위닉스 뽀송 19L', 'dehumidifier', 150000, 800000, 0.10)
 on conflict (keyword_key, category) do nothing;
+
+update sourcing_keywords
+set is_active = false,
+    updated_at = now()
+where keyword_key = 'lg전자'
+  and category = 'laptop'
+  and is_active = true;
