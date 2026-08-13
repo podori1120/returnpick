@@ -359,7 +359,7 @@ export async function POST(request: Request) {
     });
   } else {
     try {
-      const keywordOffset = await getNextSourcingKeywordOffset();
+      const keywordOffset = await getNextSourcingKeywordOffset("auto");
       const run = await runSourcing({
         useMockFallback: false,
         coordinateExecution: true,

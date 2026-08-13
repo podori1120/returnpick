@@ -82,6 +82,7 @@
     "sourcing:public-web:daily": "npm run algumon-discovery:check && node scripts/run-production-public-web-intake.mjs",
     "sourcing:public-web:daily:check": "node scripts/verify-production-public-web-intake.mjs",
     "sourcing:throughput:check": "node scripts/verify-sourcing-throughput.mjs",
+    "sourcing:keyword-priority:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-sourcing-keyword-priority.mjs",
     "sourcing:keywords:check": "node scripts/verify-sourcing-keyword-coverage.mjs",
     "keyword-coverage:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-keyword-coverage-api.mjs",
     "doctor:production": "node scripts/run-production-doctor.mjs",

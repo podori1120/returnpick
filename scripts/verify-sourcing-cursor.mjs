@@ -7,6 +7,9 @@ import { stripTypeScriptTypes } from "node:module";
 const source = readFileSync(new URL("../lib/sourcingCursor.ts", import.meta.url), "utf8")
   .replace(/^import .*;\r?\n/gm, "")
   .replace(/^export /gm, "");
+const orderSource = readFileSync(new URL("../lib/sourcingKeywordOrder.ts", import.meta.url), "utf8")
+  .replace(/^import .*;\r?\n/gm, "")
+  .replace(/^export /gm, "");
 const mockModule = `
 const mockRuns = [];
 const mockKeywords = [];
@@ -32,15 +35,17 @@ function setKeywordError(value) { keywordError = value; }
 function isSourcingExecutionRun(run) {
   return Boolean(run) && !(run.status === "launch_confirmed" && run.log_json?.kind === "post_approval_first_launch");
 }
+${orderSource}
 ${source}
 export { getNextSourcingKeywordOffset };
+export { getSourcingKeywordOrderSnapshot };
 export { mockRuns, mockKeywords, keywordCalls };
 export { setKeywordError };
 `;
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(mockModule, { mode: "transform" })).toString("base64")}`;
 const cursor = await import(moduleUrl);
 
-function run(id, { startedAt, finishedAt = null, offset, launchMarker = false } = {}) {
+function run(id, { startedAt, finishedAt = null, offset, launchMarker = false, sourceMode, keywordOrderSnapshot, keywordOrderVersion } = {}) {
   return {
     id,
     status: launchMarker ? "launch_confirmed" : "completed",
@@ -48,6 +53,9 @@ function run(id, { startedAt, finishedAt = null, offset, launchMarker = false } 
     finished_at: finishedAt,
     log_json: {
       ...(offset === undefined ? {} : { next_keyword_offset: offset }),
+      ...(sourceMode ? { source_mode: sourceMode } : {}),
+      ...(keywordOrderSnapshot ? { keyword_order_snapshot: keywordOrderSnapshot } : {}),
+      ...(keywordOrderVersion ? { keyword_order_version: keywordOrderVersion } : {}),
       ...(launchMarker ? { kind: "post_approval_first_launch" } : {})
     }
   };
@@ -57,11 +65,25 @@ function keyword(createdAt, updatedAt = createdAt) {
   return { created_at: createdAt, updated_at: updatedAt };
 }
 
-async function expectOffset(name, expected, runs, keywords, error = null) {
+function richKeyword(id, min_price, createdAt = "2026-08-09T00:00:00.000Z") {
+  return {
+    id,
+    keyword: id,
+    category: "laptop",
+    is_active: true,
+    min_price,
+    max_price: null,
+    min_discount_rate: null,
+    created_at: createdAt,
+    updated_at: createdAt
+  };
+}
+
+async function expectOffset(name, expected, runs, keywords, error = null, sourceMode = "auto") {
   cursor.mockRuns.splice(0, cursor.mockRuns.length, ...runs);
   cursor.mockKeywords.splice(0, cursor.mockKeywords.length, ...keywords);
   cursor.setKeywordError(error);
-  const actual = await cursor.getNextSourcingKeywordOffset();
+  const actual = await cursor.getNextSourcingKeywordOffset(sourceMode);
   assert.equal(actual, expected, name);
 }
 
@@ -152,6 +174,49 @@ await expectOffset(
   [run("latest", { startedAt: "2026-08-11T00:00:00.000Z", finishedAt: "2026-08-11T00:01:00.000Z", offset: 11 })],
   [keyword("2026-08-12T00:00:00.000Z")],
   new Error("KEYWORD_LOOKUP_FAILED")
+);
+
+const publicKeywords = [richKeyword("low", 500_000), richKeyword("high", 1_200_000)];
+const publicSnapshot = cursor.getSourcingKeywordOrderSnapshot(publicKeywords, "public_web_only");
+await expectOffset(
+  "public-web mode does not reuse an automatic cursor",
+  0,
+  [run("latest-auto", { startedAt: "2026-08-11T00:00:00.000Z", finishedAt: "2026-08-11T00:01:00.000Z", offset: 7 })],
+  publicKeywords,
+  null,
+  "public_web_only"
+);
+await expectOffset(
+  "automatic mode does not reuse a public-web cursor",
+  0,
+  [run("latest-public", { startedAt: "2026-08-11T00:00:00.000Z", finishedAt: "2026-08-11T00:01:00.000Z", offset: 7, sourceMode: "public_web_only", keywordOrderSnapshot: publicSnapshot })],
+  publicKeywords,
+  null,
+  "auto"
+);
+await expectOffset(
+  "public-web mode resumes only its matching snapshot",
+  7,
+  [run("latest-public", { startedAt: "2026-08-11T00:00:00.000Z", finishedAt: "2026-08-11T00:01:00.000Z", offset: 7, sourceMode: "public_web_only", keywordOrderSnapshot: publicSnapshot })],
+  publicKeywords,
+  null,
+  "public_web_only"
+);
+await expectOffset(
+  "public-web mode resets after a minimum-price edit",
+  0,
+  [run("latest-public", { startedAt: "2026-08-11T00:00:00.000Z", finishedAt: "2026-08-11T00:01:00.000Z", offset: 7, sourceMode: "public_web_only", keywordOrderSnapshot: publicSnapshot })],
+  [richKeyword("low", 500_000), richKeyword("high", 1_100_000)],
+  null,
+  "public_web_only"
+);
+await expectOffset(
+  "legacy public-web runs restart without an order snapshot",
+  0,
+  [run("legacy-public", { startedAt: "2026-08-11T00:00:00.000Z", finishedAt: "2026-08-11T00:01:00.000Z", offset: 7, sourceMode: "public_web_only" })],
+  publicKeywords,
+  null,
+  "public_web_only"
 );
 
 await expectOffset(

@@ -30,6 +30,11 @@ import {
 } from "@/lib/sourcingRunCoordination";
 import type { SourcingRun } from "@/lib/types";
 import { mergeStoredWebReturnInfo, resolveStoredWebReturnInfo, resolveWebReturnEvidence } from "@/lib/webReturnInfo";
+import {
+  getOrderedSourcingKeywords,
+  getSourcingKeywordOrderSnapshot,
+  getSourcingKeywordOrderVersion
+} from "@/lib/sourcingKeywordOrder";
 
 function isWithinKeywordPrice(product: ProviderProduct, keyword: SourcingKeyword) {
   const price = product.return_price ?? product.source_price ?? product.new_price;
@@ -401,6 +406,8 @@ async function enrichAndSaveProduct(product: ProviderProduct, keyword: SourcingK
 export async function runSourcing(options?: RunSourcingOptions) {
   const startedAt = Date.now();
   const sourceMode = options?.sourceMode === "public_web_only" ? "public_web_only" : "auto";
+  const keywordOrderVersion = getSourcingKeywordOrderVersion(sourceMode);
+  let keywordOrderSnapshot: string | null = null;
   const useMockFallback = sourceMode === "public_web_only" ? false : options?.useMockFallback ?? true;
   const keywordLimit = normalizePositiveInteger(options?.keywordLimit);
   const requestedKeywordOffset = options?.keywordOffset ?? 0;
@@ -437,12 +444,14 @@ export async function runSourcing(options?: RunSourcingOptions) {
     }
 
     const activeKeywords = await listKeywords({ activeOnly: true });
-    activeKeywordCount = activeKeywords.length;
+    const orderedActiveKeywords = getOrderedSourcingKeywords(activeKeywords, sourceMode);
+    keywordOrderSnapshot = getSourcingKeywordOrderSnapshot(activeKeywords, sourceMode);
+    activeKeywordCount = orderedActiveKeywords.length;
     keywordStartOffset = normalizeOffset(requestedKeywordOffset, activeKeywordCount);
     nextKeywordOffset = keywordStartOffset;
     const orderedKeywords = keywordStartOffset
-      ? [...activeKeywords.slice(keywordStartOffset), ...activeKeywords.slice(0, keywordStartOffset)]
-      : activeKeywords;
+      ? [...orderedActiveKeywords.slice(keywordStartOffset), ...orderedActiveKeywords.slice(0, keywordStartOffset)]
+      : orderedActiveKeywords;
     const keywords = keywordLimit ? orderedKeywords.slice(0, keywordLimit) : orderedKeywords;
     targetKeywordCount = keywords.length;
     if (keywordStartOffset > 0) {
@@ -688,7 +697,9 @@ export async function runSourcing(options?: RunSourcingOptions) {
         product_enrichment_concurrency: productEnrichmentConcurrency,
         elapsed_ms: Date.now() - startedAt,
         use_mock_fallback: useMockFallback,
-        source_mode: sourceMode
+        source_mode: sourceMode,
+        keyword_order_version: keywordOrderVersion,
+        keyword_order_snapshot: keywordOrderSnapshot
       }
     });
   } catch (error) {
@@ -714,7 +725,9 @@ export async function runSourcing(options?: RunSourcingOptions) {
         time_budget_ms: timeBudgetMs,
         elapsed_ms: Date.now() - startedAt,
         use_mock_fallback: useMockFallback,
-        source_mode: sourceMode
+        source_mode: sourceMode,
+        keyword_order_version: keywordOrderVersion,
+        keyword_order_snapshot: keywordOrderSnapshot
       }
     });
   }

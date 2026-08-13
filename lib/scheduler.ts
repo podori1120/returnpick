@@ -217,7 +217,7 @@ export async function runScheduledSourcing() {
     };
   }
 
-  const keywordOffset = await getNextSourcingKeywordOffset();
+  const keywordOffset = await getNextSourcingKeywordOffset(publicWebOnly ? "public_web_only" : "auto");
   let run;
   try {
     run = await runSourcing({

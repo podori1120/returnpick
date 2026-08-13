@@ -122,7 +122,7 @@ export async function POST(request: Request) {
         }
       }, { status: 409 });
     }
-    const keywordOffset = await getNextSourcingKeywordOffset();
+    const keywordOffset = await getNextSourcingKeywordOffset(publicWebOnlyAllowed ? "public_web_only" : "auto");
     const mockFallbackDecision = publicWebOnlyAllowed
       ? {
           useMockFallback: false,
