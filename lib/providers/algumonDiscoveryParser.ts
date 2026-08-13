@@ -100,7 +100,7 @@ export function parseAlgumonCoupangDiscovery(html: string): AlgumonCoupangDiscov
     if (!dealId || storeName !== "쿠팡" || isAd !== false || ended !== false || seenDealIds.has(dealId)) continue;
 
     const title = readStringField(record, "title", 140);
-    if (!title || title.length < 3) continue;
+    if (!title || title.length < 3 || !/^\[\s*쿠팡\s*\]/u.test(title)) continue;
 
     seenDealIds.add(dealId);
     records.push({

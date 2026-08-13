@@ -38,13 +38,14 @@ const escapedTitle = String.raw`한정판 \"쿠팡\" 상품\\세트`;
 const fixture = [
   "<html><body><script>",
   "deals:{contents:[",
-  deal({ id: 101, title: escapedTitle }),
+  deal({ id: 101, title: `[쿠팡] ${escapedTitle}` }),
   deal({ id: 102, store: "G마켓" }),
   deal({ id: 103, ad: true }),
   deal({ id: 101, title: "중복 상품" }),
   deal({ id: "abc", title: "잘못된 아이디" }),
   `{id:104,storeName:"쿠팡",title:"${"x".repeat(8_100)}",ended:false,isAd:false}`,
-  ...Array.from({ length: 12 }, (_, index) => deal({ id: 200 + index, title: `정상 상품 ${index}` })),
+  `{id:105,storeName:"쿠팡",title:"접두사 없는 쿠팡 상품",ended:false,isAd:false}`,
+  ...Array.from({ length: 12 }, (_, index) => deal({ id: 200 + index, title: `[쿠팡] 정상 상품 ${index}` })),
   "]}},",
   "</script></body></html>"
 ].join("");
@@ -52,10 +53,11 @@ const fixture = [
 const records = parseAlgumonCoupangDiscovery(fixture);
 assert.equal(records.length, MAX_ALGUMON_DISCOVERY_RESULTS);
 assert.equal(records[0].dealId, "101");
-assert.equal(records[0].title, '한정판 "쿠팡" 상품\\세트');
+assert.equal(records[0].title, '[쿠팡] 한정판 "쿠팡" 상품\\세트');
 assert.equal(records[0].storeName, "쿠팡");
 assert.equal(records.filter((record) => record.dealId === "101").length, 1);
 assert.equal(records.some((record) => record.dealId === "102" || record.dealId === "103" || record.dealId === "104"), false);
+assert.equal(records.some((record) => record.dealId === "105"), false);
 assert.equal(parseAlgumonCoupangDiscovery('{id:999,storeName:"쿠팡",title:"종료 상태 누락",isAd:false}').length, 0);
 
 for (const record of records) {
@@ -448,6 +450,7 @@ assert.equal(parserSource.includes("eval("), false);
 assert.equal(parserSource.includes("new Function"), false);
 assert.equal(parserSource.includes("outboundUrl"), false);
 assert.equal(parserSource.includes("thumbnailUrl"), false);
+assert.match(parserSource, /\^\\\[\\s\*쿠팡\\s\*\\\]/u);
 assert.equal(hotDealsParserSource.includes("eval("), false);
 assert.equal(hotDealsParserSource.includes("new Function"), false);
 assert.equal(hotDealsParserSource.includes("image_url"), false);
