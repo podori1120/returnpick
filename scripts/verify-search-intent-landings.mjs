@@ -101,6 +101,31 @@ assert.equal(
   false
 );
 
+const macbookM4Rule = getSearchIntentLanding("macbook-m4");
+assert.ok(macbookM4Rule);
+assert.equal(
+  matchesSearchIntent(
+    product("맥북 에어 M4 16GB 512GB", "laptop", "", { brand: "Apple", model_name: "MacBook Air M4" }),
+    macbookM4Rule
+  ),
+  true
+);
+assert.equal(
+  matchesSearchIntent(
+    product("Apple MacBook Air M4 16GB 512GB", "laptop", "", { brand: "Apple", model_name: "MacBook Air M4" }),
+    macbookM4Rule
+  ),
+  true
+);
+assert.equal(
+  matchesSearchIntent(
+    product("Apple MacBook Air M40 16GB 512GB", "laptop", "", { brand: "Apple", model_name: "MacBook Air M40" }),
+    macbookM4Rule
+  ),
+  false
+);
+assert.equal(matchesSearchIntent(product("LG 그램 M4 16GB 512GB", "laptop"), macbookM4Rule), false);
+
 const odysseyRule = getSearchIntentLanding("odyssey-monitor");
 assert.ok(odysseyRule);
 assert.equal(
@@ -117,6 +142,25 @@ assert.equal(
   ),
   false
 );
+
+const oledMonitorRule = getSearchIntentLanding("oled-monitor");
+assert.ok(oledMonitorRule);
+assert.equal(
+  matchesSearchIntent(
+    product("LG OLED 27인치 모니터", "monitor", "", { brand: "LG", model_name: "OLED 27" }),
+    oledMonitorRule
+  ),
+  true
+);
+assert.equal(
+  matchesSearchIntent(
+    product("LG OLED 27-inch monitor", "monitor", "", { brand: "LG", model_name: "OLED 27" }),
+    oledMonitorRule
+  ),
+  true
+);
+assert.equal(matchesSearchIntent(product("LG QLED 27인치 모니터", "monitor"), oledMonitorRule), false);
+assert.equal(matchesSearchIntent(product("LG IPS 27인치 모니터", "monitor"), oledMonitorRule), false);
 
 const premiumRobotVacuumRule = getSearchIntentLanding("premium-robot-vacuum");
 assert.ok(premiumRobotVacuumRule);
@@ -171,4 +215,109 @@ assert.equal(
   false
 );
 
-console.log("Search intent matcher checks passed: broad rules and five strict landing gates stay aligned.");
+const qrevoProRule = getSearchIntentLanding("qrevo-pro-robot-vacuum");
+assert.ok(qrevoProRule);
+assert.equal(
+  matchesSearchIntent(
+    product("로보락 Qrevo Pro 로봇청소기", "robot_vacuum", "", { brand: "로보락", model_name: "Qrevo Pro" }),
+    qrevoProRule
+  ),
+  true
+);
+assert.equal(
+  matchesSearchIntent(
+    product("Roborock Qrevo Pro Robot Vacuum", "robot_vacuum", "", { brand: "Roborock", model_name: "Qrevo Pro" }),
+    qrevoProRule
+  ),
+  true
+);
+assert.equal(
+  matchesSearchIntent(
+    product("드리미 Qrevo Pro 로봇청소기", "robot_vacuum", "", { brand: "Dreame", model_name: "Qrevo Pro" }),
+    qrevoProRule
+  ),
+  false
+);
+assert.equal(
+  matchesSearchIntent(
+    product("Roborock Qrevo Plus 로봇청소기", "robot_vacuum", "", { brand: "Roborock", model_name: "Qrevo Plus" }),
+    qrevoProRule
+  ),
+  false
+);
+
+const dreameX50Rule = getSearchIntentLanding("dreame-x50");
+assert.ok(dreameX50Rule);
+assert.equal(
+  matchesSearchIntent(
+    product("드리미 X50 로봇청소기", "robot_vacuum", "", { brand: "드리미", model_name: "X50" }),
+    dreameX50Rule
+  ),
+  true
+);
+assert.equal(
+  matchesSearchIntent(
+    product("Dreame X50 Robot Vacuum", "robot_vacuum", "", { brand: "Dreame", model_name: "X50" }),
+    dreameX50Rule
+  ),
+  true
+);
+assert.equal(
+  matchesSearchIntent(
+    product("Dreame X500 Robot Vacuum", "robot_vacuum", "", { brand: "Dreame", model_name: "X500" }),
+    dreameX50Rule
+  ),
+  false
+);
+assert.equal(
+  matchesSearchIntent(
+    product("Roborock X50 Robot Vacuum", "robot_vacuum", "", { brand: "Roborock", model_name: "X50" }),
+    dreameX50Rule
+  ),
+  false
+);
+
+const codezeroObjetRule = getSearchIntentLanding("codezero-objet");
+assert.ok(codezeroObjetRule);
+assert.equal(
+  matchesSearchIntent(
+    product("LG 코드제로 오브제컬렉션 무선청소기", "cordless_vacuum", "", {
+      brand: "LG",
+      model_name: "Code Zero Objet Collection"
+    }),
+    codezeroObjetRule
+  ),
+  true
+);
+assert.equal(
+  matchesSearchIntent(
+    product("LG Code Zero Objet Collection Cordless Vacuum", "cordless_vacuum", "", {
+      brand: "LG",
+      model_name: "Code Zero Objet Collection"
+    }),
+    codezeroObjetRule
+  ),
+  true
+);
+assert.equal(
+  matchesSearchIntent(
+    product("삼성 코드제로 오브제컬렉션 무선청소기", "cordless_vacuum", "", {
+      brand: "Samsung",
+      model_name: "Code Zero Objet Collection"
+    }),
+    codezeroObjetRule
+  ),
+  false
+);
+assert.equal(
+  matchesSearchIntent(
+    product("LG 코드제로 무선청소기", "cordless_vacuum", "LG 코드제로 오브제", {
+      brand: "LG",
+      model_name: "Code Zero Collection"
+    }),
+    codezeroObjetRule
+  ),
+  false
+);
+
+console.log("Search intent matcher checks passed: broad rules and ten strict landing gates stay aligned.");

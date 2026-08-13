@@ -152,6 +152,27 @@ export const searchIntentLandings: SearchIntentLanding[] = [
     ]
   },
   {
+    slug: "macbook-m4",
+    category: "laptop",
+    label: "맥북 M4",
+    icon: "laptop",
+    seoTitle: "맥북 M4 반품 상품, 모델과 구성 확인 가이드",
+    seoDescription: "맥북 M4를 비교할 때 제품군, 화면 크기, 메모리·저장장치와 반품 조건을 확인하는 기준을 정리합니다.",
+    intro: "맥북 M4는 제품군과 화면 크기, 메모리·저장장치와 구성품에 따라 확인할 항목이 달라질 수 있습니다. 리턴픽은 고객에게 보여 줄 준비가 확인된 상품만 노출하며, 가격·재고·반품 조건처럼 확인되지 않은 정보는 확인필요로 남깁니다.",
+    searchQueries: ["맥북 M4", "맥북 에어 M4", "맥북 프로 M4", "MacBook M4", "MacBook Air M4", "MacBook Pro M4"],
+    requiredIdentityQueryGroups: [["맥북", "MacBook"], ["M4"]],
+    searchLabel: "맥북 M4·MacBook M4",
+    comparePoints: [
+      { title: "제품군·세대", detail: "맥북 제품군과 M4 표기가 상품명·모델 정보에서 함께 확인되는지 봅니다." },
+      { title: "RAM·SSD", detail: "메모리와 저장장치 용량이 찾는 작업과 맞는지 상품 정보에서 확인합니다." },
+      { title: "화면·배터리·구성품", detail: "화면 크기, 충전기와 배터리 상태, 구성품 조건이 공개됐는지 살펴봅니다." }
+    ],
+    faqs: [
+      { question: "맥북 M4는 상품명만 보고 비교해도 되나요?", answer: "상품명만으로 세대·화면 크기·RAM·SSD와 구성품을 확정하지 않습니다. 확인된 정보만 비교하고 나머지는 확인필요로 남깁니다." },
+      { question: "M4 표기가 없으면 어떻게 보나요?", answer: "맥북과 M4가 함께 확인되지 않는 상품은 이 검색 대상에 포함하지 않습니다. 고객에게 보여 줄 준비와 근거가 확인된 항목만 반영합니다." }
+    ]
+  },
+  {
     slug: "student-laptop",
     category: "laptop",
     label: "대학생 노트북",
@@ -254,6 +275,27 @@ export const searchIntentLandings: SearchIntentLanding[] = [
     ]
   },
   {
+    slug: "oled-monitor",
+    category: "monitor",
+    label: "OLED 모니터",
+    icon: "monitor",
+    seoTitle: "OLED 모니터 반품 상품, 패널과 연결 조건 확인",
+    seoDescription: "OLED 모니터를 비교할 때 패널 상태, 해상도·주사율, 입력단자와 구성품을 확인하는 기준을 정리합니다.",
+    intro: "OLED 모니터는 패널 특성과 연결 조건, 사용 흔적과 구성품에 따라 확인할 항목이 달라질 수 있습니다. 리턴픽은 고객에게 보여 줄 준비가 확인된 상품만 노출하며, 가격·재고·패널 상태처럼 확인되지 않은 정보는 확인필요로 남깁니다.",
+    searchQueries: ["OLED 모니터", "OLED monitor", "OLED 디스플레이", "OLED display"],
+    requiredIdentityQueryGroups: [["OLED"]],
+    searchLabel: "OLED 모니터·OLED monitor",
+    comparePoints: [
+      { title: "패널 상태", detail: "번인, 불량 화소와 화면 손상에 대한 확인 조건이 공개됐는지 봅니다." },
+      { title: "해상도·주사율", detail: "원하는 해상도와 주사율을 실제 연결 환경에서 지원하는지 확인합니다." },
+      { title: "입력·구성품", detail: "HDMI·DisplayPort 등 입력단자와 케이블·스탠드가 필요한 구성인지 살펴봅니다." }
+    ],
+    faqs: [
+      { question: "OLED 모니터는 패널 종류만 보면 되나요?", answer: "아닙니다. 패널 상태와 해상도·주사율, 입력단자와 구성품을 같은 모델 기준으로 확인해야 합니다." },
+      { question: "번인이나 구성품 정보가 확인되지 않으면 어떻게 하나요?", answer: "확인되지 않은 패널 상태와 구성품을 정상으로 가정하지 않습니다. 고객에게 보여 줄 준비가 확인된 항목만 반영하고 나머지는 확인필요로 남깁니다." }
+    ]
+  },
+  {
     slug: "robot-vacuum",
     category: "robot_vacuum",
     label: "로봇청소기",
@@ -298,6 +340,48 @@ export const searchIntentLandings: SearchIntentLanding[] = [
     ]
   },
   {
+    slug: "qrevo-pro-robot-vacuum",
+    category: "robot_vacuum",
+    label: "로보락 Qrevo Pro",
+    icon: "robot",
+    seoTitle: "로보락 Qrevo Pro 반품 상품, 도크와 구성 확인",
+    seoDescription: "로보락 Qrevo Pro를 비교할 때 도크, 물걸레 구성, 센서와 소모품 조건을 확인하는 기준을 정리합니다.",
+    intro: "로보락 Qrevo Pro는 본체뿐 아니라 도크와 물걸레 구성, 센서·배터리와 소모품 조건을 함께 확인해야 합니다. 리턴픽은 고객에게 보여 줄 준비가 확인된 상품만 노출하며, 가격·재고·구성품처럼 확인되지 않은 정보는 확인필요로 남깁니다.",
+    searchQueries: ["로보락 Qrevo Pro", "Roborock Qrevo Pro", "Qrevo Pro 로봇청소기", "Roborock Qrevo Pro Robot Vacuum"],
+    requiredIdentityQueryGroups: [["로보락", "Roborock"], ["Qrevo"], ["Pro"]],
+    searchLabel: "로보락 Qrevo Pro·Roborock Qrevo Pro",
+    comparePoints: [
+      { title: "도크·물걸레", detail: "자동 먼지비움과 물걸레 세척·건조, 물통과 전원 구성품이 함께 확인되는지 봅니다." },
+      { title: "센서·배터리", detail: "센서 구성과 배터리 상태, 충전·도킹 동작을 상품 정보와 수령 후 점검으로 나눠 확인합니다." },
+      { title: "소모품·지원", detail: "필터·브러시·먼지봉투 등 소모품과 지원 조건이 공개됐는지 살펴보고 모호하면 확인필요로 둡니다." }
+    ],
+    faqs: [
+      { question: "로보락 Qrevo Pro는 본체만 확인하면 되나요?", answer: "아닙니다. Qrevo Pro 표기와 브랜드·모델이 일치하는지 먼저 보고 도크, 물걸레, 센서·배터리와 구성품을 함께 확인해야 합니다." },
+      { question: "Qrevo Pro 구성이나 지원 정보가 없으면 어떻게 하나요?", answer: "확인되지 않은 도크·소모품·지원 조건을 추정하지 않습니다. 고객에게 보여 줄 준비가 확인된 정보만 반영하고 나머지는 확인필요로 남깁니다." }
+    ]
+  },
+  {
+    slug: "dreame-x50",
+    category: "robot_vacuum",
+    label: "드리미 X50",
+    icon: "robot",
+    seoTitle: "드리미 X50 반품 상품, 모델과 구성 확인 가이드",
+    seoDescription: "드리미 X50을 비교할 때 모델 표기, 도크·물걸레 구성, 센서와 소모품 조건을 확인하는 기준을 정리합니다.",
+    intro: "드리미 X50은 정확한 모델 표기와 도크·물걸레 구성, 센서·배터리와 소모품 조건을 함께 확인해야 합니다. 리턴픽은 고객에게 보여 줄 준비가 확인된 상품만 노출하며, 가격·재고·구성품처럼 확인되지 않은 정보는 확인필요로 남깁니다.",
+    searchQueries: ["드리미 X50", "Dreame X50", "드리미 X50 로봇청소기", "Dreame X50 Robot Vacuum"],
+    requiredIdentityQueryGroups: [["드리미", "Dreame"], ["X50"]],
+    searchLabel: "드리미 X50·Dreame X50",
+    comparePoints: [
+      { title: "모델 표기", detail: "드리미·Dreame 브랜드와 X50 모델 표기가 상품명·모델 정보에서 함께 확인되는지 봅니다." },
+      { title: "도크·물걸레", detail: "도크, 물통과 물걸레 세척·건조 구성품이 모델에 맞게 공개됐는지 확인합니다." },
+      { title: "센서·소모품", detail: "센서·배터리 상태와 필터·브러시 등 소모품, 지원 조건이 확인되는지 살펴봅니다." }
+    ],
+    faqs: [
+      { question: "드리미 X50은 모델명만으로 비교해도 되나요?", answer: "모델명만으로 도크·물걸레 구성, 센서·배터리와 소모품 조건을 확정하지 않습니다. 확인된 근거를 모델별로 맞춰야 합니다." },
+      { question: "X50이나 브랜드 표기가 다르면 어떻게 하나요?", answer: "드리미·Dreame와 X50이 함께 확인되지 않는 상품은 이 검색 대상에 포함하지 않습니다. 확인되지 않은 항목은 확인필요로 남깁니다." }
+    ]
+  },
+  {
     slug: "cordless-vacuum",
     category: "cordless_vacuum",
     label: "무선청소기",
@@ -315,6 +399,27 @@ export const searchIntentLandings: SearchIntentLanding[] = [
     faqs: [
       { question: "무선청소기 반품의 배터리는 어떻게 확인하나요?", answer: "완충 후 일반 모드 사용 시간과 급격한 잔량 저하, 충전 중 이상 발열을 확인하세요. 공개된 배터리 정보가 없으면 확인필요로 둡니다." },
       { question: "구성품 하나가 빠져도 할인 상품인가요?", answer: "누락된 헤드·거치대·충전기는 별도 비용과 사용 불편을 만들 수 있습니다. 리턴픽은 확인 가능한 구성품 근거를 우선합니다." }
+    ]
+  },
+  {
+    slug: "codezero-objet",
+    category: "cordless_vacuum",
+    label: "LG 코드제로 오브제컬렉션",
+    icon: "cordless",
+    seoTitle: "LG 코드제로 오브제컬렉션 반품 상품, 구성 확인 가이드",
+    seoDescription: "LG 코드제로 오브제컬렉션을 비교할 때 배터리, 헤드·거치대, 구성품과 반품 조건을 확인하는 기준을 정리합니다.",
+    intro: "LG 코드제로 오브제컬렉션은 배터리와 헤드·거치대, 필터·소모품과 구성품 조건을 함께 확인해야 합니다. 리턴픽은 고객에게 보여 줄 준비가 확인된 상품만 노출하며, 가격·재고·구성품처럼 확인되지 않은 정보는 확인필요로 남깁니다.",
+    searchQueries: ["LG 코드제로 오브제컬렉션", "LG 코드제로 오브제", "LG Code Zero Objet Collection", "Code Zero Objet cordless vacuum"],
+    requiredIdentityQueryGroups: [["LG"], ["코드제로", "Code Zero"], ["오브제", "Objet"]],
+    searchLabel: "LG 코드제로 오브제컬렉션·LG Code Zero Objet",
+    comparePoints: [
+      { title: "배터리·충전", detail: "배터리 개수와 상태, 충전기 포함 여부와 교체 조건이 확인되는지 봅니다." },
+      { title: "헤드·거치대", detail: "메인 브러시와 침구·틈새 도구, 거치대가 필요한 구성에 맞게 포함되는지 확인합니다." },
+      { title: "필터·소모품", detail: "필터와 롤러, 소모품 조건과 지원 범위가 공개됐는지 살펴보고 모호하면 확인필요로 둡니다." }
+    ],
+    faqs: [
+      { question: "LG 코드제로 오브제컬렉션은 배터리만 보면 되나요?", answer: "아닙니다. LG·코드제로·오브제 계열 표기와 배터리, 헤드·거치대, 필터·소모품 구성을 함께 확인해야 합니다." },
+      { question: "오브제 구성이나 배터리 정보가 확인되지 않으면 어떻게 하나요?", answer: "확인되지 않은 구성품과 배터리 상태를 정상으로 가정하지 않습니다. 고객에게 보여 줄 준비가 확인된 정보만 반영하고 나머지는 확인필요로 남깁니다." }
     ]
   },
   {
