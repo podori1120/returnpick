@@ -78,6 +78,7 @@ export const DEFAULT_SOURCING_KEYWORDS: KeywordInput[] = [
   { keyword: "갤럭시북", category: "laptop", min_price: 400000, max_price: 1800000, min_discount_rate: 0.1 },
   { keyword: "LG 그램", category: "laptop", min_price: 600000, max_price: 2200000, min_discount_rate: 0.1 },
   { keyword: "레노버 아이디어패드", category: "laptop", min_price: 350000, max_price: 1400000, min_discount_rate: 0.12 },
+  { keyword: "레노버 아이디어패드 슬림5", category: "laptop", min_price: 1000000, max_price: 2000000, min_discount_rate: 0.12 },
   { keyword: "레노버 리전", category: "laptop", min_price: 700000, max_price: 2400000, min_discount_rate: 0.15 },
   { keyword: "HP 빅터스", category: "laptop", min_price: 600000, max_price: 1800000, min_discount_rate: 0.15 },
   { keyword: "ASUS TUF", category: "laptop", min_price: 700000, max_price: 2200000, min_discount_rate: 0.15 },
