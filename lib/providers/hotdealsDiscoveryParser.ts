@@ -8,6 +8,33 @@ const HOTDEALS_HOSTS = new Set([HOTDEALS_CANONICAL_HOST, "hotdeals.kr"]);
 const MAX_HOTDEALS_TITLE_CHARS = 300;
 const voidHtmlTagNames = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
 const rawHtmlTagNames = new Set(["script", "style", "noscript", "template"]);
+const DISCOVERY_TERM_ALIASES = [
+  ["lg 코드제로 오브제컬렉션", "lg codezero objetcollection"],
+  ["lg 코드제로", "lg codezero"],
+  ["lg그램", "lg gram"],
+  ["lg 그램", "lg gram"],
+  ["맥북 프로", "macbook pro"],
+  ["맥북 에어", "macbook air"],
+  ["다이슨 gen5 디텍트", "dyson gen5 detect"],
+  ["qrevo 프로", "qrevo pro"],
+  ["maxv 울트라", "maxv ultra"],
+  ["게이밍 모니터", "gaming monitor"],
+  ["울트라와이드 모니터", "ultrawide monitor"],
+  ["갤럭시북", "galaxybook"],
+  ["아이디어패드", "ideapad"],
+  ["오브제컬렉션", "objetcollection"],
+  ["퓨리케어", "puricare"],
+  ["블루스카이", "bluesky"],
+  ["코드제로", "codezero"],
+  ["맥북", "macbook"],
+  ["다이슨", "dyson"],
+  ["드리미", "dreame"],
+  ["로보락", "roborock"],
+  ["레노버", "lenovo"],
+  ["삼성", "samsung"],
+  ["비스포크", "bespoke"]
+] as const;
+const AMBIGUOUS_DISCOVERY_KEYWORDS = new Set(["pro", "air", "gram", "프로", "에어", "그램"]);
 
 export type HotDealsCoupangDiscoveryRecord = {
   siteId: string;
@@ -17,13 +44,19 @@ export type HotDealsCoupangDiscoveryRecord = {
 };
 
 function normalizeDiscoveryKeyword(value: string) {
-  return value
+  let normalized = value
     .normalize("NFKC")
-    .toLocaleLowerCase("ko-KR")
-    .replace(/[^\p{L}\p{N}]+/gu, "");
+    .toLocaleLowerCase("ko-KR");
+  for (const [from, to] of DISCOVERY_TERM_ALIASES) normalized = normalized.replaceAll(from, to);
+  return normalized.replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
 export function matchesHotDealsDiscoveryKeyword(title: string, keyword: string) {
+  const compactKeyword = keyword
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+  if (AMBIGUOUS_DISCOVERY_KEYWORDS.has(compactKeyword)) return false;
   const normalizedKeyword = normalizeDiscoveryKeyword(keyword);
   if (normalizedKeyword.length < 2) return false;
   return normalizeDiscoveryKeyword(title).includes(normalizedKeyword);

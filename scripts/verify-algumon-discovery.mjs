@@ -190,6 +190,20 @@ assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] LG그램 16 노트북", "
 assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] 갤럭시북 프로", "LG 그램"), false);
 assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] LG 그램 파우치", "LG 그램"), true);
 assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] LG", "L"), false);
+assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] LG 그램 17ZD90", "LG Gram 17"), true);
+assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] MacBook Pro M4", "맥북 프로 M4"), true);
+assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] 다이슨 Gen5 디텍트", "Dyson Gen5 Detect"), true);
+assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] 드리미 X50", "Dreame X50"), true);
+assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] 로보락 Qrevo 프로", "Roborock Qrevo Pro"), true);
+assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] 삼성 OLED G8", "Samsung OLED G8"), true);
+assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] OLED 게이밍 모니터", "OLED Gaming Monitor"), true);
+assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] LG 그램 16", "LG Gram 17"), false);
+assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] LG 그램", "LG Gram 17"), false);
+assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] 고급 프로젝터 4K", "프로"), false);
+assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] Professional 모니터 암", "pro"), false);
+assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] Hair Dryer", "에어"), false);
+assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] 1 kilogram 주방저울", "그램"), false);
+assert.equal(matchesHotDealsDiscoveryKeyword("[쿠팡] 1 kilogram 17단계 주방저울", "그램 17"), false);
 assert.deepEqual(
   parseHotDealsCoupangDiscovery(hotDealsFixture, hotDealsPageUrl, "무선 키보드").map((record) => record.dealId),
   ["5227902"]
