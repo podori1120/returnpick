@@ -894,7 +894,9 @@ function isHotDealsHost(url: URL) {
 }
 
 function isHotDealsKeywordSearchPage(url: URL) {
-  return url.protocol === "https:" && isHotDealsHost(url) && /^\/deals\/k\/[^/]+$/u.test(url.pathname);
+  if (url.protocol !== "https:" || !isHotDealsHost(url)) return false;
+  if (/^\/deals\/k\/[^/]+$/u.test(url.pathname)) return true;
+  return url.pathname === "/deals" && Boolean(url.searchParams.get("keyword")?.trim());
 }
 
 function isHotDealsFeedPage(url: URL) {

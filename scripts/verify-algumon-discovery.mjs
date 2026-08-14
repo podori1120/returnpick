@@ -30,7 +30,7 @@ import {
   resolveDiscoveryReviewState
 } from "../lib/sourcedProductIdentity.ts";
 
-assert.equal(HOTDEALS_DISCOVERY_SEARCH_TEMPLATE, "https://www.hotdeals.kr/deals/k/{keyword}");
+assert.equal(HOTDEALS_DISCOVERY_SEARCH_TEMPLATE, "https://www.hotdeals.kr/deals?keyword={keyword}");
 
 function deal({ id, store = "쿠팡", title = "테스트 상품", ad = false, ended = false, extra = "" }) {
   return `{id:${id},siteName:"뽐뿌",siteIconUrl:"https://cdn.example/icon.png",siteType:"PPOMPPU",storeName:"${store}",rankNum:null,title:"${title}",thumbnailUrl:"https://cdn.example/image.jpg",price:"19,000원",deliveryInfo:"무료",perPriceText:"",outboundUrl:"/n/d/${id}?secret=must-not-leak",originalLikes:0,createdAt:"2026-08-09T09:00:00+09:00",ended:${ended},isAd:${ad}${extra}}`;
@@ -86,7 +86,7 @@ function hotDealsList(cards) {
   return `<div class="public-deal-list">${cards.join("")}</div>`;
 }
 
-const hotDealsPageUrl = "https://www.hotdeals.kr/deals/k/%EB%85%B8%ED%8A%B8%EB%B6%81";
+const hotDealsPageUrl = "https://www.hotdeals.kr/deals?keyword=%EB%85%B8%ED%8A%B8%EB%B6%81";
 const hotDealsFeedUrl = `https://www.hotdeals.kr${HOTDEALS_DISCOVERY_FEED_PATH}?keyword=LG%20%EA%B7%B8%EB%9E%A8%2016`;
 const hotDealsFeedFixture = `<rss><channel>${[
   `<item><title><![CDATA[[쿠팡] LG 그램 16ZD90SU-GXF6K]]></title><link>https://www.hotdeals.kr/deals/DomesticDealbada/31695</link><description>가격과 외부 링크는 읽지 않음</description></item>`,
@@ -492,6 +492,7 @@ assert.match(providerSource, /isAllowedPublicWebSearchContentType/);
 assert.match(providerSource, /application\/rss\+xml/);
 assert.match(providerSource, /feed_only: true/);
 assert.match(providerSource, /isHotDealsKeywordSearchPage/);
+assert.match(providerSource, /url\.pathname === "\/deals" && Boolean\(url\.searchParams\.get\("keyword"\)\?\.trim\(\)\)/);
 assert.match(providerSource, /discovery_only: true/);
 assert.match(providerSource, /source_site_id: record\.siteId/);
 assert.match(providerSource, /source_deal_id: record\.dealId/);
