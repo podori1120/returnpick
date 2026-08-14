@@ -82,6 +82,7 @@
     "sourcing:concurrency:live:check": "node scripts/verify-sourcing-run-coordination-live.mjs",
     "sourcing:cursor:check": "node --disable-warning=ExperimentalWarning scripts/verify-sourcing-cursor.mjs",
     "sourcing:public-web:daily": "npm run algumon-discovery:check && node scripts/run-production-public-web-intake.mjs",
+    "sourcing:public-web:limit:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-public-web-keyword-limit.mjs",
     "sourcing:public-web:daily:check": "node scripts/verify-production-public-web-intake.mjs",
     "sourcing:throughput:check": "node scripts/verify-sourcing-throughput.mjs",
     "sourcing:keyword-priority:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-sourcing-keyword-priority.mjs",

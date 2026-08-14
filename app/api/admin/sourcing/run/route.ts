@@ -5,15 +5,11 @@ import { getPublicWebRuntimeProfile, matchesRequiredPublicWebProfile } from "@/l
 import { isSourcingRunConflict, runSourcing } from "@/lib/sourcing";
 import { getNextSourcingKeywordCursor } from "@/lib/sourcingCursor";
 import { diagnoseSourcingRun } from "@/lib/sourcingDiagnostics";
+import { parsePositiveInteger, resolveSourcingKeywordLimit } from "@/lib/publicWebSourcingLimits";
 import { requireAdmin, requirePersistentStorage } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-
-function positiveInteger(value: unknown) {
-  const parsed = Math.floor(Number(value));
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
 
 const MOCK_FALLBACK_BLOCKED_AFTER_API_READY = "MOCK_FALLBACK_BLOCKED_AFTER_API_READY";
 
@@ -135,10 +131,10 @@ export async function POST(request: Request) {
       useMockFallback: mockFallbackDecision.useMockFallback,
       sourceMode: publicWebOnlyAllowed ? "public_web_only" : "auto",
       coordinateExecution: true,
-      keywordLimit: positiveInteger(body.keywordLimit),
+      keywordLimit: resolveSourcingKeywordLimit(publicWebOnlyAllowed ? "public_web_only" : "auto", body.keywordLimit),
       keywordOffset: keywordCursor.offset,
       keywordOrderSnapshot: keywordCursor.keywordOrderSnapshot,
-      timeBudgetMs: positiveInteger(body.timeBudgetMs)
+      timeBudgetMs: parsePositiveInteger(body.timeBudgetMs)
     });
     return NextResponse.json({
       run,
