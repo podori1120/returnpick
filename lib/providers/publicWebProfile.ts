@@ -3,13 +3,18 @@ export const ALGUMON_DISCOVERY_HOST = "www.algumon.com";
 export const ALGUMON_DISCOVERY_SEARCH_TEMPLATE = "https://www.algumon.com/n/deal?keyword={keyword}";
 export const HOTDEALS_DISCOVERY_PROFILE_ID = "hotdeals_discovery_v2";
 export const HOTDEALS_DISCOVERY_HOST = "www.hotdeals.kr";
-export const HOTDEALS_DISCOVERY_SEARCH_TEMPLATE = "https://www.hotdeals.kr/deals?keyword={keyword}";
+export const HOTDEALS_DISCOVERY_SEARCH_TEMPLATE = "https://www.hotdeals.kr/deals/DomesticDealbada?keyword={keyword}";
 export const ALGUMON_HOTDEALS_DISCOVERY_PROFILE_ID = "algumon_hotdeals_discovery_v1";
 export const ALGUMON_HOTDEALS_DISCOVERY_HOSTS = [ALGUMON_DISCOVERY_HOST, HOTDEALS_DISCOVERY_HOST] as const;
 export const ALGUMON_HOTDEALS_DISCOVERY_SEARCH_TEMPLATES = [
   ALGUMON_DISCOVERY_SEARCH_TEMPLATE,
   HOTDEALS_DISCOVERY_SEARCH_TEMPLATE
 ] as const;
+
+export function isApprovedHotDealsDiscoverySearchUrl(url: URL) {
+  if (url.protocol !== "https:" || ![HOTDEALS_DISCOVERY_HOST, "hotdeals.kr"].includes(url.hostname)) return false;
+  return url.pathname === "/deals/DomesticDealbada" && Boolean(url.searchParams.get("keyword")?.trim());
+}
 
 export type PublicWebRuntimeProfile = {
   id:

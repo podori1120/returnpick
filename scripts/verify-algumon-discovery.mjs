@@ -22,6 +22,7 @@ import {
   HOTDEALS_DISCOVERY_PROFILE_ID,
   HOTDEALS_DISCOVERY_SEARCH_TEMPLATE,
   getPublicWebRuntimeProfile,
+  isApprovedHotDealsDiscoverySearchUrl,
   matchesRequiredPublicWebProfile
 } from "../lib/providers/publicWebProfile.ts";
 import {
@@ -30,7 +31,24 @@ import {
   resolveDiscoveryReviewState
 } from "../lib/sourcedProductIdentity.ts";
 
-assert.equal(HOTDEALS_DISCOVERY_SEARCH_TEMPLATE, "https://www.hotdeals.kr/deals?keyword={keyword}");
+assert.equal(HOTDEALS_DISCOVERY_SEARCH_TEMPLATE, "https://www.hotdeals.kr/deals/DomesticDealbada?keyword={keyword}");
+for (const allowedUrl of [
+  "https://www.hotdeals.kr/deals/DomesticDealbada?keyword=%EB%85%B8%ED%8A%B8%EB%B6%81",
+  "https://hotdeals.kr/deals/DomesticDealbada?keyword=%EB%85%B8%ED%8A%B8%EB%B6%81"
+]) {
+  assert.equal(isApprovedHotDealsDiscoverySearchUrl(new URL(allowedUrl)), true, allowedUrl);
+}
+for (const rejectedUrl of [
+  "https://www.hotdeals.kr/deals/DomesticDealbada/31695?keyword=%EB%85%B8%ED%8A%B8%EB%B6%81",
+  "https://www.hotdeals.kr/deals/OtherSource?keyword=%EB%85%B8%ED%8A%B8%EB%B6%81",
+  "https://www.hotdeals.kr/deals?keyword=%EB%85%B8%ED%8A%B8%EB%B6%81",
+  "https://www.hotdeals.kr/deals/k/%EB%85%B8%ED%8A%B8%EB%B6%81",
+  "https://www.hotdeals.kr/deals/DomesticDealbada?keyword=",
+  "http://www.hotdeals.kr/deals/DomesticDealbada?keyword=%EB%85%B8%ED%8A%B8%EB%B6%81",
+  "https://evil.example/deals/DomesticDealbada?keyword=%EB%85%B8%ED%8A%B8%EB%B6%81"
+]) {
+  assert.equal(isApprovedHotDealsDiscoverySearchUrl(new URL(rejectedUrl)), false, rejectedUrl);
+}
 
 function deal({ id, store = "쿠팡", title = "테스트 상품", ad = false, ended = false, extra = "" }) {
   return `{id:${id},siteName:"뽐뿌",siteIconUrl:"https://cdn.example/icon.png",siteType:"PPOMPPU",storeName:"${store}",rankNum:null,title:"${title}",thumbnailUrl:"https://cdn.example/image.jpg",price:"19,000원",deliveryInfo:"무료",perPriceText:"",outboundUrl:"/n/d/${id}?secret=must-not-leak",originalLikes:0,createdAt:"2026-08-09T09:00:00+09:00",ended:${ended},isAd:${ad}${extra}}`;
@@ -86,7 +104,7 @@ function hotDealsList(cards) {
   return `<div class="public-deal-list">${cards.join("")}</div>`;
 }
 
-const hotDealsPageUrl = "https://www.hotdeals.kr/deals?keyword=%EB%85%B8%ED%8A%B8%EB%B6%81";
+const hotDealsPageUrl = "https://www.hotdeals.kr/deals/DomesticDealbada?keyword=%EB%85%B8%ED%8A%B8%EB%B6%81";
 const hotDealsFeedUrl = `https://www.hotdeals.kr${HOTDEALS_DISCOVERY_FEED_PATH}?keyword=LG%20%EA%B7%B8%EB%9E%A8%2016`;
 const hotDealsFeedFixture = `<rss><channel>${[
   `<item><title><![CDATA[[쿠팡] LG 그램 16ZD90SU-GXF6K]]></title><link>https://www.hotdeals.kr/deals/DomesticDealbada/31695</link><description>가격과 외부 링크는 읽지 않음</description></item>`,
@@ -446,6 +464,7 @@ assert.deepEqual(
 );
 
 const root = process.cwd();
+const readmeSource = fs.readFileSync(path.join(root, "README.md"), "utf8");
 const parserSource = fs.readFileSync(path.join(root, "lib", "providers", "algumonDiscoveryParser.ts"), "utf8");
 const hotDealsParserSource = fs.readFileSync(path.join(root, "lib", "providers", "hotdealsDiscoveryParser.ts"), "utf8");
 const providerSource = fs.readFileSync(path.join(root, "lib", "providers", "publicWebProvider.ts"), "utf8");
@@ -456,6 +475,8 @@ const schemaSource = fs.readFileSync(path.join(root, "sql", "schema.sql"), "utf8
 const readinessRouteSource = fs.readFileSync(path.join(root, "app", "api", "admin", "api-readiness", "route.ts"), "utf8");
 const sourcingRouteSource = fs.readFileSync(path.join(root, "app", "api", "admin", "sourcing", "run", "route.ts"), "utf8");
 
+assert.match(readmeSource, /PUBLIC_WEB_SEARCH_TEMPLATES=https:\/\/www\.algumon\.com\/n\/deal\?keyword=\{keyword\},https:\/\/www\.hotdeals\.kr\/deals\/DomesticDealbada\?keyword=\{keyword\}/);
+assert.doesNotMatch(readmeSource, /www\.hotdeals\.kr\/deals\/k\//);
 assert.equal(parserSource.includes("eval("), false);
 assert.equal(parserSource.includes("new Function"), false);
 assert.equal(parserSource.includes("outboundUrl"), false);
@@ -492,7 +513,7 @@ assert.match(providerSource, /isAllowedPublicWebSearchContentType/);
 assert.match(providerSource, /application\/rss\+xml/);
 assert.match(providerSource, /feed_only: true/);
 assert.match(providerSource, /isHotDealsKeywordSearchPage/);
-assert.match(providerSource, /url\.pathname === "\/deals" && Boolean\(url\.searchParams\.get\("keyword"\)\?\.trim\(\)\)/);
+assert.match(providerSource, /isApprovedHotDealsDiscoverySearchUrl/);
 assert.match(providerSource, /discovery_only: true/);
 assert.match(providerSource, /source_site_id: record\.siteId/);
 assert.match(providerSource, /source_deal_id: record\.dealId/);

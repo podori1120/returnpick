@@ -2,7 +2,7 @@ import type { Category, ConditionGrade, JsonValue } from "@/lib/types";
 import type { ProviderProduct, ProviderSearchResult } from "@/lib/providers/types";
 import { parseAlgumonCoupangDiscovery } from "@/lib/providers/algumonDiscoveryParser";
 import { HOTDEALS_DISCOVERY_FEED_PATH, parseHotDealsCoupangDiscovery, parseHotDealsCoupangDiscoveryFeed } from "@/lib/providers/hotdealsDiscoveryParser";
-import { HOTDEALS_DISCOVERY_HOST } from "@/lib/providers/publicWebProfile";
+import { HOTDEALS_DISCOVERY_HOST, isApprovedHotDealsDiscoverySearchUrl } from "@/lib/providers/publicWebProfile";
 import { cleanText, extractListedPriceCandidatesFromText, extractListedPriceFromText, extractReturnInfoFromText, toReturnInfoJson } from "@/lib/webReturnInfo";
 import { getSiteUrl } from "@/lib/siteUrl";
 import { isPublicWebHostname, safeAllowlistedPublicUrl } from "@/lib/publicWebUrlSafety";
@@ -894,9 +894,7 @@ function isHotDealsHost(url: URL) {
 }
 
 function isHotDealsKeywordSearchPage(url: URL) {
-  if (url.protocol !== "https:" || !isHotDealsHost(url)) return false;
-  if (/^\/deals\/k\/[^/]+$/u.test(url.pathname)) return true;
-  return url.pathname === "/deals" && Boolean(url.searchParams.get("keyword")?.trim());
+  return isApprovedHotDealsDiscoverySearchUrl(url);
 }
 
 function isHotDealsFeedPage(url: URL) {

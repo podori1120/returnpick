@@ -213,7 +213,7 @@ PUBLIC_WEB_SEARCH_TEMPLATES=https://www.algumon.com/n/deal?keyword={keyword}
 ```bash
 PUBLIC_WEB_CRAWL_ENABLED=true
 PUBLIC_WEB_ALLOWED_HOSTS=www.algumon.com,www.hotdeals.kr
-PUBLIC_WEB_SEARCH_TEMPLATES=https://www.algumon.com/n/deal?keyword={keyword},https://www.hotdeals.kr/deals/k/%EC%BF%A0%ED%8C%A1?keyword={keyword}
+PUBLIC_WEB_SEARCH_TEMPLATES=https://www.algumon.com/n/deal?keyword={keyword},https://www.hotdeals.kr/deals/DomesticDealbada?keyword={keyword}
 ```
 
 이 소스는 공개 목록의 상품명·출처·표시 문구만 후보 근거로 보관하며 이미지, 외부 목적지, 쿠팡 상품번호, 반품가, 재고, 제휴 링크를 복사하거나 추정하지 않습니다. 신규 발견 후보만 `needs_review`로 저장되고, 동일한 소스 ID가 다시 관측되면 기존 승인·게시·거절 상태를 보존하며 상세 페이지 자동 방문도 건너뜁니다. 관리자는 후보의 원문 참고 주소를 확인한 뒤 실제 쿠팡 상품 URL과 **상품별** 파트너스 링크를 직접 입력하고, 가격·이미지·반품등급·재고를 확인해야 게시할 수 있습니다. 검색 서비스의 이용약관·robots.txt·요청 제한이 바뀌면 즉시 allowlist에서 제외하고, 공개 수집을 켜기 전 `npm run public-web:check`로 다시 확인하세요. 이 참고 수집은 쿠팡 페이지를 크롤링하거나 쿠팡 파트너스 API 권한을 대신하지 않습니다.
