@@ -2,20 +2,32 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 import AffiliateNotice from "@/components/AffiliateNotice";
+import GuideShareBar from "@/components/GuideShareBar";
 import { getSearchIntentLanding } from "@/lib/searchLandings";
 import { getSiteUrl } from "@/lib/siteUrl";
 
 const highValueLandingSlugs = [
+  "return-laptop",
+  "galaxy-book",
+  "lg-gram",
   "vivobook-laptop",
   "lg-gram-pro",
   "galaxy-book-pro",
   "macbook-m4",
+  "student-laptop",
+  "gaming-laptop",
+  "qhd-monitor",
+  "4k-monitor",
   "odyssey-monitor",
   "oled-monitor",
+  "robot-vacuum",
+  "premium-robot-vacuum",
   "qrevo-pro-robot-vacuum",
   "dreame-x50",
-  "premium-robot-vacuum",
-  "codezero-objet"
+  "cordless-vacuum",
+  "codezero-objet",
+  "air-purifier",
+  "dehumidifier"
 ] as const;
 
 const highValueLandings = highValueLandingSlugs
@@ -41,6 +53,8 @@ export default function HighValueGuidePage() {
           노트북, 모니터, 로봇청소기처럼 구매 전 확인할 항목이 많은 제품군의 기준을 한곳에 모았습니다. 제품군별 가이드에서 모델 구성과 사용 조건을 차례로 확인해 보세요.
         </p>
       </header>
+
+      <GuideShareBar sharePath="/guide/high-value" title="ReturnPick 고가 제품 구매 가이드" context="high_value_guide" />
 
       <section aria-labelledby="high-value-guides-heading">
         <div className="flex items-end justify-between gap-3">

@@ -2,11 +2,41 @@ import { NextResponse } from "next/server";
 import { createAffiliateEvent, getProductById } from "@/lib/dataStore";
 import { getCoupangOutboundLink, isCoupangPartnersLink } from "@/lib/coupangLink";
 import { isPublicDealVisible } from "@/lib/publicDeal";
+import { getSearchIntentLanding } from "@/lib/searchLandings";
 import { getSupabaseServiceClient } from "@/lib/supabase";
 import type { AffiliateEventType } from "@/lib/types";
 
 const eventTypes = new Set<AffiliateEventType>(["impression", "detail_view", "affiliate_click", "telegram_detail_click", "share_copy"]);
-const manualTrackingSurfaces = [
+type ManualTrackingSurface = {
+  context: string;
+  pathname?: string;
+  pathnamePrefix?: string;
+  impressionChannels: readonly string[];
+  affiliateClickChannels: readonly string[];
+  detailViewChannels: readonly string[];
+  telegramDetailChannels: readonly string[];
+  shareCopyChannels: readonly string[];
+};
+
+const manualTrackingSurfaces: readonly ManualTrackingSurface[] = [
+  {
+    context: "high_value_guide",
+    pathname: "/guide/high-value",
+    impressionChannels: [],
+    affiliateClickChannels: [],
+    detailViewChannels: [],
+    telegramDetailChannels: [],
+    shareCopyChannels: ["web_high_value_guide_share"]
+  },
+  {
+    context: "search_guide",
+    pathnamePrefix: "/guide/search/",
+    impressionChannels: [],
+    affiliateClickChannels: [],
+    detailViewChannels: [],
+    telegramDetailChannels: [],
+    shareCopyChannels: ["web_search_guide_share"]
+  },
   {
     context: "approval_sample",
     pathname: "/products/approval-sample",
@@ -61,7 +91,7 @@ const manualTrackingSurfaces = [
     telegramDetailChannels: [],
     shareCopyChannels: []
   }
-] as const;
+];
 
 function isEventType(value: unknown): value is AffiliateEventType {
   return typeof value === "string" && eventTypes.has(value as AffiliateEventType);
@@ -116,11 +146,19 @@ function getPublicRequestOrigin(request: Request) {
   }
 }
 
+function matchesManualTrackingPath(surface: ManualTrackingSurface, pathname: string) {
+  if (surface.pathname) return pathname === surface.pathname;
+  if (surface.context !== "search_guide" || !surface.pathnamePrefix || !pathname.startsWith(surface.pathnamePrefix)) return false;
+  const slug = pathname.slice(surface.pathnamePrefix.length);
+  return /^[a-z0-9-]+$/i.test(slug) && Boolean(getSearchIntentLanding(slug));
+}
+
 function isManualAffiliateTrackingRequest(request: Request, body: Record<string, unknown>, channel: string | null) {
   const surface = manualTrackingSurfaces.find((item) => item.context === body.context);
   if (!surface) return false;
   const isCompareShare = surface.context === "compare_share" && body.event_type === "share_copy";
-  if (!isCompareShare && !isCoupangPartnersLink(process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL)) return false;
+  const isGuideShare = surface.context === "high_value_guide" || surface.context === "search_guide";
+  if (!isCompareShare && !isGuideShare && !isCoupangPartnersLink(process.env.NEXT_PUBLIC_COUPANG_APPROVAL_PRODUCT_URL)) return false;
 
   const allowedChannels: readonly string[] =
     body.event_type === "impression"
@@ -146,7 +184,7 @@ function isManualAffiliateTrackingRequest(request: Request, body: Record<string,
     const browserOrigin = request.headers.get("origin");
     if (browserOrigin && new URL(browserOrigin).origin !== referrerUrl.origin) return false;
     if (referrerUrl.origin !== getPublicRequestOrigin(request)) return false;
-    return referrerUrl.pathname === surface.pathname;
+    return matchesManualTrackingPath(surface, referrerUrl.pathname);
   } catch {
     return false;
   }

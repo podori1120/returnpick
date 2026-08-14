@@ -6,6 +6,7 @@ import AffiliateNotice from "@/components/AffiliateNotice";
 import { ProductImpressionTracker } from "@/components/AffiliateEventTracker";
 import DealCard from "@/components/DealCard";
 import DemoModeNotice from "@/components/DemoModeNotice";
+import GuideShareBar from "@/components/GuideShareBar";
 import SearchGuideEditorialBridge from "@/components/SearchGuideEditorialBridge";
 import { getCategoryLabel } from "@/lib/category";
 import { getCategoryLandingContent } from "@/lib/categoryLanding";
@@ -149,6 +150,8 @@ export default async function SearchIntentPage({ params }: { params: Promise<{ s
           </div>
         </div>
       </header>
+
+      <GuideShareBar sharePath={`/guide/search/${landing.slug}`} title={landing.seoTitle} context="search_guide" />
 
       {demoCount ? <DemoModeNotice count={demoCount} /> : null}
 
