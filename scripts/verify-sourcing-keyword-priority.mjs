@@ -39,7 +39,7 @@ assert.deepEqual(ordered.map((keyword) => keyword.id), [
 ]);
 assert.deepEqual(keywords, originalKeywords, "ordering must not mutate the active keyword snapshot");
 assert.notStrictEqual(ordered, keywords, "ordering must return a new array");
-assert.equal(getSourcingKeywordOrderVersion("public_web_only"), "min_price_desc_category_balanced_v2");
+assert.equal(getSourcingKeywordOrderVersion("public_web_only"), "min_price_desc_category_balanced_v3");
 assert.notEqual(getSourcingKeywordOrderSnapshot(keywords, "auto"), getSourcingKeywordOrderSnapshot(keywords, "public_web_only"));
 assert.deepEqual(orderPublicWebSourcingKeywords([]), []);
 assert.equal(getSourcingKeywordOrderSnapshot([], "public_web_only"), "[]");

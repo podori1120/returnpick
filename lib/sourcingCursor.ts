@@ -1,6 +1,6 @@
 import { listKeywords, listSourcingExecutionRuns } from "@/lib/dataStore";
 import { isSourcingExecutionRun } from "@/lib/sourcingRunKinds";
-import { DATASTORE_SOURCING_KEYWORD_ORDER_VERSION, getSourcingKeywordOrderSnapshot, type SourcingMode } from "@/lib/sourcingKeywordOrder";
+import { DATASTORE_SOURCING_KEYWORD_ORDER_VERSION, getSourcingKeywordOrderSnapshot, getSourcingKeywordOrderVersion, type SourcingMode } from "@/lib/sourcingKeywordOrder";
 import type { JsonValue, SourcingKeyword, SourcingRun } from "@/lib/types";
 
 export function numberFromRunLog(value: JsonValue | undefined) {
@@ -58,6 +58,7 @@ function hasDefaultKeywordSeeded(run: SourcingRun | null | undefined) {
 
 function isCursorCompatibleRun(run: SourcingRun, sourceMode: SourcingMode) {
   if (getRunSourceMode(run) !== sourceMode) return false;
+  if (sourceMode === "public_web_only" && run.log_json?.keyword_order_version !== getSourcingKeywordOrderVersion(sourceMode)) return false;
   const snapshot = getRunKeywordOrderSnapshot(run);
   if (snapshot != null) return true;
   // Older automatic runs used the datastore order and did not persist a snapshot.

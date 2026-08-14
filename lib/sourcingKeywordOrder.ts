@@ -2,7 +2,7 @@ import type { SourcingKeyword } from "@/lib/types";
 
 export type SourcingMode = "auto" | "public_web_only";
 export const DATASTORE_SOURCING_KEYWORD_ORDER_VERSION = "datastore_created_at_desc_v1";
-export const PUBLIC_WEB_SOURCING_KEYWORD_ORDER_VERSION = "min_price_desc_category_balanced_v2";
+export const PUBLIC_WEB_SOURCING_KEYWORD_ORDER_VERSION = "min_price_desc_category_balanced_v3";
 
 function comparableMinimumPrice(keyword: SourcingKeyword) {
   return typeof keyword.min_price === "number" && Number.isFinite(keyword.min_price) && keyword.min_price >= 0 ? keyword.min_price : null;

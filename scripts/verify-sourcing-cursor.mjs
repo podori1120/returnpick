@@ -42,6 +42,7 @@ export { getNextSourcingKeywordOffset };
 export { getNextSourcingKeywordCursor };
 export { getSourcingKeywordOffsetAfterDefaultSeed };
 export { getSourcingKeywordOrderSnapshot };
+export { getSourcingKeywordOrderVersion };
 export { mockRuns, mockKeywords, keywordCalls };
 export { setKeywordError };
 `;
@@ -198,6 +199,7 @@ await expectOffset(
 
 const publicKeywords = [richKeyword("low", 500_000), richKeyword("high", 1_200_000)];
 const publicSnapshot = cursor.getSourcingKeywordOrderSnapshot(publicKeywords, "public_web_only");
+const publicOrderVersion = cursor.getSourcingKeywordOrderVersion("public_web_only");
 await expectOffset(
   "public-web mode does not reuse an automatic cursor",
   0,
@@ -212,7 +214,8 @@ cursor.mockRuns.splice(0, cursor.mockRuns.length, run("latest-before-seed", {
   finishedAt: "2026-08-13T02:08:10.000Z",
   offset: 32,
   sourceMode: "public_web_only",
-  keywordOrderSnapshot: publicSnapshot
+  keywordOrderSnapshot: publicSnapshot,
+  keywordOrderVersion: publicOrderVersion
 }));
 cursor.mockKeywords.splice(0, cursor.mockKeywords.length, ...publicKeywords);
 const cursorReadBeforeConcurrentSeed = await cursor.getNextSourcingKeywordCursor("public_web_only");
@@ -240,7 +243,15 @@ await expectOffset(
 await expectOffset(
   "public-web mode resumes only its matching snapshot",
   7,
-  [run("latest-public", { startedAt: "2026-08-11T00:00:00.000Z", finishedAt: "2026-08-11T00:01:00.000Z", offset: 7, sourceMode: "public_web_only", keywordOrderSnapshot: publicSnapshot })],
+  [run("latest-public", { startedAt: "2026-08-11T00:00:00.000Z", finishedAt: "2026-08-11T00:01:00.000Z", offset: 7, sourceMode: "public_web_only", keywordOrderSnapshot: publicSnapshot, keywordOrderVersion: publicOrderVersion })],
+  publicKeywords,
+  null,
+  "public_web_only"
+);
+await expectOffset(
+  "public-web mode resets after the discovery order version changes",
+  0,
+  [run("old-profile-public", { startedAt: "2026-08-11T00:00:00.000Z", finishedAt: "2026-08-11T00:01:00.000Z", offset: 7, sourceMode: "public_web_only", keywordOrderSnapshot: publicSnapshot, keywordOrderVersion: "min_price_desc_category_balanced_v2" })],
   publicKeywords,
   null,
   "public_web_only"
@@ -254,6 +265,7 @@ await expectOffset(
     offset: 40,
     sourceMode: "public_web_only",
     keywordOrderSnapshot: publicSnapshot,
+    keywordOrderVersion: publicOrderVersion,
     defaultKeywordsInserted: 0,
     defaultKeywordsMissing: 1
   })],
@@ -264,8 +276,16 @@ await expectOffset(
 await expectOffset(
   "public-web mode resets after a minimum-price edit",
   0,
-  [run("latest-public", { startedAt: "2026-08-11T00:00:00.000Z", finishedAt: "2026-08-11T00:01:00.000Z", offset: 7, sourceMode: "public_web_only", keywordOrderSnapshot: publicSnapshot })],
+  [run("latest-public", { startedAt: "2026-08-11T00:00:00.000Z", finishedAt: "2026-08-11T00:01:00.000Z", offset: 7, sourceMode: "public_web_only", keywordOrderSnapshot: publicSnapshot, keywordOrderVersion: publicOrderVersion })],
   [richKeyword("low", 500_000), richKeyword("high", 1_100_000)],
+  null,
+  "public_web_only"
+);
+await expectOffset(
+  "public-web mode resets when the order version is missing despite a matching snapshot",
+  0,
+  [run("legacy-public-matching-snapshot", { startedAt: "2026-08-11T00:00:00.000Z", finishedAt: "2026-08-11T00:01:00.000Z", offset: 7, sourceMode: "public_web_only", keywordOrderSnapshot: publicSnapshot })],
+  publicKeywords,
   null,
   "public_web_only"
 );
