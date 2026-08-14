@@ -71,7 +71,7 @@ const manualTrackingSurfaces: readonly ManualTrackingSurface[] = [
     affiliateClickChannels: ["web_editorial_card_home"],
     detailViewChannels: [],
     telegramDetailChannels: [],
-    shareCopyChannels: []
+    shareCopyChannels: ["web_editorial_card_share_home"]
   },
   {
     context: "editorial_deals_card",
@@ -80,7 +80,7 @@ const manualTrackingSurfaces: readonly ManualTrackingSurface[] = [
     affiliateClickChannels: ["web_editorial_card_deals"],
     detailViewChannels: [],
     telegramDetailChannels: [],
-    shareCopyChannels: []
+    shareCopyChannels: ["web_editorial_card_share_deals"]
   },
   {
     context: "editorial_picks_card",
@@ -89,7 +89,7 @@ const manualTrackingSurfaces: readonly ManualTrackingSurface[] = [
     affiliateClickChannels: ["web_editorial_card_picks"],
     detailViewChannels: [],
     telegramDetailChannels: [],
-    shareCopyChannels: []
+    shareCopyChannels: ["web_editorial_card_share_picks"]
   }
 ];
 

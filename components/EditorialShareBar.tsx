@@ -5,12 +5,40 @@ import { useMemo, useState } from "react";
 import { trackAffiliateEvent } from "@/lib/clientTracking";
 
 type ShareStatus = "shared" | "copied" | "error" | null;
+type EditorialShareContext = "editorial_pick" | "editorial_home_card" | "editorial_deals_card" | "editorial_picks_card";
 
-function buildTrackedShareUrl(canonicalUrl: string) {
-  const url = new URL(canonicalUrl);
+const editorialShareConfig = {
+  editorial_pick: {
+    channel: "web_editorial_share",
+    context: "editorial_pick",
+    campaign: "novatech_s1_window_cleaner"
+  },
+  editorial_home_card: {
+    channel: "web_editorial_card_share_home",
+    context: "editorial_home_card",
+    campaign: "editorial_home_card"
+  },
+  editorial_deals_card: {
+    channel: "web_editorial_card_share_deals",
+    context: "editorial_deals_card",
+    campaign: "editorial_deals_card"
+  },
+  editorial_picks_card: {
+    channel: "web_editorial_card_share_picks",
+    context: "editorial_picks_card",
+    campaign: "editorial_picks_card"
+  }
+} as const;
+
+function buildTrackedShareUrl(canonicalUrl: string, sharePath: string, campaign: string) {
+  if (typeof window === "undefined") return null;
+  if (!canonicalUrl) return null;
+  if (!/^\/picks\/novatech-s1-window-cleaner$/u.test(sharePath)) return null;
+  const url = new URL(sharePath, window.location.origin);
+  if (url.origin !== window.location.origin) return null;
   url.searchParams.set("utm_source", "customer_share");
   url.searchParams.set("utm_medium", "referral");
-  url.searchParams.set("utm_campaign", "novatech_s1_window_cleaner");
+  url.searchParams.set("utm_campaign", campaign);
   return url.toString();
 }
 
@@ -36,23 +64,38 @@ async function copyToClipboard(value: string) {
   }
 }
 
-export default function EditorialShareBar({ canonicalUrl, title }: { canonicalUrl: string; title: string }) {
-  const shareUrl = useMemo(() => buildTrackedShareUrl(canonicalUrl), [canonicalUrl]);
+export default function EditorialShareBar({
+  canonicalUrl,
+  sharePath = "/picks/novatech-s1-window-cleaner",
+  title,
+  context = "editorial_pick"
+}: {
+  canonicalUrl: string;
+  sharePath?: string;
+  title: string;
+  context?: EditorialShareContext;
+}) {
   const [status, setStatus] = useState<ShareStatus>(null);
+  const tracking = editorialShareConfig[context];
+  const shareUrl = useMemo(() => buildTrackedShareUrl(canonicalUrl, sharePath, tracking.campaign), [canonicalUrl, sharePath, tracking.campaign]);
 
   function recordShare(nextStatus: Exclude<ShareStatus, "error" | null>) {
     setStatus(nextStatus);
     trackAffiliateEvent({
       eventType: "share_copy",
-      channel: "web_editorial_share",
+      channel: tracking.channel,
       utmSource: "customer_share",
-      context: "editorial_pick"
+      context
     });
     window.setTimeout(() => setStatus((current) => (current === nextStatus ? null : current)), 1800);
   }
 
   async function share() {
     setStatus(null);
+    if (!shareUrl) {
+      setStatus("error");
+      return;
+    }
     if (navigator.share) {
       try {
         await navigator.share({
@@ -77,6 +120,10 @@ export default function EditorialShareBar({ canonicalUrl, title }: { canonicalUr
 
   async function copy() {
     setStatus(null);
+    if (!shareUrl) {
+      setStatus("error");
+      return;
+    }
     try {
       await copyToClipboard(shareUrl);
       recordShare("copied");

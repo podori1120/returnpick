@@ -3,14 +3,16 @@ import Link from "next/link";
 import { ArrowRight, Droplets, Gauge, ShieldCheck } from "lucide-react";
 import ApprovalCoupangButton from "@/components/ApprovalCoupangButton";
 import { EditorialPickImpressionTracker } from "@/components/AffiliateEventTracker";
+import EditorialShareBar from "@/components/EditorialShareBar";
 import { approvalSampleProduct } from "@/lib/approvalSample";
 import { isCoupangPartnersLink } from "@/lib/coupangLink";
+import { getSiteUrl } from "@/lib/siteUrl";
 
 const highlightIcons = [Gauge, Droplets, ShieldCheck];
 const cardTracking = {
-  home: { channel: "web_editorial_card_home", context: "editorial_home_card" },
-  deals: { channel: "web_editorial_card_deals", context: "editorial_deals_card" },
-  picks: { channel: "web_editorial_card_picks", context: "editorial_picks_card" }
+  home: { channel: "web_editorial_card_home", context: "editorial_home_card", shareContext: "editorial_home_card" },
+  deals: { channel: "web_editorial_card_deals", context: "editorial_deals_card", shareContext: "editorial_deals_card" },
+  picks: { channel: "web_editorial_card_picks", context: "editorial_picks_card", shareContext: "editorial_picks_card" }
 } as const;
 
 export default function ApprovalSampleCard({ placement }: { placement: "home" | "deals" | "picks" }) {
@@ -72,6 +74,12 @@ export default function ApprovalSampleCard({ placement }: { placement: "home" | 
         <Link className="mt-2 inline-flex text-xs font-black text-pine underline decoration-pine/30 underline-offset-4 hover:text-ink" href="/disclosure">
           제휴 안내 자세히 보기
         </Link>
+        <EditorialShareBar
+          canonicalUrl={`${getSiteUrl()}${approvalSampleProduct.detailPath}`}
+          context={tracking.shareContext}
+          sharePath={approvalSampleProduct.detailPath}
+          title={`${approvalSampleProduct.name} 구매 전 체크 | ReturnPick`}
+        />
       </div>
     </article>
   );
