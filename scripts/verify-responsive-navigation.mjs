@@ -17,6 +17,7 @@ const routes = [
   "/watchlist",
   "/guide/return-checklist",
   "/guide/safe-categories",
+  "/guide/high-value",
   "/disclosure",
   "/admin"
 ];

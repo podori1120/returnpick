@@ -124,6 +124,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/guide/safe-categories">
                 안전 카테고리
               </Link>
+              <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/guide/high-value">
+                고가 가이드
+              </Link>
               <Link className="whitespace-nowrap rounded-md px-2 py-2 text-center hover:bg-mist hover:text-ink sm:px-3" href="/disclosure">
                 제휴 안내
               </Link>

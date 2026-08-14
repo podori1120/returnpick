@@ -26,6 +26,7 @@ const navigationGroups = [
     links: [
       { href: "/guide/return-checklist", label: "수령 체크" },
       { href: "/guide/safe-categories", label: "안전 카테고리" },
+      { href: "/guide/high-value", label: "고가 가이드" },
       { href: "/disclosure", label: "제휴 안내" },
       { href: "/admin", label: "관리자" }
     ]

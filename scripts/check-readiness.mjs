@@ -355,6 +355,7 @@ if (
     "/watchlist",
     "/guide/return-checklist",
     "/guide/safe-categories",
+    "/guide/high-value",
     "/disclosure",
     "/admin"
   ];
@@ -383,7 +384,7 @@ if (
       layout.includes('import SearchSuggest from "@/components/SearchSuggest";') &&
       layout.includes("<SearchSuggest />") &&
       routes.every((route) => mobileNav.includes(route) && layout.includes(`href="${route}"`)),
-    "mobile navigation keeps all ten routes in a keyboard-accessible normal-flow panel while desktop nav remains sm+ and SearchSuggest stays mounted",
+    "mobile navigation keeps all eleven routes in a keyboard-accessible normal-flow panel while desktop nav remains sm+ and SearchSuggest stays mounted",
     "required"
   );
 }
