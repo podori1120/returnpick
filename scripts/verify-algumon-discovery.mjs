@@ -30,6 +30,8 @@ import {
   resolveDiscoveryReviewState
 } from "../lib/sourcedProductIdentity.ts";
 
+assert.equal(HOTDEALS_DISCOVERY_SEARCH_TEMPLATE, "https://www.hotdeals.kr/deals/k/{keyword}");
+
 function deal({ id, store = "쿠팡", title = "테스트 상품", ad = false, ended = false, extra = "" }) {
   return `{id:${id},siteName:"뽐뿌",siteIconUrl:"https://cdn.example/icon.png",siteType:"PPOMPPU",storeName:"${store}",rankNum:null,title:"${title}",thumbnailUrl:"https://cdn.example/image.jpg",price:"19,000원",deliveryInfo:"무료",perPriceText:"",outboundUrl:"/n/d/${id}?secret=must-not-leak",originalLikes:0,createdAt:"2026-08-09T09:00:00+09:00",ended:${ended},isAd:${ad}${extra}}`;
 }
