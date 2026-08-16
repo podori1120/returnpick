@@ -17,6 +17,7 @@ const requiredProviderSignals = [
   "enrichProductDetails",
   "FETCHED_DETAIL",
   "detail_page_fetched_count",
+  "merged_deduplicated_count",
   "readMetaContent",
   "readHtmlTitle",
   "web_return_info",
@@ -212,6 +213,35 @@ try {
   if (originalEnv.templates === undefined) delete process.env.PUBLIC_WEB_SEARCH_TEMPLATES;
   else process.env.PUBLIC_WEB_SEARCH_TEMPLATES = originalEnv.templates;
 }
+
+process.env.PUBLIC_WEB_CRAWL_ENABLED = "true";
+process.env.PUBLIC_WEB_ALLOWED_HOSTS = "dedup-a.example.test,dedup-b.example.test";
+process.env.PUBLIC_WEB_SEARCH_TEMPLATES = "https://dedup-a.example.test/search?q={keyword},https://dedup-b.example.test/search?q={keyword}";
+globalThis.fetch = async (input) => {
+  const url = String(input);
+  if (url.endsWith("/robots.txt")) return mockHtmlResponse("User-agent: ReturnPickBot\nAllow: /", { "content-type": "text/plain" });
+  if (url === "https://dedup-a.example.test/search?q=%EB%85%B8%ED%8A%B8%EB%B6%81") {
+    return mockHtmlResponse('<a href="/product/gram-a">LG Gram 16ZD90SU-GXF 판매가 999,000원</a>');
+  }
+  if (url === "https://dedup-b.example.test/search?q=%EB%85%B8%ED%8A%B8%EB%B6%81") {
+    return mockHtmlResponse('<a href="/product/gram-b">LG Gram 16ZD90SU-GXF 판매가 999,000원</a>');
+  }
+  if (url === "https://dedup-a.example.test/product/gram-a") {
+    return mockHtmlResponse("<title>LG Gram 16ZD90SU-GXF</title><p>판매가 999,000원</p>");
+  }
+  if (url === "https://dedup-b.example.test/product/gram-b") {
+    return mockHtmlResponse("<title>LG Gram 16ZD90SU-GXF</title><p>반품-최상 반품가 700,000원</p>");
+  }
+  throw new Error(`unexpected dedup fetch: ${url}`);
+};
+const dedupResult = await searchPublicWebProducts("노트북", "laptop");
+assert.equal(dedupResult.status, "ok");
+assert.equal(dedupResult.products.length, 1);
+assert.equal(dedupResult.meta?.merged_deduplicated_count, 1);
+assert.equal(dedupResult.meta?.detail_page_fetched_count, 2);
+assert.equal(dedupResult.products[0]?.source_product_id, "https://dedup-b.example.test/product/gram-b");
+assert.equal(dedupResult.products[0]?.return_price, 700000);
+assert.equal(dedupResult.products[0]?.affiliate_url, null);
 
 process.env.PUBLIC_WEB_CRAWL_ENABLED = "true";
 process.env.PUBLIC_WEB_ALLOWED_HOSTS = "raw-text.example.test";

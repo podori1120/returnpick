@@ -61,6 +61,9 @@
     "supabase-config:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-supabase-config-guard.mjs",
     "api-readiness:mode:check": "node scripts/verify-api-readiness-mode.mjs",
     "content-kit:check": "node scripts/verify-product-distribution-kit.mjs",
+    "blogger:setup": "node scripts/setup-blogger-oauth.mjs",
+    "blogger:publish:algumon": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --loader ./scripts/public-web-test-loader.mjs scripts/publish-real-algumon-deals.mjs",
+    "blogger:publish:batch": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --loader ./scripts/public-web-test-loader.mjs scripts/batch-publish-blogger-deals.mjs",
     "blogger-distribution:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-blogger-distribution.mjs",
     "launch-capabilities:check": "node scripts/verify-launch-capability-policy.mjs",
     "naver-match:check": "node scripts/verify-naver-product-match.mjs",
@@ -70,6 +73,7 @@
     "public-web:check": "node scripts/verify-public-web-config.mjs",
     "algumon-discovery:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-algumon-discovery.mjs",
     "public-web:intake:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-public-web-intake-enrichment.mjs",
+    "admin-draft-export:check": "node scripts/verify-admin-draft-export.mjs",
     "admin-sourcing-gate:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-admin-sourcing-gate.mjs",
     "web-return:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-web-return-info.mjs",
     "public-web-url:check": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-public-web-url-safety.mjs",
@@ -94,13 +98,16 @@
     "doctor:production:fresh": "npm run env:pull:production && npm run env:vercel && npm run doctor:production",
     "doctor:production:launch:fresh": "npm run env:pull:production && npm run env:vercel && npm run env:check:launch && npm run doctor:production:launch",
     "deploy:production:launch": "node scripts/run-production-deploy.mjs",
-    "deploy:production:go-live": "node scripts/run-production-deploy.mjs --first-launch"
+    "deploy:production:go-live": "node scripts/run-production-deploy.mjs --first-launch",
+    "blogger:daily": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --loader ./scripts/public-web-test-loader.mjs scripts/daily-pipeline-runner.mjs",
+    "daily:pipeline": "npm run blogger:daily"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.105.4",
     "clsx": "2.1.1",
     "lucide-react": "0.468.0",
     "next": "16.2.12",
+    "puppeteer": "^25.7.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "sharp": "0.35.0"

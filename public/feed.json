@@ -1,0 +1,269 @@
+{
+  "version": "https://jsonfeed.org/version/1.1",
+  "title": "리턴픽 실시간 쿠팡 핫딜 피드",
+  "home_page_url": "https://returnpick-deals.blogspot.com",
+  "feed_url": "https://returnpick.vercel.app/feed.json",
+  "description": "폴센트 60일 가격 변동 검증 실시간 핫딜",
+  "items": [
+    {
+      "id": "high-01",
+      "url": "https://returnpick.vercel.app/deals/high-01",
+      "title": "Apple 2024 맥북 에어 15 M3 칩 (16GB RAM, 512GB SSD)",
+      "content_text": "M3 칩셋 16GB 기본 탑재형 15인치 맥북 에어. 학생 및 영상편집용 끝판왕.",
+      "image": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "애플/노트북",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "high-02",
+      "url": "https://returnpick.vercel.app/deals/high-02",
+      "title": "LG전자 65인치 4K UHD 올레드 OLED TV (스탠드형 무료설치)",
+      "content_text": "자발광 4K 올레드 패널과 알파9 AI 프로세서 탑재 프리미엄 스마트 TV.",
+      "image": "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "대형가전/TV",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "high-03",
+      "url": "https://returnpick.vercel.app/deals/high-03",
+      "title": "삼성전자 비스포크 AI 콤보 올인원 세탁건조기 25kg+15kg",
+      "content_text": "세탁 후 건조까지 세탁물 이동 없이 99분 만에 끝내는 차세대 올인원 콤보.",
+      "image": "https://images.unsplash.com/photo-1626806787461-102c1bfaaea1",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "대형가전/세탁기",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "high-04",
+      "url": "https://returnpick.vercel.app/deals/high-04",
+      "title": "HP 오멘 OMEN 16 게이밍 노트북 (i7-14700HX RTX 4070 QHD 240Hz)",
+      "content_text": "i7 14세대와 RTX 4070, QHD 240Hz 초고주사율 하이엔드 게이밍 노트북.",
+      "image": "https://images.unsplash.com/photo-1603302576837-37561b2e2302",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "게이밍/노트북",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "high-05",
+      "url": "https://returnpick.vercel.app/deals/high-05",
+      "title": "로보락 S8 Pro Ultra 올인원 로봇청소기 (열풍건조 물걸레 세척)",
+      "content_text": "먼지비움, 물걸레 세척, 열풍 건조까지 100% 전자동 끝판왕 로봇청소기.",
+      "image": "https://images.unsplash.com/photo-1558317374-067fb5f30001",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "스마트가전",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "refurb-01",
+      "url": "https://returnpick.vercel.app/deals/refurb-01",
+      "title": "HP 2026 넥소스 14 가성비 노트북 (i5-1334U 16GB 512GB SSD)",
+      "content_text": "단순 박스 훼손 반품-미개봉 상태. i5 16GB 512GB 완벽 스펙 50만원대.",
+      "image": "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "노트북/PC",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "refurb-02",
+      "url": "https://returnpick.vercel.app/deals/refurb-02",
+      "title": "삼성전자 스마트 인버터 제습기 18L AY18CG7500G",
+      "content_text": "1등급 에너지 인버터 저소음 대용량 제습기 반품-최상 30만원대.",
+      "image": "https://images.unsplash.com/photo-1585771724684-38269d6639fd",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "생활가전",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "refurb-03",
+      "url": "https://returnpick.vercel.app/deals/refurb-03",
+      "title": "SK하이닉스 Platinum P41 M.2 NVMe SSD 2TB",
+      "content_text": "PCIe 4.0 7,000MB/s 극강의 저발열 플래그십 2TB SSD.",
+      "image": "https://images.unsplash.com/photo-1597872200969-2b65d56bd16b",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "컴퓨터부품",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "refurb-04",
+      "url": "https://returnpick.vercel.app/deals/refurb-04",
+      "title": "올도큐브 iPlay70 mini pro 8.4인치 LTE 태블릿 8GB",
+      "content_text": "Helio G99 탑재 한 손에 잡히는 LTE 8.4인치 태블릿.",
+      "image": "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "태블릿/모바일",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "refurb-05",
+      "url": "https://returnpick.vercel.app/deals/refurb-05",
+      "title": "ZEUSLAP 16인치 2.5K 144Hz 초경량 포터블 모니터",
+      "content_text": "2560x1600 고해상도 144Hz 게이밍 IPS 패널 포터블 모니터.",
+      "image": "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "모니터/디스플레이",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "refurb-06",
+      "url": "https://returnpick.vercel.app/deals/refurb-06",
+      "title": "커세어 CORSAIR SF750 80PLUS Platinum 풀모듈러 파워",
+      "content_text": "ITX 빌드의 명품 플래티넘 고효율 SFX 파워서플라이.",
+      "image": "https://images.unsplash.com/photo-1587202372634-32705e3bf49c",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "컴퓨터부품",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "refurb-07",
+      "url": "https://returnpick.vercel.app/deals/refurb-07",
+      "title": "샤크 에보파워 시스템 부스트+ 프리미엄 스틱청소기",
+      "content_text": "플렉스 접이식 파이프와 자동 먼지비움 스테이션 무선청소기.",
+      "image": "https://images.unsplash.com/photo-1558317374-067fb5f30001",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "생활가전",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "refurb-08",
+      "url": "https://returnpick.vercel.app/deals/refurb-08",
+      "title": "젠하이저 모멘텀 4 와이어리스 노이즈캔슬링 헤드폰",
+      "content_text": "60시간 연속 재생과 최상급 하이파이 음질의 ANC 무선 헤드폰.",
+      "image": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "음향가전",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "fresh-01",
+      "url": "https://returnpick.vercel.app/deals/fresh-01",
+      "title": "하림 무항생제 인증 자연실록 통닭 850g (냉장)",
+      "content_text": "신선한 친환경 무항생제 인증 1등급 통닭 850g. 삼계탕, 에어프라이어 구이용 추천.",
+      "image": "https://images.unsplash.com/photo-1587593810167-a84920ea0781",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "신선정육/생닭",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "fresh-02",
+      "url": "https://returnpick.vercel.app/deals/fresh-02",
+      "title": "사미헌 한끼 갈비탕 700g x 2팩 (냉동)",
+      "content_text": "부산 서면 20년 맛집 사미헌의 푸짐한 소갈비탕 2팩 세트.",
+      "image": "https://images.unsplash.com/photo-1547592180-85f173990554",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "국/탕/간편식",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "fresh-03",
+      "url": "https://returnpick.vercel.app/deals/fresh-03",
+      "title": "비비고 순살 가자미구이 60g x 6개 (냉장)",
+      "content_text": "가시를 99% 발라내어 전자레인지 1분이면 끝나는 순살 생선구이.",
+      "image": "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "수산/간편식",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "fresh-04",
+      "url": "https://returnpick.vercel.app/deals/fresh-04",
+      "title": "오늘차림 서울식 육수 소불고기 1.06kg 세트",
+      "content_text": "소불고기 700g + 비법육수 300g + 당면 60g 2~3인분 푸짐한 구성.",
+      "image": "https://images.unsplash.com/photo-1544025162-d76694265947",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "신선정육/밀키트",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "fresh-05",
+      "url": "https://returnpick.vercel.app/deals/fresh-05",
+      "title": "풀무원다논 그릭 요거트 설탕무첨가 플레인 400g x 2개",
+      "content_text": "단백질 풍부하고 묵직한 꾸덕함의 무설탕 그릭요거트 대용량.",
+      "image": "https://images.unsplash.com/photo-1488477181946-6428a0291777",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "유제품/디저트",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "fresh-06",
+      "url": "https://returnpick.vercel.app/deals/fresh-06",
+      "title": "서울우유 목장의 신선함이 살아있는 저지방 우유 1L x 2개",
+      "content_text": "목장 신선 저지방 1L 2개 개당 3,025원 로켓프레시 최저가.",
+      "image": "https://images.unsplash.com/photo-1550583724-b2692b85b150",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "유제품/우유",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    },
+    {
+      "id": "fresh-07",
+      "url": "https://returnpick.vercel.app/deals/fresh-07",
+      "title": "일본 규슈 백화점 입점 생 낫또 40팩 세트",
+      "content_text": "백화점 납품용 프리미엄 규슈 생낫또 40팩 대용량 특가.",
+      "image": "https://images.unsplash.com/photo-1540420773420-3366772f4999",
+      "date_published": "2026-08-15T23:17:29.864Z",
+      "tags": [
+        "신선건강/발효식품",
+        "쿠팡핫딜",
+        "가격비교"
+      ]
+    }
+  ]
+}

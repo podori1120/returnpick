@@ -2,6 +2,7 @@ node_modules/
 .next/
 .vercel/
 .returnpick/
+.naver_chrome_profile/
 .env
 .env.local
 .env.production
@@ -14,3 +15,4 @@ npm-debug.log*
 returnpick-coupang-approval-sample.png
 returnpick-coupang-review.png
 coupang-partners-profile-registered.png
+scripts/setup-blogger-oauth.mjs

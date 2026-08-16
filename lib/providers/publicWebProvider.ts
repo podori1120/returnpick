@@ -1,5 +1,6 @@
 import type { Category, ConditionGrade, JsonValue } from "@/lib/types";
 import type { ProviderProduct, ProviderSearchResult } from "@/lib/providers/types";
+import { mergeProviderProductBatches } from "@/lib/providerProductMerge";
 import { parseAlgumonCoupangDiscovery } from "@/lib/providers/algumonDiscoveryParser";
 import { HOTDEALS_DISCOVERY_FEED_PATH, parseHotDealsCoupangDiscovery, parseHotDealsCoupangDiscoveryFeed } from "@/lib/providers/hotdealsDiscoveryParser";
 import { HOTDEALS_DISCOVERY_HOST, isApprovedHotDealsDiscoverySearchUrl } from "@/lib/providers/publicWebProfile";
@@ -107,13 +108,19 @@ function searchTemplates() {
     .filter(Boolean);
 }
 
-function buildPublicWebMeta(diagnostics: PublicWebDiagnostic[], hosts: Set<string>, templates: string[]) {
+function buildPublicWebMeta(
+  diagnostics: PublicWebDiagnostic[],
+  hosts: Set<string>,
+  templates: string[],
+  mergedDeduplicatedCount = 0
+) {
   const detailDiagnostics = diagnostics.filter((item) => item.stage === "detail");
   return {
     public_web_diagnostics: diagnostics.slice(0, 12),
     public_web_diagnostic_count: diagnostics.length,
     detail_page_limit: MAX_PUBLIC_WEB_DETAIL_PAGES,
     detail_page_fetched_count: detailDiagnostics.filter((item) => item.status === "FETCHED_DETAIL").length,
+    merged_deduplicated_count: mergedDeduplicatedCount,
     allowed_host_count: hosts.size,
     template_count: templates.length,
     user_agent: crawlUserAgent(),
@@ -1663,8 +1670,9 @@ export async function searchPublicWebProducts(keyword: string, category: Categor
   }
 
   const enrichedProducts = products.length ? await enrichProductDetails(products, hosts, diagnostics) : products;
-  const meta = buildPublicWebMeta(diagnostics, hosts, templates);
-  if (enrichedProducts.length) return { status: "ok", products: enrichedProducts, meta };
+  const merged = mergeProviderProductBatches([{ provider: "public_web", products: enrichedProducts }]);
+  const meta = buildPublicWebMeta(diagnostics, hosts, templates, merged.deduplicatedCount);
+  if (merged.products.length) return { status: "ok", products: merged.products, meta };
   const firstBlocking = diagnostics.find((item) => item.status === "ROBOTS_DISALLOWED" || item.status === "ROBOTS_UNAVAILABLE");
   if (firstBlocking?.status === "ROBOTS_DISALLOWED") return { status: "ROBOTS_DISALLOWED", products: [], error: firstBlocking.url, meta };
   if (firstBlocking?.status === "ROBOTS_UNAVAILABLE") {
@@ -1680,5 +1688,5 @@ export async function searchPublicWebProducts(keyword: string, category: Categor
   if (firstRedirect) return { status: "REDIRECT_BLOCKED", products: [], error: firstRedirect.error ?? firstRedirect.url, meta };
   const firstCrawlDelay = diagnostics.find((item) => item.status === "CRAWL_DELAY_TOO_HIGH");
   if (firstCrawlDelay) return { status: "CRAWL_DELAY_TOO_HIGH", products: [], error: firstCrawlDelay.error ?? firstCrawlDelay.url, meta };
-  return { status: "ok", products, meta };
+  return { status: "ok", products: merged.products, meta };
 }
