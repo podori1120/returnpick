@@ -64,7 +64,7 @@ async function exactPublishNaverPost() {
 • 🔥 절약 혜택: 새상품 대비 ${saveAmt}원 세이브!
 • 🔍 검수 리포트: ${d.inspection_report}
 • 💳 혜택: ${d.card_benefit} (잔여 ${d.stock_remain}대 한정)
-👉 실시간 반품 재고 & 상태 확인: https://returnpick-deals.blogspot.com/2026/08/18.html
+👉 쿠팡 반품 할인가 실시간 재고 & 바로구매: https://link.coupang.com/a/bWq88Z
 
 ----------------------------------------
 `;

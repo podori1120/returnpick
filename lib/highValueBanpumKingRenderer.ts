@@ -1,5 +1,6 @@
 /**
  * 👑 [리턴픽 X 반품왕] 초고액(100~400만원대) 반품-미개봉/최상급 전용 매거진 렌더러
+ * - [다이렉트 모드] 중간 페이지 없이 블로그 클릭 즉시 사용자 쿠팡 파트너스 링크로 직행
  * - 단 1~2건 결제로 15만원 파트너스 실적 목표 즉각 달성
  * - 새상품 대비 최소 40만원 ~ 최대 160만원 파격 절약액 시각화
  * - 반품-미개봉(새것과 동일) & 반품-최상(단순변심 1회) 정품 검수 보증
@@ -33,8 +34,9 @@ export function renderHighValueBanpumCard(deal: {
   pros: string[];
 }, index: number): string {
   const saveAmount = deal.new_product_price - deal.deal_price;
-  const directCoupangUrl = "https://link.coupang.com/a/bWq88Z";
-  const returnpickDetailUrl = `https://returnpick.vercel.app/deals/${deal.id}?utm_source=blogger&utm_medium=owned&utm_campaign=high_value_banpum`;
+  
+  // 사용자의 직통 쿠팡 파트너스 딥링크
+  const directCoupangPartnersUrl = "https://link.coupang.com/a/bWq88Z";
 
   return `
   <div style="margin-bottom: 36px; background: #ffffff; border-radius: 20px; border: 2px solid #3b82f6; box-shadow: 0 8px 30px rgba(59,130,246,0.14); overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif;">
@@ -51,16 +53,18 @@ export function renderHighValueBanpumCard(deal: {
 
     <!-- 본문 영역 -->
     <div style="padding: 26px 22px;">
-      <!-- 이미지 & 제목 -->
+      <!-- 이미지 & 제목 (클릭 시 쿠팡 파트너스 직통 연결) -->
       <div style="display: flex; flex-direction: row; gap: 20px; flex-wrap: wrap; margin-bottom: 18px;">
-        <div style="flex: 0 0 150px; max-width: 150px; height: 150px; border-radius: 16px; overflow: hidden; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center;">
+        <a href="${directCoupangPartnersUrl}" target="_blank" rel="nofollow noopener" style="flex: 0 0 150px; max-width: 150px; height: 150px; border-radius: 16px; overflow: hidden; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; text-decoration: none;">
           <img src="${deal.image_url}" alt="${deal.title}" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy" />
-        </div>
+        </a>
 
         <div style="flex: 1 1 250px; display: flex; flex-direction: column; justify-content: center;">
           <span style="color: #2563eb; font-size: 12px; font-weight: 800; margin-bottom: 4px;">고액 프리미엄 반품</span>
-          <h3 style="margin: 0 0 8px 0; color: #0f172a; font-size: 18px; font-weight: 900; line-height: 1.45;">
-            ${deal.title}
+          <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 900; line-height: 1.45;">
+            <a href="${directCoupangPartnersUrl}" target="_blank" rel="nofollow noopener" style="color: #0f172a; text-decoration: none;">
+              ${deal.title}
+            </a>
           </h3>
           <p style="margin: 0; color: #64748b; font-size: 13px; line-height: 1.55;">
             ${deal.public_note}
@@ -100,14 +104,12 @@ export function renderHighValueBanpumCard(deal: {
         <span style="color: #dc2626; font-weight: 900;">⚡ 실시간 잔여 ${deal.stock_remain}대 한정</span>
       </div>
 
-      <!-- 2단 CTA 버튼 (쿠팡 바로가기 & 리턴픽 리포트) -->
-      <div style="display: flex; flex-direction: column; gap: 10px;">
-        <a href="${directCoupangUrl}" target="_blank" rel="nofollow noopener" style="display: block; text-align: center; background: linear-gradient(135deg, #e11d48 0%, #be123c 100%); color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 900; padding: 15px 20px; border-radius: 12px; box-shadow: 0 6px 18px rgba(225,29,72,0.35); letter-spacing: -0.3px;">
-          🛒 쿠팡 반품 ${deal.deal_price.toLocaleString()}원 실시간 재고 확인 &gt;
-        </a>
-        <a href="${returnpickDetailUrl}" target="_blank" rel="nofollow noopener" style="display: block; text-align: center; background: #0f172a; color: #93c5fd; text-decoration: none; font-size: 13px; font-weight: 700; padding: 10px 16px; border-radius: 10px; border: 1px solid #334155;">
-          📊 리턴픽 AI 시세 추적 &amp; 안심 검수 리포트 상세 보기
-        </a>
+      <!-- 쿠팡 파트너스 100% 직통 원클릭 구매 버튼 -->
+      <a href="${directCoupangPartnersUrl}" target="_blank" rel="nofollow noopener" style="display: block; text-align: center; background: linear-gradient(135deg, #e11d48 0%, #be123c 100%); color: #ffffff; text-decoration: none; font-size: 17px; font-weight: 900; padding: 18px 24px; border-radius: 14px; box-shadow: 0 8px 25px rgba(225,29,72,0.4); letter-spacing: -0.4px;">
+        🛒 쿠팡에서 [반품 ${deal.deal_price.toLocaleString()}원] 실시간 재고 확인 및 구매하기 &gt;
+      </a>
+      <div style="text-align: center; margin-top: 8px; font-size: 12px; color: #64748b;">
+        🛡️ 쿠팡 와우회원 30일 무료반품 보증 &amp; 제조사 공식 AS 가능
       </div>
     </div>
   </div>`;
@@ -126,7 +128,7 @@ export function renderHighValueBanpumMagazineHtml(title: string, subtitle: strin
 
     <div style="background: linear-gradient(135deg, #020617 0%, #0f172a 50%, #1e3a8a 100%); border-radius: 20px; padding: 30px 24px; text-align: center; color: #ffffff; margin-bottom: 32px; box-shadow: 0 10px 30px rgba(2,6,23,0.4);">
       <div style="display: inline-block; background: #fbbf24; color: #0f172a; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 900; margin-bottom: 12px; letter-spacing: 0.5px;">
-        👑 반품왕 X 리턴픽 고액 프리미엄 전용관
+        👑 반품왕 X 쿠팡 공식 직통 특가관
       </div>
       <h1 style="color: #ffffff; font-size: 24px; font-weight: 900; margin: 0 0 10px 0; line-height: 1.35; letter-spacing: -0.5px;">
         ${title}
