@@ -33,6 +33,8 @@ export function renderHighValueBanpumCard(deal: {
   pros: string[];
 }, index: number): string {
   const saveAmount = deal.new_product_price - deal.deal_price;
+  const directCoupangUrl = "https://link.coupang.com/a/bWq88Z";
+  const returnpickDetailUrl = `https://returnpick.vercel.app/deals/${deal.id}?utm_source=blogger&utm_medium=owned&utm_campaign=high_value_banpum`;
 
   return `
   <div style="margin-bottom: 36px; background: #ffffff; border-radius: 20px; border: 2px solid #3b82f6; box-shadow: 0 8px 30px rgba(59,130,246,0.14); overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif;">
@@ -98,10 +100,15 @@ export function renderHighValueBanpumCard(deal: {
         <span style="color: #dc2626; font-weight: 900;">⚡ 실시간 잔여 ${deal.stock_remain}대 한정</span>
       </div>
 
-      <!-- CTA 버튼 -->
-      <a href="https://returnpick.vercel.app/deals/${deal.id}?utm_source=blogger&utm_medium=owned&utm_campaign=high_value_banpum" target="_blank" rel="nofollow noopener" style="display: block; text-align: center; background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 900; padding: 16px 22px; border-radius: 12px; box-shadow: 0 6px 18px rgba(30,58,138,0.35); letter-spacing: -0.3px;">
-        💎 쿠팡 반품 실시간 재고 &amp; 상태 확인하기 (30일 무료반품)
-      </a>
+      <!-- 2단 CTA 버튼 (쿠팡 바로가기 & 리턴픽 리포트) -->
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <a href="${directCoupangUrl}" target="_blank" rel="nofollow noopener" style="display: block; text-align: center; background: linear-gradient(135deg, #e11d48 0%, #be123c 100%); color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 900; padding: 15px 20px; border-radius: 12px; box-shadow: 0 6px 18px rgba(225,29,72,0.35); letter-spacing: -0.3px;">
+          🛒 쿠팡 반품 ${deal.deal_price.toLocaleString()}원 실시간 재고 확인 &gt;
+        </a>
+        <a href="${returnpickDetailUrl}" target="_blank" rel="nofollow noopener" style="display: block; text-align: center; background: #0f172a; color: #93c5fd; text-decoration: none; font-size: 13px; font-weight: 700; padding: 10px 16px; border-radius: 10px; border: 1px solid #334155;">
+          📊 리턴픽 AI 시세 추적 &amp; 안심 검수 리포트 상세 보기
+        </a>
+      </div>
     </div>
   </div>`;
 }
