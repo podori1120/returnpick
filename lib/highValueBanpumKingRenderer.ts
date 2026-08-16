@@ -1,7 +1,7 @@
 /**
  * 👑 [리턴픽 X 반품왕] 초고액(100~400만원대) 반품-미개봉/최상급 전용 매거진 렌더러
- * - [사용자 파트너스 100% 직통 수익 모드] https://link.coupang.com/a/gf5Ev1IkrA
- * - 블로그 클릭 시 사용자 쿠팡 파트너스 계정으로 즉각 수익 정산
+ * - [사용자 파트너스 100% 직통 수익 모드] https://link.coupang.com/a/gf5RGBMm6e
+ * - 사용자의 쿠팡 파트너스 콘솔에서 실시간 발급된 정품 수익 딥링크 적용
  * - 단 1~2건 결제로 15만원 파트너스 실적 목표 즉각 달성
  * - 새상품 대비 최소 40만원 ~ 최대 160만원 파격 절약액 시각화
  */
@@ -35,8 +35,8 @@ export function renderHighValueBanpumCard(deal: {
 }, index: number): string {
   const saveAmount = deal.new_product_price - deal.deal_price;
   
-  // 사용자의 100% 정산 쿠팡 파트너스 수익 링크
-  const userAffiliateUrl = "https://link.coupang.com/a/gf5Ev1IkrA";
+  // 사용자의 쿠팡 파트너스 실시간 발급 수익 링크
+  const userAffiliateUrl = "https://link.coupang.com/a/gf5RGBMm6e";
 
   return `
   <div style="margin-bottom: 36px; background: #ffffff; border-radius: 20px; border: 2px solid #3b82f6; box-shadow: 0 8px 30px rgba(59,130,246,0.14); overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif;">
