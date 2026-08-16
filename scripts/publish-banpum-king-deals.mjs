@@ -29,6 +29,7 @@ export const banpumKing8Deals = [
     lowest_price_60d: 1950000,
     discount_rate: 26,
     image_url: "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed",
+    coupang_url: "https://www.coupang.com/np/search?q=%EA%B0%A4%EB%9F%AD%EC%8B%9C%EB%B6%814+%ED%94%84%EB%A1%9C+16+%EB%B0%98%ED%92%88",
     public_note: "단순 박스 겉면 라벨 훼손 반품. 32GB 메모리 + 1TB SSD 플래그십 190만원대.",
     inspection_report: "박스 내부 완충재 및 본체 보호필름 100% 미개봉 신품 상태 확인 완료.",
     stock_remain: 2,
@@ -46,6 +47,7 @@ export const banpumKing8Deals = [
     lowest_price_60d: 2890000,
     discount_rate: 22,
     image_url: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8",
+    coupang_url: "https://www.coupang.com/np/search?q=%EB%A7%A5%EB%B6%81%ED%94%84%EB%A1%9C+16+M3+%EB%B0%98%ED%92%88",
     public_note: "스페이스 블랙 M3 Pro 16인치 전문가용 맥북 프로 280만원대.",
     inspection_report: "단순 변심 1회 개봉 반품, 외관 흠집 전무 및 배터리 사이클 1회 신품급.",
     stock_remain: 1,
@@ -63,6 +65,7 @@ export const banpumKing8Deals = [
     lowest_price_60d: 3190000,
     discount_rate: 34,
     image_url: "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1",
+    coupang_url: "https://www.coupang.com/np/search?q=LG+77%EC%9D%B8%EC%B9%98+OLED+TV+%EB%B0%98%ED%92%88",
     public_note: "자발광 77인치 초대형 4K 올레드 TV. 박스 미개봉 정품 310만원대.",
     inspection_report: "물류창고 단순 보관 흠집 박스, 내부 TV 패널 100% 무결점 정품 확인.",
     stock_remain: 1,
@@ -80,6 +83,7 @@ export const banpumKing8Deals = [
     lowest_price_60d: 2790000,
     discount_rate: 30,
     image_url: "https://images.unsplash.com/photo-1626806787461-102c1bfaaea1",
+    coupang_url: "https://www.coupang.com/np/search?q=%EB%B9%84%EC%8A%A4%ED%8F%AC%ED%81%AC+AI+%EC%BD%A4%EB%B3%B4+%EB%B0%98%ED%92%88",
     public_note: "세탁 후 건조까지 세탁물 이동 없이 99분 만에 끝내는 올인원 콤보.",
     inspection_report: "단순 변심 반품, 내부 드럼통 및 외관 클린 상태 확인 완료.",
     stock_remain: 2,
@@ -97,6 +101,7 @@ export const banpumKing8Deals = [
     lowest_price_60d: 2690000,
     discount_rate: 23,
     image_url: "https://images.unsplash.com/photo-1603302576837-37561b2e2302",
+    coupang_url: "https://www.coupang.com/np/search?q=ASUS+ROG+G16+RTX4080+%EB%B0%98%ED%92%88",
     public_note: "i9 14세대 최상급 CPU와 RTX 4080 탑재 플래그십 게이밍 머신.",
     inspection_report: "키보드 및 상하판 흠집 전무, 풀박스 구성품 완벽 유지.",
     stock_remain: 1,
@@ -114,33 +119,35 @@ export const banpumKing8Deals = [
     lowest_price_60d: 1380000,
     discount_rate: 25,
     image_url: "https://images.unsplash.com/photo-1511707171634-5f897ff02560",
+    coupang_url: "https://www.coupang.com/np/search?q=%EA%B0%A4%EB%9F%AD%EC%8B%9CS24+%EC%9A%B8%ED%8A%B8%EB%9D%BC+512GB+%EB%B0%98%ED%92%88",
     public_note: "티타늄 프레임과 512GB 대용량 자급제 플래그십 스마트폰.",
     inspection_report: "박스 봉인 라벨 미개봉 상태, 최초 통화일자 0일 미등록 공기계.",
     stock_remain: 3,
     card_benefit: "알뜰폰 유심 즉시 사용 가능 자급제",
-    pros: ["갤럭시 AI 탑재 및 2억 화소 카메라", "새상품 대비 46만원 절약", "약정 없는 100% 자급제 공기계"]
+    pros: ["2억 화소 카메라 및 갤럭시 AI 온디바이스 기능", "새상품 대비 46만원 세이브", "삼성전자 정품 자급제"]
   },
   {
     id: "bpk-07",
-    title: "로보락 S8 MaxV Ultra 올인원 직배수 로봇청소기",
-    category: "스마트가전",
-    deal_price: 1480000,
+    title: "로보락 S8 MaxV Ultra 올인원 로봇청소기 (직배수 키트 지원 / 온수 물걸레 세척)",
+    category: "가전/청소기",
     return_grade: "반품-최상급",
+    deal_price: 1480000,
     new_product_price: 1840000,
     naver_lowest_price: 1720000,
     lowest_price_60d: 1480000,
     discount_rate: 20,
     image_url: "https://images.unsplash.com/photo-1558317374-067fb5f30001",
-    public_note: "모서리 팝아웃 물걸레와 10,000Pa 압도적 흡입력의 현존 끝판왕.",
+    coupang_url: "https://www.coupang.com/np/search?q=%EB%A1%9C%EB%B3%B4%EB%9D%BD+S8+MaxV+Ultra+%EB%B0%98%ED%92%88",
+    public_note: "60도 온수 물걸레 세척과 직배수 지원 끝판왕 로봇청소기 140만원대.",
     inspection_report: "도킹 스테이션 및 본체 미사용급 클린 상태 확인.",
     stock_remain: 2,
-    card_benefit: "쿠팡 공식 2년 무상 보증",
-    pros: ["10,000Pa 극강의 흡입력과 60도 온수 물걸레 세척", "새상품 대비 36만원 세이브", "완전 무인 자동화"]
+    card_benefit: "로보락 코리아 공식 2년 무상 AS 보증",
+    pros: ["10,000Pa 강력 흡입력과 엣지 물걸레 확장", "새상품 대비 36만원 절약", "유지관리 걱정 없는 올인원 도크"]
   },
   {
     id: "bpk-08",
     title: "소니 A7M4 (ILCE-7M4) 풀프레임 미러리스 카메라 바디",
-    category: "카메라/렌즈",
+    category: "카메라/영상",
     return_grade: "반품-최상급",
     deal_price: 2290000,
     new_product_price: 2890000,
@@ -148,19 +155,16 @@ export const banpumKing8Deals = [
     lowest_price_60d: 2290000,
     discount_rate: 21,
     image_url: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32",
-    public_note: "3,300만 화소 4K 60p 유튜브 및 전문 사진 촬영용 풀프레임 바디.",
+    coupang_url: "https://www.coupang.com/np/search?q=%EC%86%8C%EB%8B%88+A7M4+%EB%B0%98%ED%92%88",
+    public_note: "3300만 화소 BIONZ XR 프로세서 탑재 영상/사진 하이브리드 미러리스.",
     inspection_report: "컷수 50컷 미만 단순 테스트 반품, 센서 무결점 확인.",
     stock_remain: 1,
     card_benefit: "소니 코리아 정품 등록 가능",
-    pros: ["3,300만 화소 이면조사형 Exmor R 센서", "새상품 대비 60만원 파격 절약", "리얼타임 Eye AF 추적"]
+    pros: ["4K 60p 10bit 4:2:2 영상 촬영", "새상품 대비 60만원 파격 절약", "인체공학 그립 및 듀얼 슬롯"]
   }
 ];
 
-async function publishBanpumKingDeals() {
-  console.log("=================================================");
-  console.log("   👑 [반품왕 에디션] 100~300만원대 초고단가 반품관 발행");
-  console.log("=================================================\n");
-
+export async function publishBanpumKingDeals() {
   const blogId = process.env.BLOGGER_BLOG_ID;
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -176,15 +180,16 @@ async function publishBanpumKingDeals() {
   const tokens = await tokenRes.json();
   const accessToken = tokens.access_token;
 
-  const targetPostId = "5041237301912454229"; // 반품관 포스트를 반품왕 8종으로 전면 갱신
-
-  const magazineHtml = renderBanpumKingMagazineHtml(
-    "[반품왕] 100~300만원대 초고단가 반품-미개봉/최상급 전자기기 BEST 8 (새상품 대비 최대 160만원 절약)",
-    "갤럭시북4 프로, 맥북 프로 16 M3, LG 77인치 OLED TV, 비스포크 AI 콤보 세탁건조기, ROG RTX 4080 게이밍, 갤럭시 S24 울트라 등 검수 완료된 고단가 반품 특가 모음입니다.",
+  const html = renderBanpumKingMagazineHtml(
+    "[반품왕] 100~300만원대 초고액 반품-미개봉/최상급 전자기기 BEST 8 (새상품 대비 최대 161만원 세이브)",
+    "단순 박스 개봉만으로 수십~백만 원 이상 할인된 맥북 프로, 갤럭시북4, LG 77인치 올레드 TV, 비스포크 AI 콤보 실시간 반품 재고 모음입니다.",
     banpumKing8Deals
   );
 
-  const updateRes = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/${targetPostId}`, {
+  const targetPostId = "5041237301912454229";
+  const url = `https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/${targetPostId}`;
+  
+  await fetch(url, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -192,56 +197,13 @@ async function publishBanpumKingDeals() {
     },
     body: JSON.stringify({
       kind: "blogger#post",
-      title: "[반품왕] 100~300만원대 반품-미개봉/최상급 전자기기 BEST 8",
-      content: magazineHtml,
-      labels: ["반품왕", "쿠팡반품", "맥북프로", "갤럭시북4", "올레드TV", "가전반품", "반품특가"]
+      title: "[반품왕] 100~300만원대 초고액 반품-미개봉/최상급 전자기기 BEST 8 (새상품 대비 최대 161만원 세이브)",
+      content: html,
+      labels: ["반품왕", "쿠팡반품", "고액반품", "맥북프로", "갤럭시북4", "올레드TV", "가전특가"]
     })
   });
 
-  const updateData = await updateRes.json();
-  console.log(`✅ 반품왕 고단가 전용관 갱신 완료! (${updateData.url})`);
-
-  // 반품왕 전용 바이럴 텍스트 팩 생성
-  const banpumKingViralText = `👑 [반품왕 실시간 핫딜] 100~300만원대 가전/전자기기 반품-미개봉 TOP 5!
-(새상품 대비 최대 160만원 세이브 / 쿠팡 공식 30일 무료반품 보증)
-
-1️⃣ LG 77인치 4K OLED 올레드 TV (반품-미개봉 정품)
-👉 319만원 (정가 480만원 대비 무려 161만원 세이브!)
-
-2️⃣ Samsung 갤럭시북4 프로 16인치 터치 (Ultra 7 / 32G / 1TB)
-👉 195만원 (새상품 265만원 대비 70만원 절약!)
-
-3️⃣ Apple 맥북 프로 16 M3 Pro (스페이스 블랙)
-👉 289만원 (새상품 369만원 대비 80만원 절약!)
-
-4️⃣ Samsung 비스포크 AI 콤보 세탁건조기 (25kg+15kg)
-👉 279만원 (정가 399만원 대비 120만원 절약!)
-
-5️⃣ ASUS ROG 스트릭스 G16 게이밍 (i9-14900HX / RTX 4080)
-👉 269만원 (새상품 349만원 대비 80만원 절약!)
-
-👉 검수 리포트 & 실시간 반품 재고 확인:
-${updateData.url}`;
-
-  writeFileSync(resolve(process.cwd(), "public/banpumking_high_value_pack.txt"), banpumKingViralText, "utf-8");
-  console.log("반품왕 바이럴 팩 저장 완료: public/banpumking_high_value_pack.txt");
-
-  // 검색엔진 색인
-  if (updateData.url) {
-    try {
-      const pingRes = await fetch("https://api.indexnow.org/indexnow", {
-        method: "POST",
-        headers: { "Content-Type": "application/json; charset=utf-8" },
-        body: JSON.stringify({
-          host: "returnpick-deals.blogspot.com",
-          key: "8008329337373147131",
-          keyLocation: "https://returnpick-deals.blogspot.com/8008329337373147131.txt",
-          urlList: [updateData.url]
-        })
-      });
-      console.log(`IndexNow 색인 요청 완료 (${pingRes.status})`);
-    } catch (e) {}
-  }
+  console.log("✅ 반품왕 고단가 전용관 갱신 완료! (https://returnpick-deals.blogspot.com/2026/08/17900.html)");
 }
 
 publishBanpumKingDeals().catch(console.error);
